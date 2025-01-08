@@ -10,6 +10,16 @@ load_dotenv()
 
 if __name__ == "__main__":
 
+    # Args handling
+    """
+    - Implement arguments:
+        - output_path (probably a path in UWA server)
+        - start/end dates for whole pipeline(extraction, processing)
+        - start/end dates for qc
+        - qc window from present to past (in hours, days, months, etc)
+
+    """
+
     # Loading metadata
     """ 
     - Load buoys_metadata.csv as Pandas DataFrame
