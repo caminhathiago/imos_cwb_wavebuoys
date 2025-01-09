@@ -19,7 +19,7 @@ from wavebuoy.common.pickle_db import ardcPickle
 from wavebuoy.common.processing import process_wave_dataframe, get_timestamp_start_end_to_download
 from wavebuoy.utils import IMOSLogging, args
 from wavebuoy.sofar import config
-from wavebuoy.sofar.api import sofarApi
+from wavebuoy.sofar.api_dep import sofarApi
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import rrule, MONTHLY
 

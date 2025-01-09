@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 
 from wavebuoy.wavebuoy import WaveBuoy
-from wavebuoy.sofar.api_new import SofarAPI
+from wavebuoy.sofar.api import SofarAPI
 
 
 import os
