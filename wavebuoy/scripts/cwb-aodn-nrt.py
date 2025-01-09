@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# from wavebuoy.sofar.api import sofarApi
 
 import pandas as pd
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
+from wavebuoy.wavebuoy import WaveBuoy
+from wavebuoy.sofar.api_new import SofarAPI
+
+
+import os
 load_dotenv()
+
 
 if __name__ == "__main__":
 
@@ -28,14 +34,35 @@ if __name__ == "__main__":
     - 
     """
 
+    wb = WaveBuoy()
+
+    sofar_api = SofarAPI(buoys_metadata=wb.buoys_metadata_token_sorted)    
+    
+    
     # General ETL idea
     """
-    - Iterate through each site_id
+    - Iterate over each site_id
     - Handle error for each site_name
     - Reuse aodn logging approach
     - 
 
     """
+    for site_id in wb.site_ids:
+        print(site_id)
+        sofar_api.check_token_iteration(next_token=wb.buoys_metadata_token_sorted.loc[site_id, 'sofar_token'])
+        
+        spot_id = sofar_api.get_spot_id(site_id=site_id, buoys_metadata=wb.buoys_metadata_token_sorted)
+        spot_obj = sofar_api.select_spotter_obj_from_spotter_grid(spot_id=spot_id,
+                                                                spotter_grid=sofar_api.spotter_grid,
+                                                                devices=sofar_api.devices)
+
+        
+        print(spot_obj)
+        print(spot_id)
+
+        print("="*10)
+
+        pass
 
     # Extract
     """
