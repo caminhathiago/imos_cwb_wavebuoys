@@ -11,3 +11,5 @@ pysofar
 netCDF4
 requests
 setuptools
+boto3
+awscli
