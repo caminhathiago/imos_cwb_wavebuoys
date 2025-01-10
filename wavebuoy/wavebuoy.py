@@ -40,9 +40,6 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler): #(CWBAWSs3):
     def _sort_sites_by_sofar_token(self, buoys_metadata=pd.DataFrame) -> pd.DataFrame:
         return buoys_metadata.sort_values("sofar_token")
 
-    # def get_latest_processed_date_time(self):
-    #     pass
-
     def get_latest_available_date_time(self):
         pass
 
