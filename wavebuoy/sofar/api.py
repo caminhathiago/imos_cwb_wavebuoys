@@ -1,8 +1,8 @@
+from datetime import datetime
+
 from pysofar.sofar import SofarApi
 from pysofar.spotter import Spotter
 import pandas as pd
-
-import time
 
 
 class SofarAPI:
@@ -52,3 +52,7 @@ class SofarAPI:
             if device["spotterId"] == spot_id:
                 idx = devices.index(device)
         return spotter_grid[idx]
+    
+    def get_latest_available_datetime(self, spotter_obj) -> datetime:
+        latest_available_datetime = spotter_obj.latest_data()["wave"]["timestamp"]
+        return datetime.strptime(latest_available_datetime, "%Y-%m-%dT%H:%M:%S.%fZ")
