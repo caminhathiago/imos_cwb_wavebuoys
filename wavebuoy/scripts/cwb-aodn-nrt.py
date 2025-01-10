@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import os
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -8,9 +9,10 @@ from datetime import datetime, timedelta
 
 from wavebuoy.wavebuoy import WaveBuoy
 from wavebuoy.sofar.api import SofarAPI
+from wavebuoy.netcdf.lookup import NetCDFFileHandler
 
 
-import os
+
 load_dotenv()
 
 
@@ -26,6 +28,11 @@ if __name__ == "__main__":
 
     """
 
+    period_to_process = timedelta(days=90) # months
+    period_to_qualify = 24 # hours
+
+
+
     # Loading metadata
     """ 
     - Load buoys_metadata.csv as Pandas DataFrame
@@ -35,9 +42,9 @@ if __name__ == "__main__":
     """
 
     wb = WaveBuoy()
-
     sofar_api = SofarAPI(buoys_metadata=wb.buoys_metadata_token_sorted)    
     
+     
     
     # General ETL idea
     """
@@ -47,22 +54,27 @@ if __name__ == "__main__":
     - 
 
     """
+
     for site_id in wb.site_ids:
         print(site_id)
         sofar_api.check_token_iteration(next_token=wb.buoys_metadata_token_sorted.loc[site_id, 'sofar_token'])
         
-        spot_id = sofar_api.get_spot_id(site_id=site_id, buoys_metadata=wb.buoys_metadata_token_sorted)
-        spot_obj = sofar_api.select_spotter_obj_from_spotter_grid(spot_id=spot_id,
+        spotter_id = sofar_api.get_spot_id(site_id=site_id, buoys_metadata=wb.buoys_metadata_token_sorted)
+        spotter_obj = sofar_api.select_spotter_obj_from_spotter_grid(spot_id=spotter_id,
                                                                 spotter_grid=sofar_api.spotter_grid,
                                                                 devices=sofar_api.devices)
-
         
-        print(spot_obj)
-        print(spot_id)
+        latest_available_datetime = sofar_api.get_latest_available_datetime(spotter_obj=spotter_obj)
+
+        print(latest_available_datetime)
+
+        nc_file_paths_list = wb.lookup_netcdf_files(site_id=site_id, latest_available_datetime=latest_available_datetime)
+
+        print(nc_file_paths_list)
 
         print("="*10)
 
-        pass
+        break
 
     # Extract
     """
