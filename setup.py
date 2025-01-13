@@ -23,6 +23,10 @@ PACKAGE_DATA = {
     'wavebuoy.': ['*.csv'],
 }
 
+SCRIPTS = [
+    'scripts/cwb-spotter-netcdf.py',
+    'scripts/cwb-netcdf-aodn.py']
+
 setup(
     name=PACKAGE_NAME,
     version='0.1.0',
@@ -33,11 +37,12 @@ setup(
     url='',
     # install_requires=INSTALL_REQUIRES,
     packages=find_packages(exclude=PACKAGE_EXCLUDES),
-    scripts=['wavebuoy/scripts/cwb-aodn-nrt.py'],
-    #  entry_points={
+    scripts=SCRIPTS,
+    # entry_points={
     #     'console_scripts': [
-    #         'cwb-aodn-nrt = wavebuoys.scripts.cwb-aodn-.py:main',  # Replace with actual module and function
-    #     ]},
+    #         'cwb-spotter-netcdf=scripts.cwb_spotter_netcdf:main',
+    #     ]
+    # },
     package_data=PACKAGE_DATA,
     # test_suite='test_ardc_nrt',
     # tests_require=TESTS_REQUIRE,
