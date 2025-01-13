@@ -41,7 +41,7 @@ if __name__ == "__main__":
     - 
     """
 
-    wb = WaveBuoy()
+    wb = WaveBuoy(buoy_type="sofar")
     sofar_api = SofarAPI(buoys_metadata=wb.buoys_metadata_token_sorted)    
     
      
