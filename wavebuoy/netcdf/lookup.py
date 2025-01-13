@@ -17,7 +17,7 @@ class NetCDFFileHandler():
     def __init__(self):
         pass
 
-    def generate_filename(self, site_id:str, date_time_month:datetime) -> str:
+    def generate_filename(self, site_id:str, institution:str,date_time_month:datetime) -> str:
         """
         Generates an IMOS-compliant wave buoy data file name given a site ID and a datetime.
 
@@ -41,7 +41,9 @@ class NetCDFFileHandler():
         site_id = site_id.upper()
 
         date_time_month_str = date_time_month.strftime("%Y%m%d")
-        return NC_FILE_NAME_TEMPLATE.format(date_time_month=date_time_month_str, site_id=site_id+2)
+        return NC_FILE_NAME_TEMPLATE.format(date_time_month=date_time_month_str,
+                                            site_id=site_id+2,
+                                            institution=institution)
 
     def lookup_netcdf_files(self, 
                             site_id:str, 
