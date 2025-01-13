@@ -13,3 +13,4 @@ requests
 setuptools
 boto3
 awscli
+pytest
