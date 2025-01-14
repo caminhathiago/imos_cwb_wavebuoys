@@ -49,12 +49,12 @@ class NetCDFFileHandler():
                             institution:str,
                             site_id:str, 
                             latest_available_datetime:datetime,
-                            maximum_datetime_recursion:datetime=datetime(2020,1,1), # This should be less than the minimum Datetime of the first spotter we ever deployed
+                            minimum_datetime_recursion:datetime=datetime(2020,1,1), # This should be less than the minimum Datetime of the first spotter we ever deployed
                             threshold:timedelta=timedelta(hours=24)) -> str:
 
         
-        if latest_available_datetime < maximum_datetime_recursion:
-            print(f"""No stored data from {maximum_datetime_recursion}.
+        if latest_available_datetime < minimum_datetime_recursion:
+            print(f"""No stored data from {minimum_datetime_recursion}.
                   Considering {site_id} as a new site (i.e. New NetCDF created for {latest_available_datetime.year}-{latest_available_datetime.month}).
                   """)
             return
@@ -131,3 +131,7 @@ class NetCDFFileHandler():
             return True
         else:
             return False
+        
+    def _generate_daterange(self, latest_available_datetime:datetime,
+                    threshold:timedelta):
+        start_date = latest_available_datetime - threshold
