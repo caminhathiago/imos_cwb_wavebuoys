@@ -55,11 +55,11 @@ if __name__ == "__main__":
 
     """
 
-    for site_id in wb.site_ids:
-        print(site_id)
-        sofar_api.check_token_iteration(next_token=wb.buoys_metadata_token_sorted.loc[site_id, 'sofar_token'])
-        
-        spotter_id = sofar_api.get_spot_id(site_id=site_id, buoys_metadata=wb.buoys_metadata_token_sorted)
+    for idx, site in wb.buoys_metadata_token_sorted.iterrows():
+        print(site.name)
+        sofar_api.check_token_iteration(next_token=wb.buoys_metadata_token_sorted.loc[site.name, 'sofar_token'])
+    
+        spotter_id = sofar_api.get_spot_id(site_id=site.name, buoys_metadata=wb.buoys_metadata_token_sorted)
         spotter_obj = sofar_api.select_spotter_obj_from_spotter_grid(spot_id=spotter_id,
                                                                 spotter_grid=sofar_api.spotter_grid,
                                                                 devices=sofar_api.devices)
@@ -68,7 +68,9 @@ if __name__ == "__main__":
 
         print(latest_available_datetime)
 
-        nc_file_paths_list = wb.lookup_netcdf_files(site_id=site_id, latest_available_datetime=latest_available_datetime)
+        nc_file_paths_list = wb.lookup_netcdf_files(institution=site.region,
+                                                    site_id=site.name,
+                                                    latest_available_datetime=latest_available_datetime)
 
         print(nc_file_paths_list)
 
