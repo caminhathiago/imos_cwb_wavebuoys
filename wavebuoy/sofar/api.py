@@ -56,3 +56,22 @@ class SofarAPI:
     def get_latest_available_datetime(self, spotter_obj) -> datetime:
         latest_available_datetime = spotter_obj.latest_data()["wave"]["timestamp"]
         return datetime.strptime(latest_available_datetime, "%Y-%m-%dT%H:%M:%S.%fZ")
+    
+    def grab_raw_data(self, spotter_obj, include_bulk:bool=True, include_spectral:bool=False) -> pd.DataFrame:
+        
+        # TEMPORARY - Working with kwargs as possible approach
+        # def function_x(argument1, argument2):
+        #     return argument1 + argument2
+        # kwargs = {"argument1":2, "argument2":2}
+        # function_x(**kwargs) -> 4
+        
+        kwargs = {}
+
+        if include_bulk:
+            pass
+        if include_spectral:
+            pass
+
+        data = spotter_obj.grab_data(**kwargs)
+
+        return data
