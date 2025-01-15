@@ -1,5 +1,5 @@
 import pytest
-from wavebuoy.wavebuoy import WaveBuoy
+from wavebuoy_nrt.wavebuoy import WaveBuoy
 
 
 # def test_WaveBuoy():
