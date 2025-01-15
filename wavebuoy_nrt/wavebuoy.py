@@ -3,9 +3,9 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from wavebuoy.netcdf.lookup import NetCDFFileHandler
+from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
 
-from wavebuoy.config.config import FILES_PATH
+from wavebuoy_nrt.config.config import FILES_PATH
 
 
 class FilesHandler():
