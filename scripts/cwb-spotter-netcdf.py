@@ -7,9 +7,9 @@ import pandas as pd
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 
-from wavebuoy.wavebuoy import WaveBuoy
-from wavebuoy.sofar.api import SofarAPI
-from wavebuoy.netcdf.lookup import NetCDFFileHandler
+from wavebuoy_nrt.wavebuoy import WaveBuoy
+from wavebuoy_nrt.sofar.api import SofarAPI
+from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
 
 
 
@@ -41,9 +41,14 @@ if __name__ == "__main__":
     - 
     """
 
+
     wb = WaveBuoy(buoy_type="sofar")
-    sofar_api = SofarAPI(buoys_metadata=wb.buoys_metadata_token_sorted)    
-    
+        
+    ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS
+    # sofar_api = SofarAPI(buoys_metadata=wb.buoys_metadata_token_sorted)    
+    import pickle
+    with open("tests\sofar_api_object.pkl", "rb") as pickle_file:
+        sofar_api = pickle.load(pickle_file)
      
     
     # General ETL idea
@@ -57,6 +62,8 @@ if __name__ == "__main__":
 
     for idx, site in wb.buoys_metadata_token_sorted.iterrows():
         print(site.name)
+
+        # EXTRACTION
         sofar_api.check_token_iteration(next_token=wb.buoys_metadata_token_sorted.loc[site.name, 'sofar_token'])
     
         spotter_id = sofar_api.get_spot_id(site_id=site.name, buoys_metadata=wb.buoys_metadata_token_sorted)
@@ -68,11 +75,46 @@ if __name__ == "__main__":
 
         print(latest_available_datetime)
 
-        nc_file_paths_list = wb.lookup_netcdf_files(institution=site.region,
-                                                    site_id=site.name,
-                                                    latest_available_datetime=latest_available_datetime)
+        nc_files_available = wb._get_available_nc_files(institution=site.region,
+                                                             site_id=site.name)
+        
+        if nc_files_available:
+            nc_files_needed = wb.lookup_netcdf_files_needed(institution=site.region,
+                                                        site_id=site.name,
+                                                        latest_available_datetime=latest_available_datetime,
+                                                        window=4,
+                                                        window_unit="months")
+            
+            latest_nc_file_available = wb._get_latest_nc_file_available(institution=site.region,
+                                                                site_id=site.name)
+            latest_processed_datetime = wb._get_latest_processed_datetime(nc_file_path=latest_nc_file_available)
+            
+            
+            availability_check = wb._check_nc_files_needed_available(nc_files_needed=nc_files_needed,
+                                                            nc_files_available=nc_files_available)
+            if availability_check:
+                nc_to_load = nc_files_needed
+            else:
+                nc_to_load = latest_nc_file_available
 
-        print(nc_file_paths_list)
+            previous_data = wb.load_datasets(nc_file_paths=nc_to_load)
+
+        else:
+            # change naming
+            latest_processed_datetime = wb._generate_window_start_datetime(latest_available_datetime=latest_available_datetime,
+                                                                           window=4)
+
+        new_data = spotter_obj.grab_data(start_date=latest_processed_datetime,
+                                        end_date=latest_available_datetime,
+                                        include_track=False,
+                                        include_barometer_data=True,
+                                        include_waves=True,
+                                        include_wind=True,
+                                        include_surface_temp_data=True,
+                                        include_frequency_data=False)
+            
+
+
 
         print("="*10)
 
