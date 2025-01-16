@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import logging
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -10,7 +11,7 @@ from datetime import datetime, timedelta
 from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
 from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
-
+from wavebuoy_nrt.utils import args
 
 
 load_dotenv()
@@ -28,9 +29,13 @@ if __name__ == "__main__":
 
     """
 
-    period_to_process = timedelta(days=90) # months
-    period_to_qualify = 24 # hours
+    # vargs = args()
 
+    ### TEMPORARY SETUP (REMOVE WHEN DONE)
+    window = 24 # hours
+    window_unit = "hours"
+    period_to_qualify = 24 # hours
+    ### END OF TEMPORARY SETUP
 
 
     # Loading metadata
@@ -43,13 +48,13 @@ if __name__ == "__main__":
 
 
     wb = WaveBuoy(buoy_type="sofar")
-        
-    ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS
     # sofar_api = SofarAPI(buoys_metadata=wb.buoys_metadata_token_sorted)    
+
+    ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
     import pickle
     with open("tests\sofar_api_object.pkl", "rb") as pickle_file:
         sofar_api = pickle.load(pickle_file)
-     
+    ### END OF TEMPORARY SETUP 
     
     # General ETL idea
     """
@@ -63,48 +68,49 @@ if __name__ == "__main__":
     for idx, site in wb.buoys_metadata_token_sorted.iterrows():
         print(site.name)
 
-        # EXTRACTION
+        # Relevant loads ---------------------------------------
         sofar_api.check_token_iteration(next_token=wb.buoys_metadata_token_sorted.loc[site.name, 'sofar_token'])
     
-        spotter_id = sofar_api.get_spot_id(site_id=site.name, buoys_metadata=wb.buoys_metadata_token_sorted)
-        spotter_obj = sofar_api.select_spotter_obj_from_spotter_grid(spot_id=spotter_id,
+        spot_id = sofar_api.get_spot_id(site_id=site.name, buoys_metadata=wb.buoys_metadata_token_sorted)
+        spotter_obj = sofar_api.select_spotter_obj_from_spotter_grid(spot_id=spot_id,
                                                                 spotter_grid=sofar_api.spotter_grid,
                                                                 devices=sofar_api.devices)
         
         latest_available_datetime = sofar_api.get_latest_available_datetime(spotter_obj=spotter_obj)
 
-        print(latest_available_datetime)
-
-        nc_files_available = wb._get_available_nc_files(institution=site.region,
+        nc_files_available = wb.get_available_nc_files(institution=site.region,
                                                              site_id=site.name)
         
         if nc_files_available:
             nc_files_needed = wb.lookup_netcdf_files_needed(institution=site.region,
                                                         site_id=site.name,
                                                         latest_available_datetime=latest_available_datetime,
-                                                        window=4,
-                                                        window_unit="months")
+                                                        window=window,
+                                                        window_unit=window_unit)
             
-            latest_nc_file_available = wb._get_latest_nc_file_available(institution=site.region,
+            latest_nc_file_available = wb.get_latest_nc_file_available(institution=site.region,
                                                                 site_id=site.name)
-            latest_processed_datetime = wb._get_latest_processed_datetime(nc_file_path=latest_nc_file_available)
+            latest_processed_datetime = wb.get_latest_processed_datetime(nc_file_path=latest_nc_file_available)
+            print(latest_nc_file_available)
+            print(latest_processed_datetime)
             
-            
-            availability_check = wb._check_nc_files_needed_available(nc_files_needed=nc_files_needed,
+            availability_check = wb.check_nc_files_needed_available(nc_files_needed=nc_files_needed,
                                                             nc_files_available=nc_files_available)
             if availability_check:
                 nc_to_load = nc_files_needed
             else:
                 nc_to_load = latest_nc_file_available
-
-            previous_data = wb.load_datasets(nc_file_paths=nc_to_load)
-
+            print("loading previous")
+            previous_data_df = wb.load_datasets(nc_file_paths=nc_to_load)
+            print(previous_data_df.columns)
         else:
             # change naming
-            latest_processed_datetime = wb._generate_window_start_datetime(latest_available_datetime=latest_available_datetime,
-                                                                           window=4)
+            latest_processed_datetime = wb.generate_window_start_datetime(latest_available_datetime=latest_available_datetime,
+                                                                           window=window,
+                                                                           window_unit=window_unit)
 
-        new_data = spotter_obj.grab_data(start_date=latest_processed_datetime,
+        # Extraction ---------------------------------------
+        new_data_raw = spotter_obj.grab_data(start_date=latest_processed_datetime,
                                         end_date=latest_available_datetime,
                                         include_track=False,
                                         include_barometer_data=True,
@@ -112,6 +118,35 @@ if __name__ == "__main__":
                                         include_wind=True,
                                         include_surface_temp_data=True,
                                         include_frequency_data=False)
+        
+        # Processing ---------------------------------------
+        waves_new_data_df = wb.convert_to_dataframe(raw_data=new_data_raw,
+                                                    parameters_type="waves")
+        waves_new_data_df = wb.convert_to_datetime(data=waves_new_data_df)
+        
+        
+        sst_new_data_df = wb.convert_to_dataframe(raw_data=new_data_raw,
+                                                parameters_type="surfaceTemp")
+        sst_new_data_df = wb.convert_to_datetime(data=sst_new_data_df)
+
+        all_new_data_df = wb.merge_parameter_types(waves=waves_new_data_df,
+                                                    sst=sst_new_data_df)
+
+        all_new_data_df = wb.conform_columns_names_aodn(data=all_new_data_df)
+        all_new_data_df = wb.drop_unwanted_columns(data=all_new_data_df)
+        all_new_data_df = wb.sort_datetimes(data=all_new_data_df)
+        # TEMPORARY SETUP
+        all_new_data_df["check"] = "new"
+
+        if 'previous_data' in globals():
+            all_data_df = wb.concat_previous_new(previous_data=previous_data_df,
+                                                new_data=all_new_data_df)
+            
+        # TEMPORARY SETUP (REMOVE WHEN DONE)
+        all_data_df.to_csv("tests/all_data_df_output.csv", index=False)
+
+
+
             
 
 
