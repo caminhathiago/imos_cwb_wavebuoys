@@ -23,7 +23,7 @@ class NetCDFFileHandler():
     def __init__(self):
         pass
 
-    def generate_filename(self, site_id:str, institution:str,date_time_month:datetime) -> str:
+    def generate_filename(self, site_id: str, institution: str,date_time_month: datetime) -> str:
         """
         Generates an IMOS-compliant wave buoy data file name given a site ID and a datetime.
 
@@ -105,14 +105,14 @@ class NetCDFFileHandler():
     #     return xr.open_dataset(nc_file_path)
 
     def lookup_netcdf_files_needed(self, 
-                            institution:str,
-                            site_id:str, 
-                            latest_available_datetime:datetime,
+                            institution: str,
+                            site_id: str, 
+                            latest_available_datetime: datetime,
                             #minimum_datetime_recursion:datetime=datetime(2020,1,1), # This should be less than the minimum Datetime of the first spotter we ever deployed
-                            window:int=24,
-                            window_unit:str="hours") -> str:
+                            window: int=24,
+                            window_unit: str="hours") -> str:
             
-            window_start_date = self._generate_window_start_datetime(latest_available_datetime=latest_available_datetime,
+            window_start_date = self.generate_window_start_datetime(latest_available_datetime=latest_available_datetime,
                                                                     window=window,
                                                                     window_unit=window_unit)
             monthly_daterange = self._generate_monthly_daterange(start_date=window_start_date,
@@ -128,7 +128,7 @@ class NetCDFFileHandler():
 
             return self.nc_file_paths_to_process
 
-    def _check_nc_files_exist(self, nc_file_paths_to_process:list) -> list:
+    def _check_nc_files_exist(self, nc_file_paths_to_process: list) -> list:
         
         # Check for all files (best/expected scenario)
         if all([os.path.exists(f) for f in nc_file_paths_to_process]):
@@ -145,11 +145,14 @@ class NetCDFFileHandler():
             return missing_files
 
     
-    def _generate_window_start_datetime(self, latest_available_datetime:datetime, window:int, window_unit:str="hours"):
+    def generate_window_start_datetime(self,
+                                       latest_available_datetime: datetime, 
+                                       window: int, 
+                                       window_unit: str="hours"):
         kwargs = {window_unit:window}
         return latest_available_datetime - relativedelta(**kwargs)
     
-    def _generate_monthly_daterange(self, start_date:datetime, end_date:datetime):
+    def _generate_monthly_daterange(self, start_date: datetime, end_date: datetime):
         
         monthly_daterange = pd.date_range(start_date, end_date, freq="MS")
         
@@ -163,25 +166,22 @@ class NetCDFFileHandler():
 
         return monthly_daterange    
 
- 
-    def check_period(self, 
-                    window:timedelta,
-                    nc_dataset:xr.Dataset,
-                    latest_available_datetime:datetime,
-                    latest_processed_datetime:datetime):
+    # def check_period(self, 
+    #                 window: timedelta,
+    #                 nc_dataset: xr.Dataset,
+    #                 latest_available_datetime: datetime,
+    #                 latest_processed_datetime: datetime):
         
-        min_datetime = datetime.fromtimestamp(nc_dataset["TIME"].min().values.astype('datetime64[s]').astype(int))
+    #     min_datetime = datetime.fromtimestamp(nc_dataset["TIME"].min().values.astype('datetime64[s]').astype(int))
         
-        if (latest_processed_datetime - min_datetime) > window:
-            print("Enough data points to be processed.")
-            return True 
-        else:
-            print("NC File does not have enough data points to be processed.")
-            return False
+    #     if (latest_processed_datetime - min_datetime) > window:
+    #         print("Enough data points to be processed.")
+    #         return True 
+    #     else:
+    #         print("NC File does not have enough data points to be processed.")
+    #         return False
 
-    def _get_available_nc_files(self,
-                                    institution:str,
-                                    site_id:str) -> list:
+    def get_available_nc_files(self, institution: str, site_id: str) -> list:
         
         nc_file_filter = NC_FILE_NAME_TEMPLATE.format(institution=REGION_TO_INSTITUTION[institution],# Temporary data
                                                     monthly_datetime="*",
@@ -191,29 +191,24 @@ class NetCDFFileHandler():
 
         return glob.glob(nc_file_path)
     
-    def _get_latest_nc_file_available(self,
-                                    institution:str,
-                                    site_id:str) -> str:
+    def get_latest_nc_file_available(self, institution:str, site_id:str) -> str:
         
-        available_nc_files = self._get_available_nc_files(institution=institution,
+        available_nc_files = self.get_available_nc_files(institution=institution,
                                                           site_id=site_id)
         date_pattern = re.compile(r"_(\d{8})_")
         most_recent_file_path = max(available_nc_files, key=lambda x: int(date_pattern.search(x).group(1)))
 
         return most_recent_file_path
 
-    def _get_latest_processed_datetime(self,
-                                    nc_file_path:str) -> datetime:
+    def get_latest_processed_datetime(self, nc_file_path: str) -> datetime:
         
-        return datetime.fromtimestamp(
-                                    (xr.open_dataset(nc_file_path)["TIME"]
-                                     .max()
-                                     .values
-                                     .astype('datetime64[s]')
-                                     .astype(int))
-                                    )
+        return pd.to_datetime((xr.open_dataset(nc_file_path)
+                       ["TIME"]
+                       .max()
+                       .values)
+                    ).to_pydatetime()
 
-    def _check_nc_files_needed_available(self, nc_files_needed:list, nc_files_available:list):
+    def check_nc_files_needed_available(self, nc_files_needed: list, nc_files_available: list):
         
         test = [file in nc_files_available for file in nc_files_needed]
 
@@ -229,16 +224,22 @@ class NetCDFFileHandler():
             return False
         
     def load_datasets(self, nc_file_paths: Union[List[str], str]) -> pd.DataFrame:
+        print("engine selected ===============================")
 
-        
-        if nc_file_paths is list:
+        if isinstance(nc_file_paths, list):
             global_dataframe = pd.DataFrame([])
             for nc_file in nc_file_paths:
-                dataframe = xr.open_dataset(nc_file).to_dataframe()
+                dataframe = (xr.open_dataset(nc_file, engine="netcdf4")
+                             .to_dataframe()
+                             .reset_index())
                 global_dataframe = pd.concat([global_dataframe,dataframe])
         else:
-            global_dataframe = xr.open_dataset(nc_file).to_dataframe()
+            global_dataframe = (xr.open_dataset(nc_file_paths, engine="netcdf4")
+                                .to_dataframe()
+                                .reset_index())
 
+        # TEMPORARY SETUP
+        global_dataframe["check"] = "prev"
 
         return global_dataframe
 
@@ -253,16 +254,11 @@ class NetCDFFileHandler():
     #                                  .astype(int))
     #                                 )
 
-    def get_site_ids(self, buoys_metadata:pd.DataFrame) -> list:
+    def get_site_ids(self, buoys_metadata: pd.DataFrame) -> list:
         return buoys_metadata.name.list()
 
-
-    def _validade_site_id(self, site_id:str, site_ids:list) -> bool:
+    def _validade_site_id(self, site_id: str, site_ids: list) -> bool:
         if site_id in site_ids:
             return True
         else:
             return False
-        
-    def _generate_daterange(self, latest_available_datetime:datetime,
-                    window:timedelta):
-        start_date = latest_available_datetime - window
