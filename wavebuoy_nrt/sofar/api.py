@@ -61,13 +61,3 @@ class SofarAPI:
         return datetime.strptime(latest_available_datetime, "%Y-%m-%dT%H:%M:%S.%fZ")
 
     
-    def convert_raw_dataframe(self, raw_data: dict, parameters_type: str) -> pd.DataFrame: 
-        return pd.DataFrame(raw_data[parameters_type])
-
-    def merge_parameter_types(self, waves: pd.DataFrame, wind: pd.DataFrame) -> pd.DataFrame:
-        # # IN PROGRESS
-        # wind = wind.drop(columns=["latitude","longitude", "processing_source"])
-        # all = waves.merge(wind, on="timestamp", copy=False)
-        
-        # return waves
-        pass
