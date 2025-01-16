@@ -21,6 +21,14 @@ def args():
                         help="output directory of netcdf file",
                         required=True)
     
+    parser.add_argument('-w', '--window', dest='window', type=str, default=24,
+                        help="desired window from present backwards to be processed and qualified. Default to 24, please check argument --window-unit for the right desired unit.",
+                        required=False)
+
+    parser.add_argument('-wu', '--window-unit', dest='window_unit', type=str, default="hours",
+                        help="desired window unit (hours:Default, months).",
+                        required=False)
+
     parser.add_argument('-pp', '--period-to-process', dest='period_to_process', type=str, default=None, nargs=2,
                         help="desired period to be extracted, processed and qualified. Please pass start and end dates as YYYY-mm-ddTHH:MM separated by a blank space.",
                         required=False)
@@ -67,18 +75,17 @@ def args():
 
 class IMOSLogging:
 
-    def __init__(self):
-        self.logging_filepath = []
+    def __init__(self, logging_filepath):
+        self.logging_filepath = logging_filepath
         self.logger = []
 
-    def logging_start(self, logging_filepath):
+    def logging_start(self):
         """ start logging using logging python library
         output:
            logger - similar to a file handler
         """
-        self.logging_filepath = logging_filepath
-        if not os.path.exists(os.path.dirname(logging_filepath)):
-            os.makedirs(os.path.dirname(logging_filepath))
+        if not os.path.exists(os.path.dirname(self.logging_filepath)):
+            os.makedirs(os.path.dirname(self.logging_filepath))
 
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger()
