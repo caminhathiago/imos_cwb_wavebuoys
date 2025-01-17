@@ -210,21 +210,22 @@ class NetCDFFileHandler():
 
     def check_nc_files_needed_available(self, nc_files_needed: list, nc_files_available: list):
         
-        test = [file in nc_files_available for file in nc_files_needed]
+        nc_file_paths = [file in nc_files_available for file in nc_files_needed]
 
-        if all(test):
-            print("All nc files needed are available")
-            return True
-        else:
-            if any(test):
-                print("Some nc files needed are available, probably best get the most recent available")
-            if not all(test):
-                print("No nc files needed are available, probably best get the most recent available")
-
-            return False
+        if all(nc_file_paths) or any(nc_file_paths):
+            print("All or some nc files needed are available, load the intersection.")
+            availability_check = True
+        
+        elif not all(nc_file_paths):
+            availability_check = False
+            
+        return availability_check, nc_file_paths 
         
     def load_datasets(self, nc_file_paths: Union[List[str], str]) -> pd.DataFrame:
         print("engine selected ===============================")
+
+        if not nc_file_paths:
+            return pd.DataFrame()
 
         if isinstance(nc_file_paths, list):
             global_dataframe = pd.DataFrame([])
@@ -233,7 +234,7 @@ class NetCDFFileHandler():
                              .to_dataframe()
                              .reset_index())
                 global_dataframe = pd.concat([global_dataframe,dataframe])
-        else:
+        elif isinstance(nc_file_paths, str):
             global_dataframe = (xr.open_dataset(nc_file_paths, engine="netcdf4")
                                 .to_dataframe()
                                 .reset_index())
