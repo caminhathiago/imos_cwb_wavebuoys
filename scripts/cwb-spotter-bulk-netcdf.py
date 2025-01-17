@@ -35,6 +35,7 @@ if __name__ == "__main__":
     window = 24 # hours
     window_unit = "hours"
     period_to_qualify = 24 # hours
+    backfill = True
     ### END OF TEMPORARY SETUP
 
 
@@ -48,13 +49,13 @@ if __name__ == "__main__":
 
 
     wb = WaveBuoy(buoy_type="sofar")
-    # sofar_api = SofarAPI(buoys_metadata=wb.buoys_metadata_token_sorted)    
+    sofar_api = SofarAPI(buoys_metadata=wb.buoys_metadata)    
 
-    ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
-    import pickle
-    with open("tests\sofar_api_object.pkl", "rb") as pickle_file:
-        sofar_api = pickle.load(pickle_file)
-    ### END OF TEMPORARY SETUP 
+    # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
+    # import pickle
+    # with open("tests\sofar_api_object.pkl", "rb") as pickle_file:
+    #     sofar_api = pickle.load(pickle_file)
+    # ### END OF TEMPORARY SETUP 
     
     # General ETL idea
     """
@@ -69,18 +70,22 @@ if __name__ == "__main__":
         print(site.name)
 
         # Relevant loads ---------------------------------------
-        sofar_api.check_token_iteration(next_token=wb.buoys_metadata_token_sorted.loc[site.name, 'sofar_token'])
-    
-        spot_id = sofar_api.get_spot_id(site_id=site.name, buoys_metadata=wb.buoys_metadata_token_sorted)
-        spotter_obj = sofar_api.select_spotter_obj_from_spotter_grid(spot_id=spot_id,
-                                                                spotter_grid=sofar_api.spotter_grid,
-                                                                devices=sofar_api.devices)
+        # sofar_api.check_token_iteration(next_token=wb.buoys_metadata_token_sorted.loc[site.name, 'sofar_token'])
+
+        # spot_id = sofar_api.get_spot_id(site_id=site.name, buoys_metadata=wb.buoys_metadata_token_sorted)
+        # spotter_obj = sofar_api.select_spotter_obj_from_spotter_grid(spot_id=spot_id,
+                                                                # spotter_grid=sofar_api.spotter_grid,
+                                                                # devices=sofar_api.devices)
         
-        latest_available_datetime = sofar_api.get_latest_available_datetime(spotter_obj=spotter_obj)
+        latest_available_datetime = sofar_api.get_latest_available_time(spot_id=site.serial, token=site.sofar_token)
+
+        window_start_date = wb.generate_window_start_datetime(latest_available_datetime=latest_available_datetime,
+                                                              window=window,
+                                                              window_unit=window_unit)
 
         nc_files_available = wb.get_available_nc_files(institution=site.region,
                                                              site_id=site.name)
-        
+
         if nc_files_available:
             nc_files_needed = wb.lookup_netcdf_files_needed(institution=site.region,
                                                         site_id=site.name,
@@ -91,46 +96,57 @@ if __name__ == "__main__":
             latest_nc_file_available = wb.get_latest_nc_file_available(institution=site.region,
                                                                 site_id=site.name)
             latest_processed_datetime = wb.get_latest_processed_datetime(nc_file_path=latest_nc_file_available)
-            print(latest_nc_file_available)
-            print(latest_processed_datetime)
             
-            availability_check = wb.check_nc_files_needed_available(nc_files_needed=nc_files_needed,
+            availability_check, nc_file_paths = wb.check_nc_files_needed_available(nc_files_needed=nc_files_needed,
                                                             nc_files_available=nc_files_available)
-            if availability_check:
-                nc_to_load = nc_files_needed
-            else:
-                nc_to_load = latest_nc_file_available
-            print("loading previous")
+            if availability_check: # any or all needed ar available
+                nc_to_load = nc_file_paths
+            else: # none is available
+                if backfill:
+                    nc_to_load = latest_nc_file_available
+                else:
+                    nc_to_load = None
+
             previous_data_df = wb.load_datasets(nc_file_paths=nc_to_load)
-            print(previous_data_df.columns)
-        else:
-            # change naming
-            latest_processed_datetime = wb.generate_window_start_datetime(latest_available_datetime=latest_available_datetime,
-                                                                           window=window,
-                                                                           window_unit=window_unit)
+            start_date = latest_processed_datetime
 
         # Extraction ---------------------------------------
-        new_data_raw = spotter_obj.grab_data(start_date=latest_processed_datetime,
-                                        end_date=latest_available_datetime,
-                                        include_track=False,
-                                        include_barometer_data=True,
-                                        include_waves=True,
-                                        include_wind=True,
-                                        include_surface_temp_data=True,
-                                        include_frequency_data=False)
+        """
+        &includeBarometerData=true
+        &processingSources=all'..
+        """
         
+        # new_data_raw = spotter_obj.grab_data(start_date=latest_processed_datetime,
+        #                                 end_date=latest_available_datetime,
+        #                                 include_waves=True,
+        #                                 include_track=False,
+        #                                 include_surface_temp_data=True,
+        #                                 include_wind=True,
+        #                                 include_frequency_data=False,
+        #                                 include_directional_moments=False,
+        #                                 include_partition_data=False,
+        #                                 include_barometer_data=True,                                       
+        #                                 processing_sources="all")
+        query_params = sofar_api.compose_query_parameters(spot_id=site.serial,
+                                                        start_date=start_date,
+                                                        end_date=latest_available_datetime)
+        new_data_raw = sofar_api.request_api(spot_id=site.serial,
+                                           token=site.sofar_token,
+                                           data_type="waves",
+                                           query_params=query_params)
+
         # Processing ---------------------------------------
-        waves_new_data_df = wb.convert_to_dataframe(raw_data=new_data_raw,
-                                                    parameters_type="waves")
+        # for parameters_type in ["waves", "wind"]:
+        #     pass
+        
+        waves_new_data_df = wb.convert_to_dataframe(raw_data=new_data_raw, parameters_type="waves")
         waves_new_data_df = wb.convert_to_datetime(data=waves_new_data_df)
         
         
-        sst_new_data_df = wb.convert_to_dataframe(raw_data=new_data_raw,
-                                                parameters_type="surfaceTemp")
+        sst_new_data_df = wb.convert_to_dataframe(raw_data=new_data_raw, parameters_type="surfaceTemp")
         sst_new_data_df = wb.convert_to_datetime(data=sst_new_data_df)
 
-        all_new_data_df = wb.merge_parameter_types(waves=waves_new_data_df,
-                                                    sst=sst_new_data_df)
+        all_new_data_df = wb.merge_parameter_types(waves=waves_new_data_df, sst=sst_new_data_df)
 
         all_new_data_df = wb.conform_columns_names_aodn(data=all_new_data_df)
         all_new_data_df = wb.drop_unwanted_columns(data=all_new_data_df)
@@ -138,10 +154,13 @@ if __name__ == "__main__":
         # TEMPORARY SETUP
         all_new_data_df["check"] = "new"
 
-        if 'previous_data' in globals():
-            all_data_df = wb.concat_previous_new(previous_data=previous_data_df,
+        if 'previous_data_df' in locals():
+            if not previous_data_df.empty: # check if empty
+                all_data_df = wb.concat_previous_new(previous_data=previous_data_df,
                                                 new_data=all_new_data_df)
-            
+        else:
+            all_data_df = all_new_data_df
+
         # TEMPORARY SETUP (REMOVE WHEN DONE)
         all_data_df.to_csv("tests/all_data_df_output.csv", index=False)
 
