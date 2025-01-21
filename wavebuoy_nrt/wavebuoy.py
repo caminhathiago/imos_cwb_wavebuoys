@@ -1,11 +1,16 @@
 import os
 from typing import List
 from datetime import datetime, timedelta
+import logging
 
 import pandas as pd
 
 from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
 from wavebuoy_nrt.config.config import FILES_PATH, AODN_COLUMNS_TEMPLATE
+from wavebuoy_nrt.utils import args, IMOSLogging
+
+GENERAL_LOGGER = logging.getLogger("general_logger")
+SITE_LOGGER = logging.getLogger("site_logger")
 
 
 class FilesHandler():
@@ -83,7 +88,10 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy): #(CWBAWSs3):
         buoys_metadata = self._select_buoy_type(buoy_type=buoy_type, buoys_metadata=buoys_metadata)
         buoys_metadata["region"] = self._get_regions(buoys_metadata=buoys_metadata)
         buoys_metadata = buoys_metadata.set_index('name')
-        
+        GENERAL_LOGGER.info("Buoys metadata grabbed successfully.")
+        SITE_LOGGER.info("Buoys metadata grabbed successfully.")
+
+
         return buoys_metadata
 
     def _select_buoy_type(self, buoy_type:str, buoys_metadata:pd.DataFrame) -> pd.DataFrame:

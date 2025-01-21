@@ -3,7 +3,10 @@ import logging
 import tempfile
 import os
 import sys
+import re
 from datetime import datetime, timedelta
+
+GENERAL_LOGGER = logging.getLogger("general_logger")
 
 def args():
     """
@@ -74,40 +77,57 @@ def args():
 
 
 class IMOSLogging:
+    def __init__(self):
+        pass
 
-    def __init__(self, logging_filepath):
-        self.logging_filepath = logging_filepath
-        self.logger = []
-
-    def logging_start(self):
-        """ start logging using logging python library
-        output:
-           logger - similar to a file handler
+    def logging_start(self, logging_filepath, logger_name="general_logger", level=logging.INFO):
         """
+        Start logging using the Python logging library.
+        Parameters:
+            logger_name (str): Name of the logger to create or retrieve.
+            level (int): Logging level (default: logging.INFO).
+        Returns:
+            logger (logging.Logger): Configured logger instance.
+        """
+        self.logging_filepath = logging_filepath
+
+        # Ensure log directory exists
         if not os.path.exists(os.path.dirname(self.logging_filepath)):
             os.makedirs(os.path.dirname(self.logging_filepath))
 
-        logging.basicConfig(level=logging.INFO)
-        self.logger = logging.getLogger()
-        self.logger.setLevel(logging.INFO)
+        # Create or retrieve the logger
+        self.logger = logging.getLogger(logger_name)
 
-        # create a file handler
-        handler = logging.FileHandler(self.logging_filepath)
-        handler.setLevel(logging.INFO)
+        # Avoid duplicate handlers
+        if not self.logger.hasHandlers():
+            self.logger.setLevel(level)
 
-        # create a logging format
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
+            # Create a file handler
+            handler = logging.FileHandler(self.logging_filepath)
+            handler.setLevel(level)
 
-        # add the handlers to the logger
-        self.logger.addHandler(handler)
+            # Create a logging format
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+
+            # Add the handler to the logger
+            self.logger.addHandler(handler)
+
         return self.logger
 
-    def logging_stop(self):
-        """ close logging """
-        # closes the handlers of the specified logger only
-        x = list(self.logger.handlers)
-        for i in x:
-            self.logger.removeHandler(i)
-            i.flush()
-            i.close()
+    def logging_stop(self, logger):
+        """Close logging handlers for the current logger."""
+        handlers = list(logger.handlers)
+        for handler in handlers:
+            logger.removeHandler(handler)
+            handler.flush()
+            handler.close()
+
+    def get_log_file_path(self, logger):
+        return logger.handlers[0].baseFilename
+    
+    def rename_log_file(self, logger: logging.Logger, site_name: str, file_path):
+        pattern = r"\[CURRENT_SITE\]"
+        new_file_name = re.sub(pattern, f"{site_name}", file_path)
+        os.rename(file_path, new_file_name)
+        GENERAL_LOGGER.info(f"{site_name} log file renamed successfully")

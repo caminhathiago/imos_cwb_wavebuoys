@@ -30,22 +30,25 @@ if __name__ == "__main__":
     """
     vargs = args()
 
-    # Start logging
-    runtime = datetime.now().strftime("%Y%m%dT%H%M%S")#IMOSLogging().something
-    general_log_file_name = f"{runtime}_general_process.log"
-    IMOSLogging(logging_filepath=os.path.join(vargs.output_path, general_log_file_name)).logging_start()
-    global LOGGER
-    LOGGER = logging.getLogger(__name__)
+    # Start general logging
+    runtime = datetime.now().strftime("%Y%m%dT%H%M%S")
+    general_log_file = os.path.join(vargs.output_path, "logs", f"{runtime}_general_process.log")
+    general_logger = IMOSLogging().logging_start(logger_name="general_logger",
+                                                 logging_filepath=general_log_file)
+
+    # Start specific logging for current site
+    site_log_file = os.path.join(vargs.output_path, "logs", f"{runtime}_[CURRENT_SITE]_process.log")
+    site_logger = IMOSLogging().logging_start(logger_name="site_logger",
+                                                                            logging_filepath=site_log_file)
+
 
    
 
     ### TEMPORARY SETUP (REMOVE WHEN DONE)
-    window = int(vargs.window)# window = 24 # hours
-    window_unit = vargs.window_unit# window_unit = "hours"
+    # window = int(vargs.window)# window = 24 # hours
+    # window_unit = vargs.window_unit# window_unit = "hours"
     period_to_qualify = 24 # hours
     backfill = True
-    print(window)
-    print(window_unit)
     ### END OF TEMPORARY SETUP
     
 
@@ -80,17 +83,16 @@ if __name__ == "__main__":
        
         # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
         site = wb.buoys_metadata.loc["Hillarys"]
-
-        # ### END OF TEMPORARY SETUP 
         print(site.name)
+        # ### END OF TEMPORARY SETUP 
 
         # Relevant loads ---------------------------------------
         
         latest_available_datetime = sofar_api.get_latest_available_time(spot_id=site.serial, token=site.sofar_token)
 
         window_start_time = wb.generate_window_start_time(latest_available_datetime=latest_available_datetime,
-                                                              window=window,
-                                                              window_unit=window_unit)
+                                                              window=int(vargs.window),
+                                                              window_unit=vargs.window_unit)
 
         nc_files_available = wb.get_available_nc_files(institution=site.region,
                                                              site_id=site.name)
@@ -99,8 +101,8 @@ if __name__ == "__main__":
             nc_files_needed = wb.lookup_netcdf_files_needed(institution=site.region,
                                                         site_id=site.name,
                                                         latest_available_datetime=latest_available_datetime,
-                                                        window=window,
-                                                        window_unit=window_unit)
+                                                        window=int(vargs.window),
+                                                        window_unit=vargs.window_unit)
             
             latest_nc_file_available = wb.get_latest_nc_file_available(institution=site.region,
                                                                     site_id=site.name)
@@ -194,7 +196,12 @@ if __name__ == "__main__":
         # TEMPORARY SETUP (REMOVE WHEN DONE)
         all_data_df.to_csv("tests/all_data_df_output.csv", index=False)
 
-
+        imos_logging = IMOSLogging()
+        site_logger_file_path = imos_logging.get_log_file_path(site_logger)
+        imos_logging.logging_stop(logger=site_logger)
+        imos_logging.rename_log_file(logger=site_logger,
+                                    site_name=site.name,
+                                    file_path=site_logger_file_path)
 
             
 
