@@ -28,14 +28,16 @@ class SpotterWaveBuoy():
             print(f"No data for {parameters_type}.")
             return None
 
-    def merge_parameter_types(self, waves: pd.DataFrame, sst: pd.DataFrame) -> pd.DataFrame: # wind: pd.DataFrame
+    def merge_parameter_types(self, waves: pd.DataFrame, sst: pd.DataFrame = None) -> pd.DataFrame: # wind: pd.DataFrame
         # # IN PROGRESS
         # if wind:
         #     wind = wind.drop(columns=["latitude","longitude", "processing_source"])
         #     all = waves.merge(wind, on="timestamp")
-        if sst:
-            sst = sst.drop(columns=["latitude","longitude", "processing_source"])
-            waves = waves.merge(sst, on="timestamp")
+
+        if sst is not None:
+            if not sst.empty:
+                sst = sst.drop(columns=["latitude","longitude", "processing_source"])
+                waves = waves.merge(sst, on="TIME")
         
         return waves     
 
@@ -50,6 +52,23 @@ class SpotterWaveBuoy():
         parameters_types = raw_data.keys()
         for parameter_type in parameters_types:
             pass
+
+    def get_sst_from_smart_mooring(self, 
+                                   data : pd.DataFrame,
+                                   sensor_type : str = "temperature") -> pd.DataFrame:
+        
+        for data_type in data["data_type_name"].unique():
+            if sensor_type in data_type:
+                position = data[data["data_type_name"] == data_type]["sensorPosition"].unique()
+            else:
+                print(f"No {sensor_type} present in this smart_mooring.")
+                return None
+            
+            if len(position) > 1: # select surface sensor based on surface position (i.e. the lowest position)
+                selected_position = position.min()
+                
+        return data[data["sensorPosition"] == selected_position]
+            
 
 class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy): #(CWBAWSs3):
     def __init__(self, buoy_type:str,buoys_metadata_file_name:str="buoys_metadata.csv"):
