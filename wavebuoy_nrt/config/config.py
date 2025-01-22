@@ -32,5 +32,6 @@ AODN_COLUMNS_TEMPLATE = {
     "meanPeriod": 'WPFM',
     "peakPeriod": 'WPPE',
     "significantWaveHeight": 'WSSH',
-    "degrees": 'SST'
+    "degrees": 'SST',
+    "value": 'SST'
 }
