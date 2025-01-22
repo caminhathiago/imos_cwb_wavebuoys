@@ -102,26 +102,20 @@ class IMOSLogging:
         """
         self.logging_filepath = logging_filepath
 
-        # Ensure log directory exists
         if not os.path.exists(os.path.dirname(self.logging_filepath)):
             os.makedirs(os.path.dirname(self.logging_filepath))
 
-        # Create or retrieve the logger
         self.logger = logging.getLogger(logger_name)
 
-        # Avoid duplicate handlers
         if not self.logger.hasHandlers():
             self.logger.setLevel(level)
 
-            # Create a file handler
             handler = logging.FileHandler(self.logging_filepath, mode="w")
             handler.setLevel(level)
 
-            # Create a logging format
             formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
             handler.setFormatter(formatter)
 
-            # Add the handler to the logger
             self.logger.addHandler(handler)
 
         return self.logger
@@ -137,11 +131,11 @@ class IMOSLogging:
     def get_log_file_path(self, logger):
         return logger.handlers[0].baseFilename
     
-    def rename_log_file(self, logger: logging.Logger, site_name: str, file_path):
+    def rename_log_file(self, site_name: str, file_path):
         pattern = r"\[CURRENT_SITE\]"
         new_file_name = re.sub(pattern, f"{site_name}", file_path)
         if os.path.exists(new_file_name):
             os.replace(file_path, new_file_name)
         else:
             os.rename(file_path, new_file_name)
-        GENERAL_LOGGER.info(f"{site_name} log file renamed successfully")
+        GENERAL_LOGGER.info(f"{site_name} log file renamed as {new_file_name}")
