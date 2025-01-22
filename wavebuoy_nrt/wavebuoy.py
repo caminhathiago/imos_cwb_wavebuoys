@@ -18,8 +18,14 @@ class FilesHandler():
         pass
 
     def _get_file_path(self, file_name):
-        return os.path.join(FILES_PATH, file_name)
-    
+        if os.path.exists(os.path.join(FILES_PATH, file_name)):
+            return os.path.join(FILES_PATH, file_name)
+        else:
+            error_message = """Path for buoys_metadata.csv does not exist.
+                                 Check if the correct path was provided, or if buoyus_metadata.csv was moved."""
+            GENERAL_LOGGER.error(error_message)
+            raise FileNotFoundError(error_message)
+
 class SpotterWaveBuoy():
 
     def convert_to_dataframe(self, raw_data: dict, parameters_type: str) -> pd.DataFrame:
@@ -89,8 +95,6 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy): #(CWBAWSs3):
         buoys_metadata["region"] = self._get_regions(buoys_metadata=buoys_metadata)
         buoys_metadata = buoys_metadata.set_index('name')
         GENERAL_LOGGER.info("Buoys metadata grabbed successfully.")
-        SITE_LOGGER.info("Buoys metadata grabbed successfully.")
-
 
         return buoys_metadata
 

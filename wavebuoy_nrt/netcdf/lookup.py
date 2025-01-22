@@ -1,5 +1,6 @@
 
 import os
+import logging
 
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -12,6 +13,10 @@ from typing import Union, List
 
 
 from wavebuoy_nrt.config.config import FILES_OUTPUT_PATH, NC_FILE_NAME_TEMPLATE, REGION_TO_INSTITUTION
+
+GENERAL_LOGGER = logging.getLogger("general_logger")
+SITE_LOGGER = logging.getLogger("site_logger")
+
 
 class NetCDFFileHandler():
     """
@@ -113,13 +118,33 @@ class NetCDFFileHandler():
 
         return most_recent_file_path
 
-    def get_latest_processed_datetime(self, nc_file_path: str) -> datetime:
+    def get_latest_processed_time(self, nc_file_path: str) -> datetime:
         
         return pd.to_datetime((xr.open_dataset(nc_file_path)
                        ["TIME"]
                        .max()
                        .values)
                     ).to_pydatetime()
+
+    def get_earliest_nc_file_available(self, institution:str, site_id:str) -> str:
+        
+        available_nc_files = self.get_available_nc_files(institution=institution,
+                                                          site_id=site_id)
+        date_pattern = re.compile(r"_(\d{8})_")
+        most_recent_file_path = min(available_nc_files, key=lambda x: int(date_pattern.search(x).group(1)))
+
+        return most_recent_file_path
+
+    def get_earliest_processed_time(self, nc_file_path: str) -> datetime:
+        
+        return pd.to_datetime((xr.open_dataset(nc_file_path)
+                       ["TIME"]
+                       .min()
+                       .values)
+                    ).to_pydatetime()
+
+
+
 
     def check_nc_files_needed_available(self, nc_files_needed: list, nc_files_available: list):
         

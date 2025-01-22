@@ -33,32 +33,11 @@ if __name__ == "__main__":
     # Start general logging
     runtime = datetime.now().strftime("%Y%m%dT%H%M%S")
     general_log_file = os.path.join(vargs.output_path, "logs", f"{runtime}_general_process.log")
-    general_logger = IMOSLogging().logging_start(logger_name="general_logger",
-                                                 logging_filepath=general_log_file)
+    GENERAL_LOGGER = IMOSLogging().logging_start(logger_name="general_logger",
+                                                logging_filepath=general_log_file)
 
     # Start specific logging for current site
-    site_log_file = os.path.join(vargs.output_path, "logs", f"{runtime}_[CURRENT_SITE]_process.log")
-    site_logger = IMOSLogging().logging_start(logger_name="site_logger",
-                                                                            logging_filepath=site_log_file)
 
-
-   
-
-    ### TEMPORARY SETUP (REMOVE WHEN DONE)
-    # window = int(vargs.window)# window = 24 # hours
-    # window_unit = vargs.window_unit# window_unit = "hours"
-    period_to_qualify = 24 # hours
-    backfill = True
-    ### END OF TEMPORARY SETUP
-    
-
-    # Loading metadata
-    """ 
-    - Load buoys_metadata.csv as Pandas DataFrame
-    - Get site_ids (site names)
-    - Get Sofar API Tokens
-    - 
-    """
 
 
     wb = WaveBuoy(buoy_type="sofar")
@@ -79,12 +58,16 @@ if __name__ == "__main__":
 
     """
 
-    for idx, site in wb.buoys_metadata_token_sorted.iterrows():
+    for idx, site in wb.buoys_metadata.iterrows():
        
         # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
         site = wb.buoys_metadata.loc["Hillarys"]
-        print(site.name)
+        GENERAL_LOGGER.info(f"PROCESSING {site.name}")
         # ### END OF TEMPORARY SETUP 
+
+        site_log_file = os.path.join(vargs.output_path, "logs", f"{runtime}_[CURRENT_SITE]_process.log")
+        SITE_LOGGER = IMOSLogging().logging_start(logger_name="site_logger",
+                                            logging_filepath=site_log_file)
 
         # Relevant loads ---------------------------------------
         
@@ -106,20 +89,29 @@ if __name__ == "__main__":
             
             latest_nc_file_available = wb.get_latest_nc_file_available(institution=site.region,
                                                                     site_id=site.name)
-            latest_processed_datetime = wb.get_latest_processed_datetime(nc_file_path=latest_nc_file_available)
+            latest_processed_time = wb.get_latest_processed_time(nc_file_path=latest_nc_file_available)
             
             availability_check, nc_file_paths = wb.check_nc_files_needed_available(nc_files_needed=nc_files_needed,
                                                             nc_files_available=nc_files_available)
             
             if availability_check: # any or all needed ar available
-                nc_to_load = nc_file_paths
+                earliest_nc_file_available = wb.get_earliest_nc_file_available(institution=site.region,
+                                                                            site_id=site.name)
+                earliest_available_time = wb.get_earliest_processed_time(nc_file_path=latest_nc_file_available)
+                
+                if window_start_time < earliest_available_time:
+                    nc_to_load = None
+                else:
+                    nc_to_load = nc_file_paths
+            
             else: # none is available
-                if backfill:
+                if vargs.backfill:
                     nc_to_load = latest_nc_file_available
                 else:
                     nc_to_load = None
+            
             previous_data_df = wb.load_datasets(nc_file_paths=nc_to_load)
-            window_start_time = latest_processed_datetime
+            window_start_time = latest_processed_time
 
         # Extraction ---------------------------------------
         """
@@ -169,13 +161,14 @@ if __name__ == "__main__":
         if sst_new_data_df is None and site.version in ("smart_mooring", "half_smart_mooring"):
             new_sensor_data_raw = sofar_api.get_sensor_data(spot_id=site.serial,
                                                         token=site.sofar_token,
-                                                        start_date=window_start_date,
+                                                        start_date=window_start_time,
                                                         end_date=latest_available_datetime + timedelta(hours=1))
 
             sensor_new_data_df = wb.convert_to_dataframe(raw_data=new_sensor_data_raw)
             sensor_new_data_df = wb.convert_to_datetime(data=new_sensor_data_raw)
             
-            sst_new_data_df = wb.get_sst_from_smart_mooring(data=new_sensor_data_raw)
+            sst_new_data_df = wb.get_sst_from_smart_mooring(data=new_sensor_data_raw,
+                                                            sensor_type="temperature")
             
 
         all_new_data_df = wb.merge_parameter_types(waves=waves_new_data_df, sst=sst_new_data_df)
@@ -194,12 +187,14 @@ if __name__ == "__main__":
             all_data_df = all_new_data_df
 
         # TEMPORARY SETUP (REMOVE WHEN DONE)
-        all_data_df.to_csv("tests/all_data_df_output.csv", index=False)
+        csv_file_path = os.path.join(vargs.output_path, "test_files", "all_data_df_output.csv")
+        all_data_df.to_csv(csv_file_path, index=False)
 
+        # Closing
         imos_logging = IMOSLogging()
-        site_logger_file_path = imos_logging.get_log_file_path(site_logger)
-        imos_logging.logging_stop(logger=site_logger)
-        imos_logging.rename_log_file(logger=site_logger,
+        site_logger_file_path = imos_logging.get_log_file_path(SITE_LOGGER)
+        imos_logging.logging_stop(logger=SITE_LOGGER)
+        imos_logging.rename_log_file(logger=SITE_LOGGER,
                                     site_name=site.name,
                                     file_path=site_logger_file_path)
 

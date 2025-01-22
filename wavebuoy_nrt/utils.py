@@ -7,6 +7,8 @@ import re
 from datetime import datetime, timedelta
 
 GENERAL_LOGGER = logging.getLogger("general_logger")
+SITE_LOGGER = logging.getLogger("site_logger")
+
 
 def args():
     """
@@ -40,6 +42,9 @@ def args():
                         help="desired period to be qualified. Please pass start and end dates as YYYY-mm-ddTHH:MM separated by a blank space.",
                         required=False)
 
+    parser.add_argument('-bf', '--backfill', dest='backfill', action="store_true",
+                        help="wether the user wants to backfill the data from the latest available time back to the last processed time.",
+                        required=False)
     # parser.add_argument('-p', '--push-to-incoming', dest='incoming_path', type=str, default=None,
     #                     help="incoming directory for files to be ingested by AODN pipeline (Optional)",
     #                     required=False)
@@ -72,7 +77,11 @@ def args():
         vargs.period_to_qualify_start_date = datetime.strptime(vargs.period_to_qualify[0],"%Y-%m-%dT%H:%M")
         vargs.period_to_qualify_end_date = datetime.strptime(vargs.period_to_qualify[1],"%Y-%m-%dT%H:%M")
 
-    
+    if vargs.backfill:
+        backfill = True
+    else:
+        backfill = False
+
     return vargs
 
 
