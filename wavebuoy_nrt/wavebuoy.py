@@ -21,14 +21,13 @@ class FilesHandler():
         if os.path.exists(os.path.join(FILES_PATH, file_name)):
             return os.path.join(FILES_PATH, file_name)
         else:
-            error_message = """Path for buoys_metadata.csv does not exist.
-                                 Check if the correct path was provided, or if buoyus_metadata.csv was moved."""
+            error_message = f"""Path for {file_name} does not exist.\nCheck if the correct path was provided, or if {file_name} was moved."""
             GENERAL_LOGGER.error(error_message)
             raise FileNotFoundError(error_message)
 
 class SpotterWaveBuoy():
 
-    def convert_to_dataframe(self, raw_data: dict, parameters_type: str) -> pd.DataFrame:
+    def convert_wave_data_to_dataframe(self, raw_data: dict, parameters_type: str) -> pd.DataFrame:
         """
         ['spotterId', 'limit', 'frequencyData', 'wind', 'waves', 'surfaceTemp', 'barometerData']
         
@@ -39,6 +38,9 @@ class SpotterWaveBuoy():
             print(f"No data for {parameters_type}.")
             return None
 
+    def convert_smart_mooring_to_dataframe(self, raw_data: dict) -> pd.DataFrame:
+        return pd.DataFrame(raw_data)
+
     def merge_parameter_types(self, waves: pd.DataFrame, sst: pd.DataFrame = None) -> pd.DataFrame: # wind: pd.DataFrame
         # # IN PROGRESS
         # if wind:
@@ -47,7 +49,7 @@ class SpotterWaveBuoy():
 
         if sst is not None:
             if not sst.empty:
-                sst = sst.drop(columns=["latitude","longitude", "processing_source"])
+                sst = sst.drop(columns=["latitude","longitude"])
                 waves = waves.merge(sst, on="TIME")
         
         return waves     
@@ -57,7 +59,10 @@ class SpotterWaveBuoy():
         return data.rename(columns=rename_dict)
 
     def drop_unwanted_columns(self, data: pd.DataFrame) -> pd.DataFrame:
-        return data.drop(columns=["processing_source"])
+        try:
+            return data.drop(columns=["processing_source"])
+        except:
+            return data
 
     def check_parameters_type_available(self, raw_data: dict) -> list:
         parameters_types = raw_data.keys()
@@ -74,19 +79,21 @@ class SpotterWaveBuoy():
             else:
                 print(f"No {sensor_type} present in this smart_mooring.")
                 return None
-            
-            if len(position) > 1: # select surface sensor based on surface position (i.e. the lowest position)
-                selected_position = position.min()
+
+        if len(position) > 1: # select surface sensor based on surface position (i.e. the lowest position)
+            position = position.min()
+        else:
+            position = position[0]
                 
-        return data[data["sensorPosition"] == selected_position]
+        return data[data["sensorPosition"] == position]
             
 
 class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy): #(CWBAWSs3):
     def __init__(self, buoy_type:str,buoys_metadata_file_name:str="buoys_metadata.csv"):
         self.buoys_metadata = self._get_buoys_metadata(buoy_type=buoy_type, buoys_metadata_file_name=buoys_metadata_file_name)
-        self.buoys_metadata_token_sorted = self._sort_sites_by_sofar_token(buoys_metadata=self.buoys_metadata)
-        self.site_ids = self._get_site_ids(buoys_metadata=self.buoys_metadata_token_sorted)
-        self.sites_per_region = self._get_sites_per_region(buoys_metadata=self.buoys_metadata_token_sorted)
+        # self.buoys_metadata_token_sorted = self._sort_sites_by_sofar_token(buoys_metadata=self.buoys_metadata)
+        self.site_ids = self._get_site_ids(buoys_metadata=self.buoys_metadata)
+        self.sites_per_region = self._get_sites_per_region(buoys_metadata=self.buoys_metadata)
 
     def _get_buoys_metadata(self, buoy_type:str,buoys_metadata_file_name:str):
         buoys_metadata_path = self._get_file_path(file_name=buoys_metadata_file_name)
