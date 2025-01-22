@@ -86,6 +86,8 @@ def args():
 
 
 class IMOSLogging:
+    unexpected_error_message = "An unexpected error occurred when processing {site_name}\n Please check the site log for details"
+
     def __init__(self):
         pass
 
@@ -112,11 +114,11 @@ class IMOSLogging:
             self.logger.setLevel(level)
 
             # Create a file handler
-            handler = logging.FileHandler(self.logging_filepath)
+            handler = logging.FileHandler(self.logging_filepath, mode="w")
             handler.setLevel(level)
 
             # Create a logging format
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
             handler.setFormatter(formatter)
 
             # Add the handler to the logger
@@ -138,5 +140,8 @@ class IMOSLogging:
     def rename_log_file(self, logger: logging.Logger, site_name: str, file_path):
         pattern = r"\[CURRENT_SITE\]"
         new_file_name = re.sub(pattern, f"{site_name}", file_path)
-        os.rename(file_path, new_file_name)
+        if os.path.exists(new_file_name):
+            os.replace(file_path, new_file_name)
+        else:
+            os.rename(file_path, new_file_name)
         GENERAL_LOGGER.info(f"{site_name} log file renamed successfully")
