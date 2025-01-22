@@ -1,10 +1,13 @@
 from datetime import datetime, timedelta
 import requests
+import logging
 
 from pysofar.sofar import SofarApi
 from pysofar.spotter import Spotter
 import pandas as pd
 
+GENERAL_LOGGER = logging.getLogger("general_logger")
+SITE_LOGGER = logging.getLogger("site_logger")
 
 class SofarAPI:
     def __init__(self, buoys_metadata: pd.DataFrame):
@@ -183,8 +186,10 @@ class SofarAPI:
             latest_available_time = latest_data["waves"][-1]["timestamp"]
         except:
             latest_available_time = latest_data["track"][-1]["timestamp"]
+
+        latest_available_time = datetime.strptime(latest_available_time, "%Y-%m-%dT%H:%M:%S.%fZ")
         
-        return datetime.strptime(latest_available_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+        return latest_available_time
 
     def _get_status_code(self, response: requests.Response) -> int:
         return response.status_code

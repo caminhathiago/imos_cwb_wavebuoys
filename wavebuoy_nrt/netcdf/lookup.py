@@ -162,7 +162,6 @@ class NetCDFFileHandler():
         return availability_check, nc_file_paths 
         
     def load_datasets(self, nc_file_paths: Union[List[str], str]) -> pd.DataFrame:
-        print("engine selected ===============================")
 
         if not nc_file_paths:
             return pd.DataFrame()
