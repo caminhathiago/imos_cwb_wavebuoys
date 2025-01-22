@@ -86,7 +86,16 @@ class SpotterWaveBuoy():
             position = position[0]
                 
         return data[data["sensorPosition"] == position]
-            
+
+    def process_smart_mooring_columns(self, data: pd.DataFrame) -> pd.DataFrame:
+        cols_to_drop = ["sensorPosition","units","unit_type","data_type_name"]
+        data = data.drop(columns=cols_to_drop)
+        data = data.rename(columns={"value":"SST"})
+        return data
+    
+    def round_parameter_values(self, data: pd.DataFrame, parameter: str, decimals: int = 2) -> pd.DataFrame:
+        data[parameter] = data[parameter].round(decimals)
+        return data
 
 class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy): #(CWBAWSs3):
     def __init__(self, buoy_type:str,buoys_metadata_file_name:str="buoys_metadata.csv"):
