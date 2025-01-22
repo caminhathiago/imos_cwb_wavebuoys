@@ -61,7 +61,6 @@ if __name__ == "__main__":
                                                                 window_unit=vargs.window_unit)
             SITE_LOGGER.info(f"window start generated as {latest_available_time} minus {vargs.window} {vargs.window_unit}: {window_start_time}")
 
-
             nc_files_available = wb.get_available_nc_files(institution=site.region, site_id=site.name)
             SITE_LOGGER.info(f"available nc files: {nc_files_available}")
 
@@ -98,16 +97,20 @@ if __name__ == "__main__":
                 
                 else:
                     SITE_LOGGER.info("no needed nc files are available.")
+                    
                     if vargs.backfill:
                         SITE_LOGGER.info(f"backfilling using latest nc file available as backfill argument is set to {vargs.backfill}")
+                        
                         nc_to_load = latest_nc_file_available
                     else:
                         SITE_LOGGER.info("no Backfilling as backfill argument is set to {vargs.backfill}. Only creating new nc files with newly extracted data.")
+                        
                         nc_to_load = None
             
                 previous_data_df = wb.load_datasets(nc_file_paths=nc_to_load)
                 window_start_time = latest_processed_time
-                SITE_LOGGER.info(f"considering window start time as lastest processed time{window_start_time} as a previous nc files are being loaded.")
+                SITE_LOGGER.info(f"considering window start time as lastest processed time ({window_start_time}) as previous nc files are being loaded.")
+            
             else:
                 SITE_LOGGER.info("no previous nc files available. Extract new data and create new nc files.")
 
@@ -119,17 +122,25 @@ if __name__ == "__main__":
                                             end_date=window_end_date)
             SITE_LOGGER.info(f"raw spotter data extracted from Sofar API")
 
+            if not new_data_raw["waves"]:
+                SITE_LOGGER.info("No data for the desired period. Aborting processing for this site")
+                break
+
             # Processing ---------------------------------------
             waves_new_data_df = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="waves")
             waves_new_data_df = wb.convert_to_datetime(data=waves_new_data_df)
-            SITE_LOGGER.info(f"waves data converted to DataFrame")
+            waves_new_data_df = wb.drop_unwanted_columns(data=waves_new_data_df)
+            SITE_LOGGER.info(f"waves data converted to DataFrame and pre-processed")
 
-            sst_new_data_df = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="surfaceTemp")
-            sst_new_data_df = wb.convert_to_datetime(data=sst_new_data_df)
-            SITE_LOGGER.info(f"sst data converted to DataFrame if exists.")
+            if new_data_raw["surfaceTemp"]:
+                sst_new_data_df = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="surfaceTemp")
+                sst_new_data_df = wb.convert_to_datetime(data=sst_new_data_df)
+                sst_new_data_df = wb.drop_unwanted_columns(data=sst_new_data_df)
+                SITE_LOGGER.info(f"sst data converted to DataFrame and pre-processed if exists")
 
-            if sst_new_data_df is None and site.version in ("smart_mooring", "half_smart_mooring"):
+            if not new_data_raw["surfaceTemp"] and site.version in ("smart_mooring", "half_smart_mooring"):
                 SITE_LOGGER.info(f"no sst available from spotter, grab smart mooring data since it is available (i.e. buoy version: {site.version})")
+                
                 new_sensor_data_raw = sofar_api.get_sensor_data(spot_id=site.serial,
                                                             token=site.sofar_token,
                                                             start_date=window_start_time,
@@ -138,16 +149,16 @@ if __name__ == "__main__":
                 
                 sensor_new_data_df = wb.convert_smart_mooring_to_dataframe(raw_data=new_sensor_data_raw)
                 sensor_new_data_df = wb.convert_to_datetime(data=sensor_new_data_df)
-                sst_new_data_df = wb.get_sst_from_smart_mooring(data=sensor_new_data_df,
-                                                                sensor_type="temperature")
+                sensor_new_data_df = wb.get_sst_from_smart_mooring(data=sensor_new_data_df, sensor_type="temperature")
+                sensor_new_data_df = wb.process_smart_mooring_columns(data=sensor_new_data_df)
+                sst_new_data_df = wb.round_parameter_values(data=sensor_new_data_df, parameter="SST")
+
                 SITE_LOGGER.info("smart mooring data processed")
 
-
             all_new_data_df = wb.merge_parameter_types(waves=waves_new_data_df, sst=sst_new_data_df)
-            SITE_LOGGER.info("waves and SST/Upper smart mooring temperature sensor merged")
+            SITE_LOGGER.info("waves and sst/upper smart mooring temperature sensor merged")
 
             all_new_data_df = wb.conform_columns_names_aodn(data=all_new_data_df)
-            all_new_data_df = wb.drop_unwanted_columns(data=all_new_data_df)
             all_new_data_df = wb.sort_datetimes(data=all_new_data_df)
             SITE_LOGGER.info("new data processed")
 
@@ -159,7 +170,7 @@ if __name__ == "__main__":
                 if not previous_data_df.empty:
                     all_data_df = wb.concat_previous_new(previous_data=previous_data_df,
                                                     new_data=all_new_data_df)
-                    SITE_LOGGER.info("concatenate new data with previous since availba")
+                    SITE_LOGGER.info("concatenate new data with previous since available")
             else:
                 all_data_df = all_new_data_df
 
@@ -167,7 +178,7 @@ if __name__ == "__main__":
             # TEMPORARY SETUP (REMOVE WHEN DONE)
             csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_output.csv")
             all_data_df.to_csv(csv_file_path, index=False)
-            SITE_LOGGER.info(f"saved processed data as {csv_file_path}")
+            SITE_LOGGER.info(f"processed data saved as '{csv_file_path}'")
             
             # Qualification ---------------------------------------
             
