@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import logging
 
 import pandas as pd
+import numpy as np
 
 from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
 from wavebuoy_nrt.config.config import FILES_PATH, AODN_COLUMNS_TEMPLATE
@@ -50,7 +51,7 @@ class SpotterWaveBuoy():
         if sst is not None:
             if not sst.empty:
                 sst = sst.drop(columns=["latitude","longitude"])
-                waves = waves.merge(sst, on="TIME")
+                waves = waves.merge(sst, on="TIME", how='outer')
         
         return waves     
 
@@ -96,6 +97,23 @@ class SpotterWaveBuoy():
     def round_parameter_values(self, data: pd.DataFrame, parameter: str, decimals: int = 2) -> pd.DataFrame:
         data[parameter] = data[parameter].round(decimals)
         return data
+    
+    def test_duplicated(self, data: pd.DataFrame) -> bool:
+        return any(data.duplicated().values)
+    
+    def generate_pickle_file(self, data, file_name, site_name):
+        import pickle
+        with open(f"output_path/test_files/{site_name}_{file_name}.pkl", "wb") as pickle_file:
+            pickle.dump(data, pickle_file)
+            print(f"saved pkl as output_path/test_files/{site_name}_{file_name}.pkl")
+
+    def select_processing_source(self, data: pd.DataFrame, priority_source: str="HDR") -> pd.DataFrame:
+        available_sources = data["processing_source"].unique()
+        if priority_source in available_sources:
+            return data[data["processing_source"] == priority_source]
+        else:
+            index = np.argwhere(available_sources!=priority_source)
+            return data[data["processing_source"] == str(available_sources[index].squeeze())]
 
 class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy): #(CWBAWSs3):
     def __init__(self, buoy_type:str,buoys_metadata_file_name:str="buoys_metadata.csv"):
@@ -117,8 +135,6 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy): #(CWBAWSs3):
         except:
             error_message = "Loading and processing buoys_metadata.csv unsuccessful. Check if the file is corrupted or if its structure has been changed"
             GENERAL_LOGGER.error(error_message, exc_info=True)
-
-
         
     def _select_buoy_type(self, buoy_type:str, buoys_metadata:pd.DataFrame) -> pd.DataFrame:
         return buoys_metadata.loc[buoys_metadata["type"] == buoy_type]
@@ -153,17 +169,20 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy): #(CWBAWSs3):
 
     def convert_to_datetime(self, data: pd.DataFrame, timestamp_col_name: str="timestamp") -> pd.DataFrame:
         if data is not None:
-            data["TIME"] = pd.to_datetime(data[timestamp_col_name], errors="coerce")
+            data["TIME"] = (pd.to_datetime(data[timestamp_col_name], errors="coerce", utc=True)
+                            .dt.tz_localize(None)) # making sure to generate tz naive times following AODN previous data and templates
             data = data.drop(columns=[timestamp_col_name])
             return data
         else:
             return None
         
-        
-    
     def sort_datetimes(self, data: pd.DataFrame) -> pd.DataFrame:
         return data.sort_values("TIME")
 
     def concat_previous_new(self, previous_data: pd.DataFrame, new_data: pd.DataFrame) -> pd.DataFrame:
         return pd.concat([previous_data, new_data], axis=0)
+    
+    def create_timeseries_aodn_column(self, data: pd.DataFrame) -> pd.DataFrame:
+        data["timeSeries"] = float(1)
+        return data
 
