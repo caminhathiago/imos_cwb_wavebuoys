@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
-from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
+from wavebuoy_nrt.qc.qcTests import WaveBuoyQC
 from wavebuoy_nrt.utils import args, IMOSLogging
 
 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     
 
     # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
-    site = wb.buoys_metadata.loc["Hillarys"]
+    # site = wb.buoys_metadata.loc["Hillarys"]
     wb.buoys_metadata = wb.buoys_metadata.loc[["Hillarys","Hillarys_HSM"]].copy()
     for idx, site in wb.buoys_metadata.iterrows():
         
@@ -120,6 +120,9 @@ if __name__ == "__main__":
                                             token=site.sofar_token,
                                             start_date=window_start_time,
                                             end_date=window_end_date)
+            wb.generate_pickle_file(data=new_data_raw, file_name="new_data_raw", site_name=site.name)
+
+
             SITE_LOGGER.info(f"raw spotter data extracted from Sofar API")
 
             if not new_data_raw["waves"]:
@@ -129,14 +132,24 @@ if __name__ == "__main__":
             # Processing ---------------------------------------
             waves_new_data_df = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="waves")
             waves_new_data_df = wb.convert_to_datetime(data=waves_new_data_df)
+            waves_new_data_df = wb.select_processing_source(data=waves_new_data_df, priority_source="HDR")
             waves_new_data_df = wb.drop_unwanted_columns(data=waves_new_data_df)
+
             SITE_LOGGER.info(f"waves data converted to DataFrame and pre-processed")
+
+            
 
             if new_data_raw["surfaceTemp"]:
                 sst_new_data_df = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="surfaceTemp")
                 sst_new_data_df = wb.convert_to_datetime(data=sst_new_data_df)
+                # sst_new_data_df = wb.select_processing_source(data=sst_new_data_df, priority_source="HDR")
                 sst_new_data_df = wb.drop_unwanted_columns(data=sst_new_data_df)
+                wb.generate_pickle_file(data=sst_new_data_df, file_name="surfaceTemp_new_data", site_name=site.name)
+
+               
+
                 SITE_LOGGER.info(f"sst data converted to DataFrame and pre-processed if exists")
+
 
             if not new_data_raw["surfaceTemp"] and site.version in ("smart_mooring", "half_smart_mooring"):
                 SITE_LOGGER.info(f"no sst available from spotter, grab smart mooring data since it is available (i.e. buoy version: {site.version})")
@@ -154,17 +167,34 @@ if __name__ == "__main__":
                 sst_new_data_df = wb.round_parameter_values(data=sensor_new_data_df, parameter="SST")
 
                 SITE_LOGGER.info("smart mooring data processed")
-
+            
             all_new_data_df = wb.merge_parameter_types(waves=waves_new_data_df, sst=sst_new_data_df)
+            all_new_data_df_test = waves_new_data_df.merge(sst_new_data_df, on="TIME", how="outer")
+
+            wb.generate_pickle_file(data=sst_new_data_df, file_name="sst_new_data_df", site_name=site.name)
+            wb.generate_pickle_file(data=waves_new_data_df, file_name="waves_new_data_df", site_name=site.name)
+            wb.generate_pickle_file(data=all_new_data_df, file_name="all_new_data_df", site_name=site.name)
+            wb.generate_pickle_file(data=all_new_data_df_test, file_name="all_new_data_df_test", site_name=site.name)
+
             SITE_LOGGER.info("waves and sst/upper smart mooring temperature sensor merged")
 
+            test = wb.test_duplicated(data=all_new_data_df)
+            SITE_LOGGER.warning(f"data has duplicated values? R: {test}")
+
+
+            all_new_data_df = wb.create_timeseries_aodn_column(data=all_new_data_df)
             all_new_data_df = wb.conform_columns_names_aodn(data=all_new_data_df)
             all_new_data_df = wb.sort_datetimes(data=all_new_data_df)
+
+            
+            
+
             SITE_LOGGER.info("new data processed")
 
 
             # TEMPORARY SETUP
             all_new_data_df["check"] = "new"
+            # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
 
             if nc_files_available:
                 if not previous_data_df.empty:
@@ -174,20 +204,46 @@ if __name__ == "__main__":
             else:
                 all_data_df = all_new_data_df
 
+
             
             # TEMPORARY SETUP (REMOVE WHEN DONE)
             csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_output.csv")
             all_data_df.to_csv(csv_file_path, index=False)
             SITE_LOGGER.info(f"processed data saved as '{csv_file_path}'")
-            
+            # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
+
             # Qualification ---------------------------------------
+            q = WaveBuoyQC()
+            qc_config = q.select_qc_config(qc_configs=q.qc_configs, config_id=1)
+            qc_config_dict = q.convert_qc_config_to_dict(qc_config=qc_config)
+
+            parameters = ["WSSH", "SST"]
+            for param in parameters:
+                all_data_df = q.gross_range_test(data=all_data_df, parameter=param, qc_config=qc_config_dict)
+                all_data_df = q.rate_of_change_test(data=all_data_df, parameter=param, qc_config=qc_config_dict)
             
+            # TEMPORARY SETUP (REMOVE WHEN DONE)
+            all_data_df_qualified = all_data_df
+            csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_qualified_output.csv")
+            all_data_df_qualified.to_csv(csv_file_path, index=False)
+            SITE_LOGGER.info(f"qualified data saved as '{csv_file_path}'")
+            # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
 
+    
+            # Processing Nc File --------------------------------------------
+            # all_data_df_qualified = wb.
+            # dataset = wb.convert_dataframe_to_dataset(data=all_data_df_qualified)
 
+            # Loading -------------------
 
+            # dataset = all_data_df_qualified.to_xarray()
+            # nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_qualified.nc")
+            # dataset.to_netcdf(nc_file_path, engine="netcdf4")
+            # SITE_LOGGER.info(f"raw nc file (no attributes) saved as '{nc_file_path}'")
 
             GENERAL_LOGGER.info(f"Processing successful")
-    
+
+
         except Exception as e:
             error_message = IMOSLogging().unexpected_error_message.format(site_name=site.name.upper())
             GENERAL_LOGGER.error(error_message)
