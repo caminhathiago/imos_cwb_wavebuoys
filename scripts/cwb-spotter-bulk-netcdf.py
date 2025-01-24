@@ -53,6 +53,8 @@ if __name__ == "__main__":
 
         try:       
             # Relevant loads ---------------------------------------
+            SITE_LOGGER.info("LOADING STEP ====================================")
+
             latest_available_time = sofar_api.get_latest_available_time(spot_id=site.serial, token=site.sofar_token)
             SITE_LOGGER.info(f"grabed latest_available_time: {latest_available_time}")
 
@@ -115,6 +117,8 @@ if __name__ == "__main__":
                 SITE_LOGGER.info("no previous nc files available. Extract new data and create new nc files.")
 
             # Extraction ---------------------------------------
+            SITE_LOGGER.info("EXTRACTION STEP ====================================")
+
             window_end_date = latest_available_time + timedelta(hours=1)
             new_data_raw = sofar_api.fetch_wave_data(spot_id=site.serial,
                                             token=site.sofar_token,
@@ -130,6 +134,8 @@ if __name__ == "__main__":
                 break
 
             # Processing ---------------------------------------
+            SITE_LOGGER.info("PROCESSING STEP ====================================")
+
             waves_new_data_df = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="waves")
             waves_new_data_df = wb.convert_to_datetime(data=waves_new_data_df)
             # change to priority_source to hdr at some point
@@ -187,12 +193,6 @@ if __name__ == "__main__":
             all_new_data_df = wb.conform_columns_names_aodn(data=all_new_data_df)
             all_new_data_df = wb.sort_datetimes(data=all_new_data_df)
 
-            
-            
-
-            SITE_LOGGER.info("new data processed")
-
-
             # TEMPORARY SETUP
             all_new_data_df["check"] = "new"
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
@@ -214,22 +214,29 @@ if __name__ == "__main__":
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
 
             # Qualification ---------------------------------------
+            # GENERAL_LOGGER.info("Starting qualification step")
+            SITE_LOGGER.info("QUALIFICATION STEP ====================================")
+
             qc = WaveBuoyQC(config_id=1)
-           
-            parameters = ["WSSH", "SST"]
-            for param in parameters:
-                all_data_df = qc.gross_range_test(data=all_data_df, parameter=param, qc_config=qc.qc_config_dict)
-                all_data_df = qc.rate_of_change_test(data=all_data_df, parameter=param, qc_config=qc.qc_config_dict)
-            
+            qc.load_data(data=all_data_df)
+            parameters_to_qc = qc.get_parameters_to_qc(data=all_data_df, qc_config=qc.qc_config)      
+            qualified_data = qc.qualify(data=all_data_df,
+                                        parameters=parameters_to_qc,
+                                        gross_range_test=True,
+                                        rate_of_change_test=True)
+            SITE_LOGGER.info("Qualification successfull")
+
             # TEMPORARY SETUP (REMOVE WHEN DONE)
-            all_data_df_qualified = all_data_df
+            qualified_data = all_data_df
             csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_qualified_output.csv")
-            all_data_df_qualified.to_csv(csv_file_path, index=False)
+            qualified_data.to_csv(csv_file_path, index=False)
             SITE_LOGGER.info(f"qualified data saved as '{csv_file_path}'")
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
 
-    
+            GENERAL_LOGGER.info("Starting qualification step")
             # Processing Nc File --------------------------------------------
+            SITE_LOGGER.info("NC FILE PROCESSING STEP ====================================")
+
             # all_data_df_qualified = wb.
             # dataset = wb.convert_dataframe_to_dataset(data=all_data_df_qualified)
 
