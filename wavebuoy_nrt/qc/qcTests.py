@@ -41,8 +41,7 @@ class WaveBuoyQC():
         self.data = data
 
     def drop_unwanted_variables(self, data: pd.DataFrame) -> pd.DataFrame:
-        variables_to_drop = ['TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE', 'WAVE_quality_control', 
-                        'check', 'WMDS', 'WPDS', 'WPFM', 'WPPE' ] # TEMPORARY SETUP
+        variables_to_drop = ['TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE', 'WAVE_quality_control', 'check'] # TEMPORARY SETUP
         
         try:
             data = data.drop(columns=variables_to_drop) 
@@ -71,6 +70,23 @@ class WaveBuoyQC():
             error_message = f"{params_missing} not set in the desired qc_config. Please check qc_config file"
             SITE_LOGGER.error(error_message)
             raise KeyError(error_message)
+
+    def check_qc_limits(self, qc_config: pd.DataFrame):
+        
+        nan_indexes = qc_config.set_index("parameter").isna().stack()
+        nan_locs = (nan_indexes[nan_indexes]
+                        .reset_index()
+                        .rename(columns={"level_1":"threshold"})
+                        .drop(columns=0)
+                        .set_index("parameter")
+                        # .to_dict(orient="records")
+                    )
+        
+        if not nan_locs.empty:
+            error_message = f"tresholds not provided for some parameters and tests:\n{nan_locs}"
+            # SITE_LOGGER.error(error_message)
+            raise ValueError(error_message)
+        
 
     def create_flags_columns(self, data: pd.DataFrame, parameters: list) -> pd.DataFrame:
         
@@ -117,6 +133,8 @@ class WaveBuoyQC():
                 gross_range_test: bool = True,
                 rate_of_change_test: bool = True) -> pd.DataFrame:
         
+        self.check_qc_limits(qc_config=self.qc_config)
+
         if start_date and end_date:
             data = (data
                     .set_index("TIME")
@@ -141,6 +159,8 @@ class WaveBuoyQC():
                         parameter: str,
                         qc_config: dict) -> pd.DataFrame:
         
+        print(f"{parameter} - {qc_config[parameter]["gross_range_fail_min"]}")
+
         results = qartod.gross_range_test(
             inp=data[parameter],
             suspect_span=[qc_config[parameter]["gross_range_suspect_min"],
@@ -155,14 +175,15 @@ class WaveBuoyQC():
 
         data[param_qc_column] = results
 
-        SITE_LOGGER.info(f"{parameter} - gross range test completed.")
+        SITE_LOGGER.info(f"{parameter} - gross range test completed")
         return data
     
     def rate_of_change_test(self,
                         data: pd.DataFrame,
                         parameter: str,
                         qc_config: dict) -> pd.DataFrame:
-        
+       
+              
         results = qartod.rate_of_change_test(
             inp=data[parameter],
             tinp=data["TIME"],
@@ -176,7 +197,7 @@ class WaveBuoyQC():
 
         data[param_qc_column] = results
         
-        SITE_LOGGER.info(f"{parameter} - rate of change test completed.")
+        SITE_LOGGER.info(f"{parameter} - rate of change test completed")
         return data
 
    # def compose_config(self,
