@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
             # Extraction ---------------------------------------
             window_end_date = latest_available_time + timedelta(hours=1)
-            new_data_raw = sofar_api.get_wave_data(spot_id=site.serial,
+            new_data_raw = sofar_api.fetch_wave_data(spot_id=site.serial,
                                             token=site.sofar_token,
                                             start_date=window_start_time,
                                             end_date=window_end_date)
@@ -132,9 +132,9 @@ if __name__ == "__main__":
             # Processing ---------------------------------------
             waves_new_data_df = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="waves")
             waves_new_data_df = wb.convert_to_datetime(data=waves_new_data_df)
-            waves_new_data_df = wb.select_processing_source(data=waves_new_data_df, priority_source="HDR")
+            # change to priority_source to hdr at some point
+            waves_new_data_df = wb.select_processing_source(data=waves_new_data_df, priority_source="embedded")
             waves_new_data_df = wb.drop_unwanted_columns(data=waves_new_data_df)
-
             SITE_LOGGER.info(f"waves data converted to DataFrame and pre-processed")
 
             
@@ -142,7 +142,8 @@ if __name__ == "__main__":
             if new_data_raw["surfaceTemp"]:
                 sst_new_data_df = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="surfaceTemp")
                 sst_new_data_df = wb.convert_to_datetime(data=sst_new_data_df)
-                # sst_new_data_df = wb.select_processing_source(data=sst_new_data_df, priority_source="HDR")
+                # change to priority_source to hdr at some point
+                sst_new_data_df = wb.select_processing_source(data=sst_new_data_df, priority_source="embedded") 
                 sst_new_data_df = wb.drop_unwanted_columns(data=sst_new_data_df)
                 wb.generate_pickle_file(data=sst_new_data_df, file_name="surfaceTemp_new_data", site_name=site.name)
 
@@ -213,14 +214,12 @@ if __name__ == "__main__":
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
 
             # Qualification ---------------------------------------
-            q = WaveBuoyQC()
-            qc_config = q.select_qc_config(qc_configs=q.qc_configs, config_id=1)
-            qc_config_dict = q.convert_qc_config_to_dict(qc_config=qc_config)
-
+            qc = WaveBuoyQC(config_id=1)
+           
             parameters = ["WSSH", "SST"]
             for param in parameters:
-                all_data_df = q.gross_range_test(data=all_data_df, parameter=param, qc_config=qc_config_dict)
-                all_data_df = q.rate_of_change_test(data=all_data_df, parameter=param, qc_config=qc_config_dict)
+                all_data_df = qc.gross_range_test(data=all_data_df, parameter=param, qc_config=qc.qc_config_dict)
+                all_data_df = qc.rate_of_change_test(data=all_data_df, parameter=param, qc_config=qc.qc_config_dict)
             
             # TEMPORARY SETUP (REMOVE WHEN DONE)
             all_data_df_qualified = all_data_df
