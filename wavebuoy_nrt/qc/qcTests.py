@@ -40,6 +40,23 @@ class WaveBuoyQC():
     def load_data(self, data: pd.DataFrame) -> pd.DataFrame:
         self.data = data
 
+    def get_parameters_to_qc(self, data: pd.DataFrame, qc_config: pd.DataFrame) -> list:
+        data_columns = data.columns
+        qc_config_parameters = qc_config["parameter"].values
+        
+        check = [param in qc_config_parameters for param in data_columns]
+        params_to_qc = [param for param in data_columns if param in qc_config_parameters]
+
+        if all(check):
+            return params_to_qc
+        if any(check) or not all(check):
+            print("not all parameters are present")
+            
+            params_missing = [param for param in data_columns if param not in qc_config_parameters]
+            error_message = f"{params_missing} not set in the desired qc_config. Please check qc_config file"
+            SITE_LOGGER.error(error_message)
+            raise KeyError(error_message)
+
     def create_flags_columns(self, data: pd.DataFrame, parameters: list) -> pd.DataFrame:
         
         not_eval_flag = 2.0
@@ -76,10 +93,6 @@ class WaveBuoyQC():
                 data[col] = not_eval_flag
         
         return data
-
-    def get_parameters_to_qc(self, data: pd.DataFrame) -> list:
-        columns = data.columns
-        return
 
     def qualify(self,
                 data: pd.DataFrame,
