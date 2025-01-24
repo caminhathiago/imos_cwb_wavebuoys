@@ -41,13 +41,15 @@ if __name__ == "__main__":
     # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
     # site = wb.buoys_metadata.loc["Hillarys"]
     wb.buoys_metadata = wb.buoys_metadata.loc[["Hillarys","Hillarys_HSM"]].copy()
+    # END OF TEMPORARY SETUP
     for idx, site in wb.buoys_metadata.iterrows():
         
         GENERAL_LOGGER.info(f"=========== {site.name.upper()} processing ===========")
 
-        site_log_file = os.path.join(vargs.output_path, "logs", f"[CURRENT_SITE]_process.log") # f"{runtime}_[CURRENT_SITE]_process.log
+        site_log_file = os.path.join(vargs.output_path, "logs", f"{site.name.upper()}_process.log") # f"{runtime}_[CURRENT_SITE]_process.log
         SITE_LOGGER = IMOSLogging().logging_start(logger_name="site_logger",
                                                 logging_filepath=site_log_file)
+        
         GENERAL_LOGGER.info(f"{site.name.upper()} log file created as {site_log_file}")
         SITE_LOGGER.info(f"{site.name.upper()} processing start")
 
@@ -251,9 +253,9 @@ if __name__ == "__main__":
         
         # Closing current site logging
         imos_logging = IMOSLogging()
-        site_logger_file_path = imos_logging.get_log_file_path(SITE_LOGGER)
+        # site_logger_file_path = imos_logging.get_log_file_path(SITE_LOGGER)
         imos_logging.logging_stop(logger=SITE_LOGGER)
-        imos_logging.rename_log_file(site_name=site.name, file_path=site_logger_file_path)
+        # imos_logging.rename_log_file(site_name=site.name, file_path=site_logger_file_path)
 
         GENERAL_LOGGER.info(f"=========== {site.name.upper()} successfully processed. ===========")
 
