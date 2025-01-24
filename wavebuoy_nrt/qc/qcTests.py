@@ -13,9 +13,11 @@ SITE_LOGGER = logging.getLogger("site_logger")
 class WaveBuoyQC():
     waves_parameters = ['SSWMD', 'WMDS', 'WPDI', 'WPDS', 'WPFM', 'WPPE', 'WSSH']
     
-    def __init__(self):
+    def __init__(self, config_id: int = 1):
         self.qc_configs = self.get_qc_configs()
-    
+        self.qc_config = self.select_qc_config(qc_configs=self.qc_configs, config_id=config_id)
+        self.qc_config_dict = self.convert_qc_config_to_dict(qc_config=self.qc_config )
+
     def get_qc_configs(self, file_name: str = "qc_config.csv"):
         file_path = os.path.join(FILES_PATH, file_name)
         if os.path.exists(file_path):
@@ -24,7 +26,6 @@ class WaveBuoyQC():
             error_message = "qc limits file not found, make sure it is in the relevant path."
             SITE_LOGGER.error(error_message)
             raise Exception(error_message)
-        # where are they stored?
         
     def select_qc_config(self, qc_configs: pd.DataFrame, config_id: int) -> pd.DataFrame:
         return qc_configs.loc[qc_configs["config_id"] == config_id]
@@ -72,6 +73,10 @@ class WaveBuoyQC():
                 data[col] = not_eval_flag
         
         return data
+
+    def get_parameters_to_qc(self, data: pd.DataFrame) -> list:
+        columns = data.columns
+        return
 
     def qualify(self,
                 data: pd.DataFrame,
