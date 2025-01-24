@@ -2,11 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import os
-import logging
-
-import pandas as pd
-from dotenv import load_dotenv
 from datetime import datetime, timedelta
+
+from dotenv import load_dotenv
 
 from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
@@ -46,9 +44,9 @@ if __name__ == "__main__":
         
         GENERAL_LOGGER.info(f"=========== {site.name.upper()} processing ===========")
 
+        # Create log file for current site run
         site_log_file = os.path.join(vargs.output_path, "logs", f"{site.name.upper()}_process.log") # f"{runtime}_[CURRENT_SITE]_process.log
-        SITE_LOGGER = IMOSLogging().logging_start(logger_name="site_logger",
-                                                logging_filepath=site_log_file)
+        SITE_LOGGER = IMOSLogging().logging_start(logger_name="site_logger", logging_filepath=site_log_file)
         
         GENERAL_LOGGER.info(f"{site.name.upper()} log file created as {site_log_file}")
         SITE_LOGGER.info(f"{site.name.upper()} processing start")
