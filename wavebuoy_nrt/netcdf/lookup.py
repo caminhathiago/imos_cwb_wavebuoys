@@ -151,11 +151,8 @@ class NetCDFFileHandler():
         check = [file in nc_files_available for file in nc_files_needed]
         nc_file_paths = [file for file in nc_files_needed if file in nc_files_available]
 
-        print(nc_file_paths)
         if all(check) or any(check):
-            print("All or some nc files needed are available, load the intersection.")
             availability_check = True
-        
         elif not all(check):
             availability_check = False
             
