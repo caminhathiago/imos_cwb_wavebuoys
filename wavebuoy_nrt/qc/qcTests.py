@@ -40,19 +40,34 @@ class WaveBuoyQC():
     def load_data(self, data: pd.DataFrame) -> pd.DataFrame:
         self.data = data
 
+    def drop_unwanted_variables(self, data: pd.DataFrame) -> pd.DataFrame:
+        variables_to_drop = ['TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE', 'WAVE_quality_control', 
+                        'check', 'WMDS', 'WPDS', 'WPFM', 'WPPE' ] # TEMPORARY SETUP
+        
+        try:
+            data = data.drop(columns=variables_to_drop) 
+        except:
+            variables_to_drop.remove("WAVE_quality_control")
+            data = data.drop(columns=variables_to_drop) 
+
+        return data
+
     def get_parameters_to_qc(self, data: pd.DataFrame, qc_config: pd.DataFrame) -> list:
-        data_columns = data.columns
+       
+        data = self.drop_unwanted_variables(data=data)
+        data_variables = data.columns
+        
         qc_config_parameters = qc_config["parameter"].values
         
-        check = [param in qc_config_parameters for param in data_columns]
-        params_to_qc = [param for param in data_columns if param in qc_config_parameters]
+        check = [param in qc_config_parameters for param in data_variables]
+        params_to_qc = [param for param in data_variables if param in qc_config_parameters]
 
         if all(check):
             return params_to_qc
         if any(check) or not all(check):
             print("not all parameters are present")
             
-            params_missing = [param for param in data_columns if param not in qc_config_parameters]
+            params_missing = [param for param in data_variables if param not in qc_config_parameters]
             error_message = f"{params_missing} not set in the desired qc_config. Please check qc_config file"
             SITE_LOGGER.error(error_message)
             raise KeyError(error_message)
