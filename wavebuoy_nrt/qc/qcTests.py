@@ -112,14 +112,29 @@ class WaveBuoyQC():
     def qualify(self,
                 data: pd.DataFrame,
                 parameters: list,
-                start_date: datetime,
-                end_date: datetime) -> pd.DataFrame:
+                start_date: datetime = None,
+                end_date: datetime = None,
+                gross_range_test: bool = True,
+                rate_of_change_test: bool = True) -> pd.DataFrame:
         
+        if start_date and end_date:
+            data = (data
+                    .set_index("TIME")
+                    .loc[start_date:end_date]
+                    .reset_index()
+                )
+
         for param in parameters:
-            results = self.gr
-        
-        
-        return
+            if gross_range_test:
+                data = self.gross_range_test(data=data,
+                                            parameter=param,
+                                            qc_config=self.qc_config_dict)
+            if rate_of_change_test:
+                data = self.rate_of_change_test(data=data,
+                                                parameter=param,
+                                                qc_config=self.qc_config_dict)
+
+        return data
     
     def gross_range_test(self,
                         data: pd.DataFrame,
@@ -140,6 +155,7 @@ class WaveBuoyQC():
 
         data[param_qc_column] = results
 
+        SITE_LOGGER.info(f"{parameter} - gross range test completed.")
         return data
     
     def rate_of_change_test(self,
@@ -159,7 +175,8 @@ class WaveBuoyQC():
             data = self._create_flags_column(data=data, parameter=parameter, test=test_name)
 
         data[param_qc_column] = results
-
+        
+        SITE_LOGGER.info(f"{parameter} - rate of change test completed.")
         return data
 
    # def compose_config(self,
