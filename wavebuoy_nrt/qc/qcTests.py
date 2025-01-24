@@ -37,6 +37,9 @@ class WaveBuoyQC():
                 .to_dict(orient="index")
             )
     
+    def load_data(self, data: pd.DataFrame) -> pd.DataFrame:
+        self.data = data
+
     def create_flags_columns(self, data: pd.DataFrame, parameters: list) -> pd.DataFrame:
         
         not_eval_flag = 2.0
