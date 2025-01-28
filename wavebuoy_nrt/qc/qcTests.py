@@ -3,6 +3,8 @@ import os
 import logging
 
 import pandas as pd
+import numpy as np
+
 from ioos_qc import qartod
 
 from wavebuoy_nrt.config.config import FILES_PATH
@@ -175,7 +177,7 @@ class WaveBuoyQC():
 
         data[param_qc_column] = results
 
-        SITE_LOGGER.info(f"{parameter} - gross range test completed")
+        SITE_LOGGER.info(f"{parameter} | gross range test completed")
         return data
     
     def rate_of_change_test(self,
@@ -196,9 +198,33 @@ class WaveBuoyQC():
             data = self._create_flags_column(data=data, parameter=parameter, test=test_name)
 
         data[param_qc_column] = results
+
+        qc_basic_report = self.flags_counter(results=results)
         
-        SITE_LOGGER.info(f"{parameter} - rate of change test completed")
+        SITE_LOGGER.info(f"{parameter} | rate of change test completed") #| {qc_basic_report}")
         return data
+
+    def flags_counter(self, results: np.array):
+        unique, counts = np.unique(results, return_counts=True)
+        return dict(zip(unique, counts))
+
+    def summarize_flags(self, data: pd.DataFrame, parameter_type: str = "waves") -> pd.DataFrame:
+        
+        """
+        the main idea is to summarize qc flags for each parameter in one flag to be stored in WAVES_quality_control
+        - select only qc related columns with filter(regex)
+        - choose the highest value of the parameters (except for 9)
+        - if Peak Period fails, everything fails
+        - 
+        
+        """
+        qualified_data_summarized = pd.DataFrame([])
+        return qualified_data_summarized
+
+
+
+
+
 
    # def compose_config(self,
     #                    data: pd.DataFrame,
