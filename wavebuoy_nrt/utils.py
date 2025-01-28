@@ -131,9 +131,13 @@ class IMOSLogging:
     def get_log_file_path(self, logger):
         return logger.handlers[0].baseFilename
     
-    def rename_log_file(self, site_name: str, file_path):
-        pattern = r"\[CURRENT_SITE\]"
-        new_file_name = re.sub(pattern, f"{site_name}", file_path)
+    def rename_log_file_if_error(self, site_name: str, file_path):
+        site_name = site_name.upper()
+        runtime = datetime.now().strftime("%Y%m%dT%H%M%S")
+        pattern = f"{site_name}"
+        new_name = f"{runtime}_{site_name}_error"
+
+        new_file_name = re.sub(pattern, new_name, file_path)
         if os.path.exists(new_file_name):
             os.replace(file_path, new_file_name)
         else:
