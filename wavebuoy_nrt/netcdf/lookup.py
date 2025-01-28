@@ -143,9 +143,6 @@ class NetCDFFileHandler():
                        .values)
                     ).to_pydatetime()
 
-
-
-
     def check_nc_files_needed_available(self, nc_files_needed: list, nc_files_available: list):
         
         check = [file in nc_files_available for file in nc_files_needed]
