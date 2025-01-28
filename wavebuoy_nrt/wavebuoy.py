@@ -51,7 +51,7 @@ class SpotterWaveBuoy():
         if sst is not None:
             if not sst.empty:
                 sst = sst.drop(columns=["latitude","longitude"])
-                waves = waves.merge(sst, on="TIME", how='left')
+                waves = waves.merge(sst, on="TIME", how='outer')
         
         return waves     
 
