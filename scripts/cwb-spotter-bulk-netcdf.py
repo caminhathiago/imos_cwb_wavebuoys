@@ -21,31 +21,24 @@ if __name__ == "__main__":
     vargs = args()
 
     # Start general logging
-    runtime = datetime.now().strftime("%Y%m%dT%H%M%S")
+    
     general_log_file = os.path.join(vargs.output_path, "logs", f"general_process.log") # f"{runtime}_general_process.log"
     GENERAL_LOGGER = IMOSLogging().logging_start(logger_name="general_logger",
                                                 logging_filepath=general_log_file)
 
     wb = WaveBuoy(buoy_type="sofar")
     sofar_api = SofarAPI(buoys_metadata=wb.buoys_metadata)    
-
-    # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
-    # import pickle
-    # with open("tests\sofar_api_object.pkl", "rb") as pickle_file:
-    #     sofar_api = pickle.load(pickle_file)
-    # ### END OF TEMPORARY SETUP 
+    imos_logging = IMOSLogging() 
     
-
     # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
-    # site = wb.buoys_metadata.loc["Hillarys"]
     wb.buoys_metadata = wb.buoys_metadata.loc[["Hillarys","Hillarys_HSM"]].copy()
     # END OF TEMPORARY SETUP
+
     for idx, site in wb.buoys_metadata.iterrows():
         
         GENERAL_LOGGER.info(f"=========== {site.name.upper()} processing ===========")
 
-        # Create log file for current site run
-        site_log_file = os.path.join(vargs.output_path, "logs", f"{site.name.upper()}_process.log") # f"{runtime}_[CURRENT_SITE]_process.log
+        site_log_file = os.path.join(vargs.output_path, "logs", f"{site.name.upper()}_run.log") # f"{runtime}_[CURRENT_SITE]_process.log
         SITE_LOGGER = IMOSLogging().logging_start(logger_name="site_logger", logging_filepath=site_log_file)
         
         GENERAL_LOGGER.info(f"{site.name.upper()} log file created as {site_log_file}")
@@ -54,7 +47,7 @@ if __name__ == "__main__":
         try:       
             # Relevant loads ---------------------------------------
             SITE_LOGGER.info("LOADING STEP ====================================")
-
+            
             latest_available_time = sofar_api.get_latest_available_time(spot_id=site.serial, token=site.sofar_token)
             SITE_LOGGER.info(f"grabed latest_available_time: {latest_available_time}")
 
@@ -65,7 +58,6 @@ if __name__ == "__main__":
 
             nc_files_available = wb.get_available_nc_files(institution=site.region, site_id=site.name)
             SITE_LOGGER.info(f"available nc files: {nc_files_available}")
-
 
             if nc_files_available:
                 nc_files_needed = wb.lookup_netcdf_files_needed(institution=site.region,
@@ -125,8 +117,6 @@ if __name__ == "__main__":
                                             start_date=window_start_time,
                                             end_date=window_end_date)
             wb.generate_pickle_file(data=new_data_raw, file_name="new_data_raw", site_name=site.name)
-
-
             SITE_LOGGER.info(f"raw spotter data extracted from Sofar API")
 
             if not new_data_raw["waves"]:
@@ -136,22 +126,22 @@ if __name__ == "__main__":
             # Processing ---------------------------------------
             SITE_LOGGER.info("PROCESSING STEP ====================================")
 
-            waves_new_data_df = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="waves")
-            waves_new_data_df = wb.convert_to_datetime(data=waves_new_data_df)
+            waves = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="waves")
+            waves = wb.convert_to_datetime(data=waves)
             # change to priority_source to hdr at some point
-            waves_new_data_df = wb.select_processing_source(data=waves_new_data_df, priority_source="embedded")
-            waves_new_data_df = wb.drop_unwanted_columns(data=waves_new_data_df)
+            # waves_new_data_df = wb.select_processing_source(data=waves_new_data_df, priority_source="embedded")
+            waves = wb.drop_unwanted_columns(data=waves)
             SITE_LOGGER.info(f"waves data converted to DataFrame and pre-processed")
 
             
 
             if new_data_raw["surfaceTemp"]:
-                sst_new_data_df = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="surfaceTemp")
-                sst_new_data_df = wb.convert_to_datetime(data=sst_new_data_df)
+                sst = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="surfaceTemp")
+                sst = wb.convert_to_datetime(data=sst)
                 # change to priority_source to hdr at some point
-                sst_new_data_df = wb.select_processing_source(data=sst_new_data_df, priority_source="embedded") 
-                sst_new_data_df = wb.drop_unwanted_columns(data=sst_new_data_df)
-                wb.generate_pickle_file(data=sst_new_data_df, file_name="surfaceTemp_new_data", site_name=site.name)
+                sst = wb.select_processing_source(data=sst, priority_source="embedded") 
+                sst = wb.drop_unwanted_columns(data=sst)
+                wb.generate_pickle_file(data=sst, file_name="surfaceTemp_new_data", site_name=site.name)
 
                
 
@@ -167,27 +157,38 @@ if __name__ == "__main__":
                                                             end_date=window_end_date)
                 SITE_LOGGER.info(f"raw smart mooring data extracted from Sofar API")
                 
-                sensor_new_data_df = wb.convert_smart_mooring_to_dataframe(raw_data=new_sensor_data_raw)
-                sensor_new_data_df = wb.convert_to_datetime(data=sensor_new_data_df)
-                sensor_new_data_df = wb.get_sst_from_smart_mooring(data=sensor_new_data_df, sensor_type="temperature")
-                sensor_new_data_df = wb.process_smart_mooring_columns(data=sensor_new_data_df)
-                sst_new_data_df = wb.round_parameter_values(data=sensor_new_data_df, parameter="SST")
+                sst_sm = wb.convert_smart_mooring_to_dataframe(raw_data=new_sensor_data_raw)
+                sst_sm = wb.convert_to_datetime(data=sst_sm)
+                sst_sm = wb.get_sst_from_smart_mooring(data=sst_sm, sensor_type="temperature")
+                sst_sm = wb.process_smart_mooring_columns(data=sst_sm)
+                sst = wb.round_parameter_values(data=sst_sm, parameter="SST")
 
                 SITE_LOGGER.info("smart mooring data processed")
             
-            all_new_data_df = wb.merge_parameter_types(waves=waves_new_data_df, sst=sst_new_data_df)
-            all_new_data_df_test = waves_new_data_df.merge(sst_new_data_df, on="TIME", how="outer")
+            # Maybe only merge similar processing sources
+            # waves_hdr = wb.filter_processing_source(data=waves, processing_source="hdr")
+            # waves_embedded = wb.filter_processing_source(data=waves, processing_source="embedded")
+            # sst_hdr = wb.filter_processing_source(data=sst, processing_source="hdr")
+            # sst_embedded = wb.filter_processing_source(data=sst, processing_source="embedded")
+            # all_new_hdr = wb.merge_parameter_types(waves=waves_hdr), sst=sst_hdr)
+            # all_new_embedded = wb.merge_parameter_types(waves=waves_embedded, sst=sst_embedded)
 
-            wb.generate_pickle_file(data=sst_new_data_df, file_name="sst_new_data_df", site_name=site.name)
-            wb.generate_pickle_file(data=waves_new_data_df, file_name="waves_new_data_df", site_name=site.name)
+
+
+            all_new_data_df = wb.merge_parameter_types(waves=waves, sst=sst)
+            all_new_data_df_test = waves.merge(sst, on="TIME", how="outer")
+
+            wb.generate_pickle_file(data=sst, file_name="sst_new_data_df", site_name=site.name)
+            wb.generate_pickle_file(data=waves, file_name="waves_new_data_df", site_name=site.name)
             wb.generate_pickle_file(data=all_new_data_df, file_name="all_new_data_df", site_name=site.name)
             wb.generate_pickle_file(data=all_new_data_df_test, file_name="all_new_data_df_test", site_name=site.name)
 
             SITE_LOGGER.info("waves and sst/upper smart mooring temperature sensor merged")
 
+            # TEMPORARY SETUP
             test = wb.test_duplicated(data=all_new_data_df)
             SITE_LOGGER.warning(f"data has duplicated values? R: {test}")
-
+            # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
 
             all_new_data_df = wb.create_timeseries_aodn_column(data=all_new_data_df)
             all_new_data_df = wb.conform_columns_names_aodn(data=all_new_data_df)
@@ -196,12 +197,14 @@ if __name__ == "__main__":
             # TEMPORARY SETUP
             all_new_data_df["check"] = "new"
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
-
+            print(nc_files_available)
             if nc_files_available:
                 if not previous_data_df.empty:
                     all_data_df = wb.concat_previous_new(previous_data=previous_data_df,
                                                     new_data=all_new_data_df)
                     SITE_LOGGER.info("concatenate new data with previous since available")
+                else:
+                    all_data_df = all_new_data_df
             else:
                 all_data_df = all_new_data_df
 
@@ -226,6 +229,8 @@ if __name__ == "__main__":
                                         rate_of_change_test=True)
             SITE_LOGGER.info("Qualification successfull")
 
+            qualified_data_summarized = qc.summarize_flags(data=qualified_data, parameter_type="waves")
+
             # TEMPORARY SETUP (REMOVE WHEN DONE)
             qualified_data = all_data_df
             csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_qualified_output.csv")
@@ -248,18 +253,20 @@ if __name__ == "__main__":
             # SITE_LOGGER.info(f"raw nc file (no attributes) saved as '{nc_file_path}'")
 
             GENERAL_LOGGER.info(f"Processing successful")
-
+            imos_logging.logging_stop(logger=SITE_LOGGER)
 
         except Exception as e:
             error_message = IMOSLogging().unexpected_error_message.format(site_name=site.name.upper())
             GENERAL_LOGGER.error(error_message)
             SITE_LOGGER.error(str(e), exc_info=True)
         
-        # Closing current site logging
-        imos_logging = IMOSLogging()
-        # site_logger_file_path = imos_logging.get_log_file_path(SITE_LOGGER)
-        imos_logging.logging_stop(logger=SITE_LOGGER)
-        # imos_logging.rename_log_file(site_name=site.name, file_path=site_logger_file_path)
+            # Closing current site logging
+            site_logger_file_path = imos_logging.get_log_file_path(SITE_LOGGER)
+            imos_logging.logging_stop(logger=SITE_LOGGER)
+            if e:
+                imos_logging.rename_log_file_if_error(site_name=site.name, file_path=site_logger_file_path)
+            
+            continue
 
         GENERAL_LOGGER.info(f"=========== {site.name.upper()} successfully processed. ===========")
 
