@@ -35,3 +35,5 @@ AODN_COLUMNS_TEMPLATE = {
     "degrees": 'SST',
     "value": 'SST'
 }
+
+IRDS_PATH = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves\Data"
