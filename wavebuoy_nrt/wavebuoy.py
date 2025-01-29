@@ -23,6 +23,7 @@ class FilesHandler():
             return os.path.join(FILES_PATH, file_name)
         else:
             error_message = f"""Path for {file_name} does not exist.\nCheck if the correct path was provided, or if {file_name} was moved."""
+            print(error_message)
             GENERAL_LOGGER.error(error_message)
             raise FileNotFoundError(error_message)
 
@@ -116,7 +117,7 @@ class SpotterWaveBuoy():
             return data[data["processing_source"] == str(available_sources[index].squeeze())]
 
 class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy): #(CWBAWSs3):
-    def __init__(self, buoy_type:str,buoys_metadata_file_name:str="buoys_metadata.csv"):
+    def __init__(self, buoy_type:str, buoys_metadata_file_name:str="buoys_metadata.csv"):
         self.buoys_metadata = self._get_buoys_metadata(buoy_type=buoy_type, buoys_metadata_file_name=buoys_metadata_file_name)
         # self.buoys_metadata_token_sorted = self._sort_sites_by_sofar_token(buoys_metadata=self.buoys_metadata)
         # self.site_ids = self._get_site_ids(buoys_metadata=self.buoys_metadata)
