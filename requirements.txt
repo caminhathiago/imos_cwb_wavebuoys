@@ -14,5 +14,6 @@ setuptools
 boto3
 awscli
 pytest
+openpyxl
 
 # install plugins with conda 'netcdf4', 'h5netcdf', 'scipy'
