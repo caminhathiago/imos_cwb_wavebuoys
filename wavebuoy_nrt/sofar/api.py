@@ -104,7 +104,7 @@ class SofarAPI:
                     include_directional_moments: bool = True,
                     include_partition_data: bool = True,
                     include_barometer_data: bool = True,
-                    include_track: bool = True,
+                    include_track: bool = False,
                     processing_sources="all"
                     )-> dict:
         
@@ -296,62 +296,62 @@ class SofarAPI:
         return base_url + endpoint
         
     
-    def get_wave_data2(self,
-                    spot_id: str,
-                    token: str,
-                    start_date: datetime = datetime.now() - timedelta(hours=24), 
-                    end_date: datetime = datetime.now(),
-                    limit: int = 500,
-                    add_wave_params: bool = True,
-                    include_surface_temp_data: bool = True,
-                    include_wind_data: bool = True,
-                    include_frequency_data: bool = True,
-                    include_directional_moments: bool = True,
-                    include_partition_data: bool = True,
-                    include_barometer_data: bool = True,
-                    include_track: bool = True,
-                    processing_sources="all"
-                    )-> dict:
+    # def get_wave_data2(self,
+    #                 spot_id: str,
+    #                 token: str,
+    #                 start_date: datetime = datetime.now() - timedelta(hours=24), 
+    #                 end_date: datetime = datetime.now(),
+    #                 limit: int = 500,
+    #                 add_wave_params: bool = True,
+    #                 include_surface_temp_data: bool = True,
+    #                 include_wind_data: bool = True,
+    #                 include_frequency_data: bool = True,
+    #                 include_directional_moments: bool = True,
+    #                 include_partition_data: bool = True,
+    #                 include_barometer_data: bool = True,
+    #                 include_track: bool = True,
+    #                 processing_sources="all"
+    #                 )-> dict:
         
-        kwargs_query_params = {
-                key: value for key, value in locals().items() 
-                if key not in ('self','token') and value is not None
-            }        
-        query_params = self._compose_query_parameters(**kwargs_query_params)
+    #     kwargs_query_params = {
+    #             key: value for key, value in locals().items() 
+    #             if key not in ('self','token') and value is not None
+    #         }        
+    #     query_params = self._compose_query_parameters(**kwargs_query_params)
         
-        request_url = self._compose_request_url(base_url=self._base_url, endpoint=self._endpoints["waves"])
-        headers = self._compose_header(token=token)
+    #     request_url = self._compose_request_url(base_url=self._base_url, endpoint=self._endpoints["waves"])
+    #     headers = self._compose_header(token=token)
         
-        kwargs_request = {"url":request_url,
-                          "headers": headers,
-                          "params": query_params}
-        page = 1
-        try:
-            response = requests.get(**kwargs_request)
-            SITE_LOGGER(f"Page: {page} | Start: {start_date} | End: {end_date}")
-        except Exception as e:
-            SITE_LOGGER.error(str(e), exc_info=True)
-            return
+    #     kwargs_request = {"url":request_url,
+    #                       "headers": headers,
+    #                       "params": query_params}
+    #     page = 1
+    #     try:
+    #         response = requests.get(**kwargs_request)
+    #         SITE_LOGGER(f"Page: {page} | Start: {start_date} | End: {end_date}")
+    #     except Exception as e:
+    #         SITE_LOGGER.error(str(e), exc_info=True)
+    #         return
 
-        raw_data = []
-        latest_retrieved_time = response.json()["data"]["waves"][-1]["timestamp"]
+    #     raw_data = []
+    #     latest_retrieved_time = response.json()["data"]["waves"][-1]["timestamp"]
 
-        if latest_retrieved_time >= end_date:
-            return response.json()["data"]
-        else:
-            page += 1
-            raw_data.extend(response.json()["data"])
-            SITE_LOGGER.info("API Calls pagination needed:")
-            SITE_LOGGER.infor(f"Page: {page} | Start: {start_date} | End: {end_date}")
+    #     if latest_retrieved_time >= end_date:
+    #         return response.json()["data"]
+    #     else:
+    #         page += 1
+    #         raw_data.extend(response.json()["data"])
+    #         SITE_LOGGER.info("API Calls pagination needed:")
+    #         SITE_LOGGER.infor(f"Page: {page} | Start: {start_date} | End: {end_date}")
             
             
-            start_date = end_date
-            end_date += timedelta(days=30)
-            pagination_data = self.get_wave_data(spot_id=spot_id,
-                               token=token,
-                               start_date=start_date,
-                               end_date=end_date)
-            raw_data
+    #         start_date = end_date
+    #         end_date += timedelta(days=30)
+    #         pagination_data = self.get_wave_data(spot_id=spot_id,
+    #                            token=token,
+    #                            start_date=start_date,
+    #                            end_date=end_date)
+    #         raw_data
 
  # def grab_latest_data(self, spot_id: str, token: str) -> dict:
         
