@@ -5,6 +5,7 @@ import json
 import netCDF4
 import xarray as xr
 import pandas as pd
+import numpy as np
 
 import wavebuoy_nrt.config as config
 from wavebuoy_nrt.wavebuoy import WaveBuoy
@@ -42,20 +43,76 @@ class ncWriter(WaveBuoy):
     def save_nc_file(self, file_path: str):
         return
     
+    def select_processing_source(self, data: pd.DataFrame, processing_source : str) -> pd.DataFrame:
+        return data[data["processing_source"] == processing_source]
+
     def _compose_coords_dimensions(self, data: pd.DataFrame) -> dict:
+        hdr = self.select_processing_source(data=data, processing_source="hdr")
+        embedded = self.select_processing_source(data=data, processing_source="embedded")
+
+        times = [hdr["TIME"].to_list(),embedded["TIME"].to_list()]
+        latitudes = [hdr["TIME"].to_list(),embedded["TIME"].to_list()]
+        longitudes = [hdr["TIME"].to_list(),embedded["TIME"].to_list()]
+        timeSeries = [hdr["TIME"].to_list(),embedded["TIME"].to_list()]
+
         return {
-            "TIME":("TIME", data["TIME"]),
-            "timeSeries":("timeSeries", data["timeSeries"]),
-            "LATITUDE":("TIME", data["LATITUDE"]),
-            "LONGITUDE":("TIME", data["LONGITUDE"])
+            "processing_source":["hdr", "embedded"],
+            "TIME": (["processing_source", "TIME"], times),
+            "LATITUDE": (["processing_source", "TIME"], latitudes),
+            "LONGITUDE": (["processing_source", "TIME"], longitudes),
+            "timeSeries": (["processing_source", "TIME"], timeSeries),
+
         }
+
+        # return {
+        #     "processing_source":("processing_source",["hdr", "embedded"]),
+        #     "TIME":("TIME", [hdr["TIME"], embedded["TIME"]], {"nested":True}),
+        #     "timeSeries":("timeSeries", [hdr["timeSeries"], embedded["timeSeries"]], {"nested":True}),
+        #     "LATITUDE":("LATITUDE", [hdr["LATITUDE"], embedded["LATITUDE"]], {"nested":True}),
+        #     "LONGITUDE":("LONGITUDE", [hdr["LONGITUDE"], embedded["LONGITUDE"]], {"nested":True}),
+        # }
+        
+        # return {
+        #     "processing_source":("processing_source", ["hdr"]),
+        #     "TIME":("TIME", data["TIME"]),
+        #     "timeSeries":("timeSeries", data["timeSeries"]),
+        #     "LATITUDE":("TIME", data["LATITUDE"]),
+        #     "LONGITUDE":("TIME", data["LONGITUDE"])
+        # }
+    
+        # return {
+        #     "TIME":("TIME", data["TIME"]),
+        #     "timeSeries":("timeSeries", data["timeSeries"]),
+        #     "LATITUDE":("TIME", data["LATITUDE"]),
+        #     "LONGITUDE":("TIME", data["LONGITUDE"])
+        # }
         
     def _compose_data_vars(self, data: pd.DataFrame, dimensions: list) -> dict:
+
+        hdr = self.select_processing_source(data=data, processing_source="hdr")
+        embedded = self.select_processing_source(data=data, processing_source="embedded")
+
         data_vars = {}
-        vars_to_include = data.drop(columns=['TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE']).columns
+        vars_to_include = data.drop(columns=['processing_source','TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE']).columns
         for var in vars_to_include:
-            data_vars.update({var:(dimensions, data[var])})
-        return data_vars  
+            data_list = [hdr[var].to_list(),embedded[var].to_list()]
+            data_vars.update({var:(dimensions, data_list)})
+        return data_vars 
+
+        # hdr = self.select_processing_source(data=data, processing_source="hdr")
+        # embedded = self.select_processing_source(data=data, processing_source="embedded")
+        
+        # data_vars = {}
+        # vars_to_include = data.drop(columns=['processing_source','TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE']).columns
+        # for var in vars_to_include:
+        #     data_vars.update({var:(dimensions, [hdr[var],embedded[var]])})
+        # return data_vars  
+        
+        # data_vars = {}
+        # vars_to_include = data.drop(columns=['TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE']).columns
+        # for var in vars_to_include:
+        #     data_vars.update({var:(dimensions, data[var])})
+        # return data_vars  
     
     def compose_dataset(self, data: pd.DataFrame) -> xr.Dataset:
         
@@ -64,8 +121,8 @@ class ncWriter(WaveBuoy):
         
         dataset = xr.Dataset(coords=coords, data_vars=data_vars)
 
-        dataset = self._assign_attributes_variables(dataset=dataset)
-        dataset = self._assign_general_attributes(dataset=dataset)
+        # dataset = self._assign_attributes_variables(dataset=dataset)
+        # dataset = self._assign_general_attributes(dataset=dataset)
 
         return dataset
 
