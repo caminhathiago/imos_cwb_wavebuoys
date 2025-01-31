@@ -10,6 +10,7 @@ import pandas as pd
 from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
 from wavebuoy_nrt.qc.qcTests import WaveBuoyQC
+from wavebuoy_nrt.netcdf.writer import ncWriter
 from wavebuoy_nrt.utils import args, IMOSLogging
 
 
@@ -267,6 +268,24 @@ if __name__ == "__main__":
             GENERAL_LOGGER.info("Starting qualification step")
             # Processing Nc File --------------------------------------------
             SITE_LOGGER.info("NC FILE PROCESSING STEP ====================================")
+
+            nc_writer = ncWriter(buoy_type="sofar")
+
+            ds_hdr = nc_writer.compose_dataset(data=qualified_data_hdr)
+            ds_embedded = nc_writer.compose_dataset(data=qualified_data_embedded)
+
+            combined_ds = nc_writer.combine_datasets(dataset1=ds_hdr, dataset2=ds_embedded)
+            combined_ds = nc_writer.assing_processing_source_as_coord(combined_dataset=combined_ds)
+
+            combined_ds_hdr = combined_ds.sel(processing_source="hdr").dropna("TIME", how="all").drop_vars("processing_source")
+            combined_ds_hdr = nc_writer.create_timeseries_variable(dataset=combined_ds_hdr)
+
+            combined_ds_embedded = combined_ds.sel(processing_source="embedded").dropna("TIME", how="all").drop_vars("processing_source")
+            combined_ds_embedded = nc_writer.create_timeseries_variable(dataset=combined_ds_embedded)
+
+
+            
+                
 
             # all_data_df_qualified = wb.
             # dataset = wb.convert_dataframe_to_dataset(data=all_data_df_qualified)
