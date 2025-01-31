@@ -5,6 +5,7 @@ import os
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
+import pandas as pd
 
 from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
@@ -112,35 +113,37 @@ if __name__ == "__main__":
             SITE_LOGGER.info("EXTRACTION STEP ====================================")
 
             window_end_date = latest_available_time + timedelta(hours=1)
-            new_data_raw = sofar_api.fetch_wave_data(spot_id=site.serial,
+            new_raw_data = sofar_api.fetch_wave_data(spot_id=site.serial,
                                             token=site.sofar_token,
                                             start_date=window_start_time,
                                             end_date=window_end_date)
-            wb.generate_pickle_file(data=new_data_raw, file_name="new_data_raw", site_name=site.name)
+            wb.generate_pickle_file(data=new_raw_data, file_name="new_data_raw", site_name=site.name)
             SITE_LOGGER.info(f"raw spotter data extracted from Sofar API")
 
-            if not new_data_raw["waves"]:
+            if not new_raw_data["waves"]:
                 SITE_LOGGER.info("No data for the desired period. Aborting processing for this site")
                 break
 
             # Processing ---------------------------------------
             SITE_LOGGER.info("PROCESSING STEP ====================================")
 
-            waves = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="waves")
+            # split_raw_data = wb.split_processing_source(raw_data=new_raw_data)
+
+            waves = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="waves")
             waves = wb.convert_to_datetime(data=waves)
             # change to priority_source to hdr at some point
             # waves_new_data_df = wb.select_processing_source(data=waves_new_data_df, priority_source="embedded")
-            waves = wb.drop_unwanted_columns(data=waves)
+            # waves = wb.drop_unwanted_columns(data=waves)
             SITE_LOGGER.info(f"waves data converted to DataFrame and pre-processed")
 
             
 
-            if new_data_raw["surfaceTemp"]:
-                sst = wb.convert_wave_data_to_dataframe(raw_data=new_data_raw, parameters_type="surfaceTemp")
+            if new_raw_data["surfaceTemp"]:
+                sst = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
                 sst = wb.convert_to_datetime(data=sst)
                 # change to priority_source to hdr at some point
-                sst = wb.select_processing_source(data=sst, priority_source="embedded") 
-                sst = wb.drop_unwanted_columns(data=sst)
+                # sst = wb.select_processing_source(data=sst, priority_source="embedded") 
+                # sst = wb.drop_unwanted_columns(data=sst)
                 wb.generate_pickle_file(data=sst, file_name="surfaceTemp_new_data", site_name=site.name)
 
                
@@ -148,13 +151,16 @@ if __name__ == "__main__":
                 SITE_LOGGER.info(f"sst data converted to DataFrame and pre-processed if exists")
 
 
-            if not new_data_raw["surfaceTemp"] and site.version in ("smart_mooring", "half_smart_mooring"):
+            if not new_raw_data["surfaceTemp"] and site.version in ("smart_mooring", "half_smart_mooring"):
                 SITE_LOGGER.info(f"no sst available from spotter, grab smart mooring data since it is available (i.e. buoy version: {site.version})")
                 
                 new_sensor_data_raw = sofar_api.get_sensor_data(spot_id=site.serial,
                                                             token=site.sofar_token,
                                                             start_date=window_start_time,
                                                             end_date=window_end_date)
+                
+                wb.generate_pickle_file(data=new_sensor_data_raw, file_name="smart_mooring_raw", site_name=site.name)
+
                 SITE_LOGGER.info(f"raw smart mooring data extracted from Sofar API")
                 
                 sst_sm = wb.convert_smart_mooring_to_dataframe(raw_data=new_sensor_data_raw)
@@ -162,26 +168,24 @@ if __name__ == "__main__":
                 sst_sm = wb.get_sst_from_smart_mooring(data=sst_sm, sensor_type="temperature")
                 sst_sm = wb.process_smart_mooring_columns(data=sst_sm)
                 sst = wb.round_parameter_values(data=sst_sm, parameter="SST")
+                
+                # TEMPORARY SETUP
+                sst["processing_source"] = "embedded"
+                sst2 = sst.copy()
+                sst2["processing_source"] = "hdr"
+                sst = pd.concat([sst, sst2], axis=0)
+                # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
 
                 SITE_LOGGER.info("smart mooring data processed")
-            
-            # Maybe only merge similar processing sources
-            # waves_hdr = wb.filter_processing_source(data=waves, processing_source="hdr")
-            # waves_embedded = wb.filter_processing_source(data=waves, processing_source="embedded")
-            # sst_hdr = wb.filter_processing_source(data=sst, processing_source="hdr")
-            # sst_embedded = wb.filter_processing_source(data=sst, processing_source="embedded")
-            # all_new_hdr = wb.merge_parameter_types(waves=waves_hdr), sst=sst_hdr)
-            # all_new_embedded = wb.merge_parameter_types(waves=waves_embedded, sst=sst_embedded)
 
+            all_new_data_df = wb.merge_parameter_types(waves=waves,
+                                                       sst=sst,
+                                                       consider_processing_source=True)
 
-
-            all_new_data_df = wb.merge_parameter_types(waves=waves, sst=sst)
-            all_new_data_df_test = waves.merge(sst, on="TIME", how="outer")
 
             wb.generate_pickle_file(data=sst, file_name="sst_new_data_df", site_name=site.name)
             wb.generate_pickle_file(data=waves, file_name="waves_new_data_df", site_name=site.name)
             wb.generate_pickle_file(data=all_new_data_df, file_name="all_new_data_df", site_name=site.name)
-            wb.generate_pickle_file(data=all_new_data_df_test, file_name="all_new_data_df_test", site_name=site.name)
 
             SITE_LOGGER.info("waves and sst/upper smart mooring temperature sensor merged")
 
@@ -200,6 +204,9 @@ if __name__ == "__main__":
             print(nc_files_available)
             if nc_files_available:
                 if not previous_data_df.empty:
+                    # TEMPORARY SETUP
+                    previous_data_df["processing_source"] = "embedded"
+                    # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
                     all_data_df = wb.concat_previous_new(previous_data=previous_data_df,
                                                     new_data=all_new_data_df)
                     SITE_LOGGER.info("concatenate new data with previous since available")
@@ -212,30 +219,49 @@ if __name__ == "__main__":
             
             # TEMPORARY SETUP (REMOVE WHEN DONE)
             csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_output.csv")
-            all_data_df.to_csv(csv_file_path, index=False)
+            all_data_df.reset_index().to_csv(csv_file_path, index=False)
             SITE_LOGGER.info(f"processed data saved as '{csv_file_path}'")
+            
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
-
+            
             # Qualification ---------------------------------------
             # GENERAL_LOGGER.info("Starting qualification step")
             SITE_LOGGER.info("QUALIFICATION STEP ====================================")
 
+            all_data_hdr = wb.select_processing_source(data=all_data_df, processing_source="hdr")
+            all_data_embedded = wb.select_processing_source(data=all_data_df, processing_source="embedded")
+
+
             qc = WaveBuoyQC(config_id=1)
-            qc.load_data(data=all_data_df)
-            parameters_to_qc = qc.get_parameters_to_qc(data=all_data_df, qc_config=qc.qc_config)      
-            qualified_data = qc.qualify(data=all_data_df,
+            qc.load_data(data=all_data_embedded)
+            parameters_to_qc = qc.get_parameters_to_qc(data=all_data_embedded, qc_config=qc.qc_config)      
+            qualified_data_embedded = qc.qualify(data=all_data_embedded,
                                         parameters=parameters_to_qc,
                                         gross_range_test=True,
                                         rate_of_change_test=True)
+
+            if not all_data_hdr.empty:
+                qc = WaveBuoyQC(config_id=1)
+                qc.load_data(data=all_data_hdr)
+                parameters_to_qc = qc.get_parameters_to_qc(data=all_data_hdr, qc_config=qc.qc_config)      
+                qualified_data_hdr = qc.qualify(data=all_data_hdr,
+                                            parameters=parameters_to_qc,
+                                            gross_range_test=True,
+                                            rate_of_change_test=True)
+
             SITE_LOGGER.info("Qualification successfull")
 
-            qualified_data_summarized = qc.summarize_flags(data=qualified_data, parameter_type="waves")
+            # qualified_data_summarized = qc.summarize_flags(data=qualified_data, parameter_type="waves")
 
             # TEMPORARY SETUP (REMOVE WHEN DONE)
-            qualified_data = all_data_df
-            csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_qualified_output.csv")
-            qualified_data.to_csv(csv_file_path, index=False)
-            SITE_LOGGER.info(f"qualified data saved as '{csv_file_path}'")
+            csv_file_path_embedded = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_qualified_embedded.csv")
+            qualified_data_embedded.to_csv(csv_file_path_embedded, index=False)
+            SITE_LOGGER.info(f"qualified data saved as '{csv_file_path_embedded}'")
+
+            if not all_data_hdr.empty:
+                csv_file_path_hdr = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_qualified_hdr.csv")
+                qualified_data_hdr.to_csv(csv_file_path_hdr, index=False)
+                SITE_LOGGER.info(f"qualified data saved as '{csv_file_path_hdr}'")
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
 
             GENERAL_LOGGER.info("Starting qualification step")
