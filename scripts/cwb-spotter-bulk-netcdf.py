@@ -10,7 +10,7 @@ import pandas as pd
 from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
 from wavebuoy_nrt.qc.qcTests import WaveBuoyQC
-from wavebuoy_nrt.netcdf.writer import ncWriter
+from wavebuoy_nrt.netcdf.writer import Writer, AttrsComposer, AttrsExtractor, Processor
 from wavebuoy_nrt.utils import args, IMOSLogging
 
 
@@ -132,9 +132,6 @@ if __name__ == "__main__":
 
             waves = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="waves")
             waves = wb.convert_to_datetime(data=waves)
-            # change to priority_source to hdr at some point
-            # waves_new_data_df = wb.select_processing_source(data=waves_new_data_df, priority_source="embedded")
-            # waves = wb.drop_unwanted_columns(data=waves)
             SITE_LOGGER.info(f"waves data converted to DataFrame and pre-processed")
 
             
@@ -142,13 +139,7 @@ if __name__ == "__main__":
             if new_raw_data["surfaceTemp"]:
                 sst = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
                 sst = wb.convert_to_datetime(data=sst)
-                # change to priority_source to hdr at some point
-                # sst = wb.select_processing_source(data=sst, priority_source="embedded") 
-                # sst = wb.drop_unwanted_columns(data=sst)
                 wb.generate_pickle_file(data=sst, file_name="surfaceTemp_new_data", site_name=site.name)
-
-               
-
                 SITE_LOGGER.info(f"sst data converted to DataFrame and pre-processed if exists")
 
 
@@ -159,10 +150,9 @@ if __name__ == "__main__":
                                                             token=site.sofar_token,
                                                             start_date=window_start_time,
                                                             end_date=window_end_date)
-                
-                wb.generate_pickle_file(data=new_sensor_data_raw, file_name="smart_mooring_raw", site_name=site.name)
-
                 SITE_LOGGER.info(f"raw smart mooring data extracted from Sofar API")
+
+                wb.generate_pickle_file(data=new_sensor_data_raw, file_name="smart_mooring_raw", site_name=site.name)
                 
                 sst_sm = wb.convert_smart_mooring_to_dataframe(raw_data=new_sensor_data_raw)
                 sst_sm = wb.convert_to_datetime(data=sst_sm)
@@ -232,8 +222,8 @@ if __name__ == "__main__":
             all_data_hdr = wb.select_processing_source(data=all_data_df, processing_source="hdr")
             all_data_embedded = wb.select_processing_source(data=all_data_df, processing_source="embedded")
 
-
             qc = WaveBuoyQC(config_id=1)
+            
             qc.load_data(data=all_data_embedded)
             parameters_to_qc = qc.get_parameters_to_qc(data=all_data_embedded, qc_config=qc.qc_config)      
             qualified_data_embedded = qc.qualify(data=all_data_embedded,
@@ -269,23 +259,39 @@ if __name__ == "__main__":
             # Processing Nc File --------------------------------------------
             SITE_LOGGER.info("NC FILE PROCESSING STEP ====================================")
 
-            nc_writer = ncWriter(buoy_type="sofar")
+            nc_writer = Writer(buoy_type="sofar")
 
-            ds_hdr = nc_writer.compose_dataset(data=qualified_data_hdr)
-            ds_embedded = nc_writer.compose_dataset(data=qualified_data_embedded)
+            ds_hdr = Processor().compose_dataset(data=qualified_data_hdr)
+            ds_embedded = Processor().compose_dataset(data=qualified_data_embedded)
 
-            combined_ds = nc_writer.combine_datasets(dataset1=ds_hdr, dataset2=ds_embedded)
-            combined_ds = nc_writer.assing_processing_source_as_coord(combined_dataset=combined_ds)
+            nc_combined = Processor().combine_datasets(dataset1=ds_hdr, dataset2=ds_embedded)
+            nc_combined = Processor().assing_processing_source_as_coord(combined_dataset=nc_combined)
 
-            combined_ds_hdr = combined_ds.sel(processing_source="hdr").dropna("TIME", how="all").drop_vars("processing_source")
-            combined_ds_hdr = nc_writer.create_timeseries_variable(dataset=combined_ds_hdr)
+            # ADD attributes
+            nc_attrs_composer = AttrsComposer()
+            nc_combined = nc_attrs_composer.assign_general_attributes(dataset=nc_combined, site_name=site.name)
+            nc_combined = nc_attrs_composer.assign_variables_attributes(dataset=nc_combined)
 
-            combined_ds_embedded = combined_ds.sel(processing_source="embedded").dropna("TIME", how="all").drop_vars("processing_source")
-            combined_ds_embedded = nc_writer.create_timeseries_variable(dataset=combined_ds_embedded)
 
+            # SAVE combined nc file
+            nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined.nc")
+            nc_combined.to_netcdf(nc_file_path, engine="netcdf4")
 
+            nc_hdr = nc_writer.select_processing_source(dataset=nc_combined, processing_source="hdr")
+            nc_hdr = nc_writer.create_timeseries_variable(dataset=nc_hdr)
+
+            nc_embedded = nc_writer.select_processing_source(dataset=nc_combined, processing_source="embedded")
+            nc_embedded = nc_writer.create_timeseries_variable(dataset=nc_embedded)
+
+            # SAVE nc file for each processing source
+            nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined_hdr.nc")
+            nc_hdr.to_netcdf(nc_file_path, engine="netcdf4")
+            nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined_embedded.nc")
+            nc_embedded.to_netcdf(nc_file_path, engine="netcdf4")
             
-                
+            # BREAK NC FILES INTO 
+
+
 
             # all_data_df_qualified = wb.
             # dataset = wb.convert_dataframe_to_dataset(data=all_data_df_qualified)
