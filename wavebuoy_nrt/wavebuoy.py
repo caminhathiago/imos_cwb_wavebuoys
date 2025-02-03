@@ -126,7 +126,7 @@ class SpotterWaveBuoy():
             print(f"saved pkl as output_path/test_files/{site_name}_{file_name}.pkl")
 
     def select_processing_source(self, data: pd.DataFrame, processing_source: str="hdr") -> pd.DataFrame:
-        return data[data["processing_source"] == processing_source]
+        return data[data["processing_source"] == processing_source].copy()
 
     def select_priority_processing_source(self, data: pd.DataFrame, priority_source: str="hdr") -> pd.DataFrame:
         available_sources = data["processing_source"].unique()
