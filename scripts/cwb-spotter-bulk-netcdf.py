@@ -264,22 +264,31 @@ if __name__ == "__main__":
 
             ds_hdr = Processor().compose_dataset(data=qualified_data_hdr)
             ds_embedded = Processor().compose_dataset(data=qualified_data_embedded)
+            SITE_LOGGER.info("hdr and embedded datasets composed")
 
             nc_combined = Processor().combine_datasets(dataset1=ds_hdr, dataset2=ds_embedded)
+            SITE_LOGGER.info("hdr and embedded datasets combined")
+
             nc_combined = Processor().assing_processing_source_as_coord(combined_dataset=nc_combined)
+            SITE_LOGGER.info("processing sources assigned as coordinate")
+
 
             # ADD attributes
             nc_attrs_composer = AttrsComposer(buoys_metadata=wb.buoys_metadata)
             nc_combined = nc_attrs_composer.assign_general_attributes(dataset=nc_combined, site_name=site.name)
+            SITE_LOGGER.info("general attributes assigned to combined dataset")
+
             # nc_combined = nc_attrs_composer.assign_variables_attributes(dataset=nc_combined)
 
 
             # SAVE combined nc file
             nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined.nc")
             nc_combined.to_netcdf(nc_file_path, engine="netcdf4")
+            
 
             nc_hdr = Processor().select_processing_source(dataset=nc_combined, processing_source="hdr")
             nc_hdr = Processor().create_timeseries_variable(dataset=nc_hdr)
+
 
             nc_embedded = Processor().select_processing_source(dataset=nc_combined, processing_source="embedded")
             nc_embedded = Processor().create_timeseries_variable(dataset=nc_embedded)
