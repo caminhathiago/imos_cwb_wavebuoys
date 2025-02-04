@@ -20,8 +20,8 @@ SITE_LOGGER = logging.getLogger("site_logger")
 
 class metaDataLoader:
 
-    @classmethod
-    def _load_deployment_metadata(self) -> pd.DataFrame:
+    @staticmethod
+    def _load_deployment_metadata() -> pd.DataFrame:
         deployment_metadata_path = "\\\\drive.irds.uwa.edu.au\\OGS-COD-001\\CUTTLER_wawaves\\Data\\wawaves\\Hillarys\\metadata\\Hillarys_dep08_20240703.xlsx"
         deployment_metadata = pd.read_excel(deployment_metadata_path)
         
@@ -31,8 +31,8 @@ class metaDataLoader:
         deployment_metadata = deployment_metadata.set_index("parameter")
         return deployment_metadata
     
-    @classmethod
-    def _get_template_imos(self, file_name: str) -> dict:
+    @staticmethod
+    def _get_template_imos(file_name: str) -> dict:
         file_path = os.path.join(os.path.dirname(config.__file__), file_name)
         with open(file_path) as j:
             return json.load(j)
@@ -260,12 +260,12 @@ class AttrsComposer:
 
 class Processor:
 
-    @classmethod
-    def select_processing_source(self, data: pd.DataFrame, processing_source : str) -> pd.DataFrame:
+    @staticmethod
+    def select_processing_source(data: pd.DataFrame, processing_source : str) -> pd.DataFrame:
         return data[data["processing_source"] == processing_source]
 
-    @classmethod
-    def _compose_coords_dimensions(self, data: pd.DataFrame) -> dict:
+    @staticmethod
+    def _compose_coords_dimensions(data: pd.DataFrame) -> dict:
         # hdr = self.select_processing_source(data=data, processing_source="hdr")
         # embedded = self.select_processing_source(data=data, processing_source="embedded")
 
@@ -306,8 +306,8 @@ class Processor:
             "LONGITUDE":("TIME", data["LONGITUDE"])
         }
 
-    @classmethod
-    def _compose_data_vars(self, data: pd.DataFrame, dimensions: list) -> dict:
+    @staticmethod
+    def _compose_data_vars(data: pd.DataFrame, dimensions: list) -> dict:
 
         # hdr = self.select_processing_source(data=data, processing_source="hdr")
         # embedded = self.select_processing_source(data=data, processing_source="embedded")
@@ -334,8 +334,8 @@ class Processor:
             data_vars.update({var:(dimensions, data[var])})
         return data_vars  
     
-    @classmethod
-    def compose_dataset(self, data: pd.DataFrame) -> xr.Dataset:
+    @staticmethod
+    def compose_dataset(data: pd.DataFrame) -> xr.Dataset:
         
         coords = self._compose_coords_dimensions(data=data)
         data_vars = self._compose_data_vars(data=data, dimensions=["TIME"])
@@ -347,8 +347,8 @@ class Processor:
 
         return dataset
 
-    @classmethod
-    def select_processing_source(self, dataset: xr.Dataset, processing_source: str = "hdr") -> xr.Dataset:
+    @staticmethod
+    def select_processing_source(dataset: xr.Dataset, processing_source: str = "hdr") -> xr.Dataset:
         subset_variables = list(dataset.keys()) 
         subset_variables = [variable for variable in subset_variables 
                             if not variable.endswith("_test") 
@@ -360,17 +360,17 @@ class Processor:
                 .drop_vars("processing_source")
         )
 
-    @classmethod
-    def create_timeseries_variable(self, dataset: xr.Dataset) -> xr.Dataset:
+    @staticmethod
+    def create_timeseries_variable(dataset: xr.Dataset) -> xr.Dataset:
         dataset["timeSeries"] = np.repeat(float(1), len(dataset["TIME"]))
         return dataset
 
-    @classmethod
-    def combine_datasets(self, dataset1: xr.Dataset, dataset2: xr.Dataset) -> xr.Dataset:
+    @staticmethod
+    def combine_datasets(dataset1: xr.Dataset, dataset2: xr.Dataset) -> xr.Dataset:
         return xr.concat([dataset1, dataset2], dim="processing_source")
     
-    @classmethod
-    def assing_processing_source_as_coord(self, combined_dataset: xr.Dataset) -> xr.Dataset:
+    @staticmethod
+    def assing_processing_source_as_coord(combined_dataset: xr.Dataset) -> xr.Dataset:
         processing_sources = np.array(["hdr", "embedded"], dtype=object)
         return combined_dataset.assign_coords(processing_source=("processing_source", processing_sources))
 
