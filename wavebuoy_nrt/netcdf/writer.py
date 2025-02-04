@@ -5,10 +5,12 @@ import json
 import netCDF4
 import xarray as xr
 import pandas as pd
+from pandas.core.indexes.period import PeriodIndex
 import numpy as np
 
 import wavebuoy_nrt.config as config
 from wavebuoy_nrt.wavebuoy import WaveBuoy
+from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE 
 
 
 SITE_LOGGER = logging.getLogger("site_logger")
@@ -372,6 +374,20 @@ class Processor:
         processing_sources = np.array(["hdr", "embedded"], dtype=object)
         return combined_dataset.assign_coords(processing_source=("processing_source", processing_sources))
 
+    @staticmethod
+    def extract_monthly_periods_dataset(dataset: xr.Dataset) -> PeriodIndex:
+        return pd.to_datetime(dataset["TIME"].data).to_period("M").unique()
+
+    @staticmethod
+    def split_dataset_monthly(dataset: xr.Dataset, periods: PeriodIndex) -> tuple[xr.Dataset, ...]:
+        dataset_objects = []
+        for period in periods:
+            monthly_dataset = dataset.sel(TIME=str(period))
+            dataset_objects.append(monthly_dataset)
+        return tuple(dataset_objects)
+
+
+
 class Writer(WaveBuoy):
     def __init__(self, buoy_type):
         super().__init__(buoy_type=buoy_type)
@@ -384,9 +400,34 @@ class Writer(WaveBuoy):
     def generate_nc_output_paths(self, dataframe: pd.DataFrame) -> list:
         nc_output_paths = []
         return nc_output_paths
+       
+    def compose_file_names(self,
+                            institution:str,
+                            site_id: str,
+                            periods: PeriodIndex) -> str:
+        periods_formated = periods.strftime("%Y%m")
+        file_names = []
+        for period in periods_formated:
+            file_name = NC_FILE_NAME_TEMPLATE.format(institution=institution,
+                                                     site_id=site_id,
+                                                     monthly_datetime=period
+                                                )
+            file_names.append(file_name)
+        return file_names
+    
+    def _compose_file_paths(self, file_names: list, output_path: str) -> list:
+        return [os.path.join(output_path, file_name) for file_name in file_names]
 
-    def save_nc_file(self, file_path: str):
-        return
+    def save_nc_file(self, 
+                     output_path: str,
+                     file_names: str,
+                     dataset_objects: xr.Dataset):
+        file_paths = self._compose_file_paths(output_path=output_path,
+                                                 file_names=file_names)
+        for file_path, dataset in zip(file_paths, dataset_objects):
+            dataset.to_netcdf(file_path, engine="netcdf4")
+
+        
     
 
 

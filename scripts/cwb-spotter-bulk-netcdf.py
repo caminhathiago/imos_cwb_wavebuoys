@@ -282,9 +282,18 @@ if __name__ == "__main__":
 
 
             # SAVE combined nc file
-            nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined.nc")
-            nc_combined.to_netcdf(nc_file_path, engine="netcdf4")
-            
+            # nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined.nc")
+            # nc_combined.to_netcdf(nc_file_path, engine="netcdf4")
+            periods = Processor.extract_monthly_periods_dataset(dataset=nc_combined)
+            dataset_objects = Processor.split_dataset_monthly(dataset=nc_combined,
+                                                              periods=periods)
+            nc_file_names = nc_writer.compose_file_names(institution=site.region,
+                                        site_id=site.name.upper(),
+                                        periods=periods)
+            nc_writer.save_nc_file(output_path=vargs.output_path,
+                                   file_names=nc_file_names,
+                                   dataset_objects=dataset_objects)
+
 
             nc_hdr = Processor().select_processing_source(dataset=nc_combined, processing_source="hdr")
             nc_hdr = Processor().create_timeseries_variable(dataset=nc_hdr)
