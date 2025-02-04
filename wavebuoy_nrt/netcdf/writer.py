@@ -415,6 +415,10 @@ class Writer(WaveBuoy):
             file_names.append(file_name)
         return file_names
     
+    def compose_file_names_processing_source(self, file_names: list, processing_source: str) -> list:
+        return [file_name.replace(".nc", f"_{processing_source}.nc") 
+                    for file_name in file_names]
+
     def _compose_file_paths(self, file_names: list, output_path: str) -> list:
         return [os.path.join(output_path, file_name) for file_name in file_names]
 

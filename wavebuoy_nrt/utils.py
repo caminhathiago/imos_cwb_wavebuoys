@@ -28,6 +28,10 @@ def args():
                         help="output directory of netcdf file",
                         required=True)
     
+    parser.add_argument('-i', '--incoming-path', dest='incoming_path', type=str, default=None,
+                        help="directory to store netcdf file to be pushed to AODN",
+                        required=True)
+
     parser.add_argument('-w', '--window', dest='window', type=str, default=24,
                         help="desired window from present backwards to be processed and qualified. Default to 24, please check argument --window-unit for the right desired unit.",
                         required=False)
@@ -63,11 +67,18 @@ def args():
             raise ValueError('{path} not a valid path'.format(path=vargs.output_path))
             sys.exit(1)
 
+    if not os.path.exists(vargs.incoming_path):
+        try:
+            os.makedirs(vargs.incoming_path)
+        except Exception:
+            raise ValueError('{path} not a valid path'.format(path=vargs.incoming_path))
+            sys.exit(1)
+
     # if vargs.incoming_path:
     #     if not os.path.exists(vargs.incoming_path):
-    #         raise ValueError('{path} not a valid path'.format(path=vargs.incoming_path))
-    else:
-        vargs.incoming_path = None
+    # #         raise ValueError('{path} not a valid path'.format(path=vargs.incoming_path))
+    # else:
+    #     vargs.incoming_path = None
 
     if vargs.period_to_process:
         vargs.period_to_process = vargs.period_to_process.split()

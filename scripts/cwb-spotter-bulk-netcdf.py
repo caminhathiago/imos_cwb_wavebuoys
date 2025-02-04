@@ -282,8 +282,6 @@ if __name__ == "__main__":
 
 
             # SAVE combined nc file
-            # nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined.nc")
-            # nc_combined.to_netcdf(nc_file_path, engine="netcdf4")
             periods = Processor.extract_monthly_periods_dataset(dataset=nc_combined)
             dataset_objects = Processor.split_dataset_monthly(dataset=nc_combined,
                                                               periods=periods)
@@ -293,21 +291,29 @@ if __name__ == "__main__":
             nc_writer.save_nc_file(output_path=vargs.output_path,
                                    file_names=nc_file_names,
                                    dataset_objects=dataset_objects)
+            SITE_LOGGER.info(f"combined nc files saved as {nc_file_names}")
 
 
             nc_hdr = Processor().select_processing_source(dataset=nc_combined, processing_source="hdr")
             nc_hdr = Processor().create_timeseries_variable(dataset=nc_hdr)
 
-
             nc_embedded = Processor().select_processing_source(dataset=nc_combined, processing_source="embedded")
             nc_embedded = Processor().create_timeseries_variable(dataset=nc_embedded)
 
             # SAVE nc file for each processing source
-            nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined_hdr.nc")
-            nc_hdr.to_netcdf(nc_file_path, engine="netcdf4")
-            nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined_embedded.nc")
-            nc_embedded.to_netcdf(nc_file_path, engine="netcdf4")
-            
+            # nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined_hdr.nc")
+            # nc_hdr.to_netcdf(nc_file_path, engine="netcdf4")
+            # nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined_embedded.nc")
+            # nc_embedded.to_netcdf(nc_file_path, engine="netcdf4")
+             # SAVE combined nc file
+            dataset_objects_hdr = Processor.split_dataset_monthly(dataset=nc_hdr,
+                                                              periods=periods)
+            nc_file_names_hdr = nc_writer.compose_file_names_processing_source(file_names=nc_file_names,
+                                                                               processing_source="hdr")
+            nc_writer.save_nc_file(output_path=vargs.incoming_path,
+                                   file_names=nc_file_names_hdr,
+                                   dataset_objects=dataset_objects_hdr)
+            SITE_LOGGER.info(f"combined nc files saved as {nc_file_names}")
             # BREAK NC FILES INTO 
 
 
