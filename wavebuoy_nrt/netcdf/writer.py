@@ -34,17 +34,6 @@ class metaDataLoader:
         file_path = os.path.join(os.path.dirname(config.__file__), file_name)
         with open(file_path) as j:
             return json.load(j)
-        
-    @classmethod
-    def load_deployment_metadata(self) -> pd.DataFrame:
-        deployment_metadata_path = "\\\\drive.irds.uwa.edu.au\\OGS-COD-001\\CUTTLER_wawaves\\Data\\wawaves\\Hillarys\\metadata\\Hillarys_dep08_20240703.xlsx"
-        deployment_metadata = pd.read_excel(deployment_metadata_path)
-        
-        metadata_wave_buoy_col = deployment_metadata.filter(regex="Metadata").columns
-        deployment_metadata = deployment_metadata.rename(columns={metadata_wave_buoy_col[0]:"metadata_wave_buoy",
-                                                                  "Parameter":"parameter"})
-        deployment_metadata = deployment_metadata.set_index("parameter")
-        return deployment_metadata
 
 class GeneralAttrs:
     def __init__():
@@ -60,8 +49,8 @@ class SpectralAttrs:
 
 class AttrsExtractor:
     def __init__(self):
-        self.deployment_metadata = metaDataLoader().load_deployment_metadata()
-    
+        self.deployment_metadata = metaDataLoader()._load_deployment_metadata()
+
     # from the data itself -------------
     def _extract_data_time_coverage_start(self, dataset: xr.Dataset) -> str:
         return str(dataset["TIME"].min().values)
@@ -191,9 +180,10 @@ class AttrsExtractor:
         return "_general_wave_sensor_serial_number".upper()
 
 class AttrsComposer:
-    def __init__(self):
+    def __init__(self, buoys_metadata: pd.DataFrame):
         self.deployment_metadata = metaDataLoader()._load_deployment_metadata()
         self.template_imos = metaDataLoader()._get_template_imos(file_name="general_attrs.json")
+        self.buoys_metadata = buoys_metadata
 
     def assign_variables_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
         variables = list(self.template_imos['variables'].keys())
@@ -217,11 +207,12 @@ class AttrsComposer:
     def _compose_general_attributes(self, site_name: str, dataset: xr.Dataset) -> dict:
         
         general_attributes = {}
+        attrsExtractor = AttrsExtractor()
 
-        for name in dir(self): 
+        for name in dir(attrsExtractor): 
         
             if name.startswith("_extract_"): 
-                method = getattr(self, name)
+                method = getattr(attrsExtractor, name)
                 if callable(method):
                     if name.startswith("_extract_buoys_metadata_"):
                         key = name.removeprefix("_extract_buoys_metadata_")
@@ -234,7 +225,7 @@ class AttrsComposer:
                         
                     elif name.startswith("_extract_deployment_metadata_"):
                         key = name.removeprefix("_extract_deployment_metadata_") 
-                        kwargs = {"deployment_metadata":self.deployment_metadata}
+                        kwargs = {"deployment_metadata":attrsExtractor.deployment_metadata}
                     
                     elif name.startswith("_extract_general_"):
                         key = name.removeprefix("_extract_general_") 
@@ -384,7 +375,6 @@ class Processor:
 class Writer(WaveBuoy):
     def __init__(self, buoy_type):
         super().__init__(buoy_type=buoy_type)
-        self.extractor, self.composer, self.processor = AttrsExtractor(), AttrsComposer(), Processor()
 
     def process_df(self, data: pd.DataFrame) -> pd.DataFrame:
         # check if timeseries exists then create
