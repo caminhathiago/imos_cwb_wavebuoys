@@ -11,7 +11,7 @@ from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
 from wavebuoy_nrt.qc.qcTests import WaveBuoyQC
 from wavebuoy_nrt.netcdf.writer import Writer, AttrsComposer, AttrsExtractor, Processor
-from wavebuoy_nrt.utils import args, IMOSLogging
+from wavebuoy_nrt.utils import args, IMOSLogging, generalTesting
 
 
 load_dotenv()
@@ -118,7 +118,7 @@ if __name__ == "__main__":
                                             token=site.sofar_token,
                                             start_date=window_start_time,
                                             end_date=window_end_date)
-            wb.generate_pickle_file(data=new_raw_data, file_name="new_data_raw", site_name=site.name)
+            generalTesting().generate_pickle_file(data=new_raw_data, file_name="new_data_raw", site_name=site.name)
             SITE_LOGGER.info(f"raw spotter data extracted from Sofar API")
 
             if not new_raw_data["waves"]:
@@ -139,7 +139,7 @@ if __name__ == "__main__":
             if new_raw_data["surfaceTemp"]:
                 sst = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
                 sst = wb.convert_to_datetime(data=sst)
-                wb.generate_pickle_file(data=sst, file_name="surfaceTemp_new_data", site_name=site.name)
+                generalTesting().generate_pickle_file(data=sst, file_name="surfaceTemp_new_data", site_name=site.name)
                 SITE_LOGGER.info(f"sst data converted to DataFrame and pre-processed if exists")
 
 
@@ -152,7 +152,7 @@ if __name__ == "__main__":
                                                             end_date=window_end_date)
                 SITE_LOGGER.info(f"raw smart mooring data extracted from Sofar API")
 
-                wb.generate_pickle_file(data=new_sensor_data_raw, file_name="smart_mooring_raw", site_name=site.name)
+                generalTesting().generate_pickle_file(data=new_sensor_data_raw, file_name="smart_mooring_raw", site_name=site.name)
                 
                 sst_sm = wb.convert_smart_mooring_to_dataframe(raw_data=new_sensor_data_raw)
                 sst_sm = wb.convert_to_datetime(data=sst_sm)
@@ -174,9 +174,9 @@ if __name__ == "__main__":
                                                        consider_processing_source=True)
 
 
-            wb.generate_pickle_file(data=sst, file_name="sst_new_data_df", site_name=site.name)
-            wb.generate_pickle_file(data=waves, file_name="waves_new_data_df", site_name=site.name)
-            wb.generate_pickle_file(data=all_new_data_df, file_name="all_new_data_df", site_name=site.name)
+            generalTesting().generate_pickle_file(data=sst, file_name="sst_new_data_df", site_name=site.name)
+            generalTesting().generate_pickle_file(data=waves, file_name="waves_new_data_df", site_name=site.name)
+            generalTesting().generate_pickle_file(data=all_new_data_df, file_name="all_new_data_df", site_name=site.name)
 
             SITE_LOGGER.info("waves and sst/upper smart mooring temperature sensor merged")
 
@@ -268,20 +268,20 @@ if __name__ == "__main__":
             nc_combined = Processor().assing_processing_source_as_coord(combined_dataset=nc_combined)
 
             # ADD attributes
-            nc_attrs_composer = AttrsComposer()
+            nc_attrs_composer = AttrsComposer(buoys_metadata=wb.buoys_metadata)
             nc_combined = nc_attrs_composer.assign_general_attributes(dataset=nc_combined, site_name=site.name)
-            nc_combined = nc_attrs_composer.assign_variables_attributes(dataset=nc_combined)
+            # nc_combined = nc_attrs_composer.assign_variables_attributes(dataset=nc_combined)
 
 
             # SAVE combined nc file
             nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined.nc")
             nc_combined.to_netcdf(nc_file_path, engine="netcdf4")
 
-            nc_hdr = nc_writer.select_processing_source(dataset=nc_combined, processing_source="hdr")
-            nc_hdr = nc_writer.create_timeseries_variable(dataset=nc_hdr)
+            nc_hdr = Processor().select_processing_source(dataset=nc_combined, processing_source="hdr")
+            nc_hdr = Processor().create_timeseries_variable(dataset=nc_hdr)
 
-            nc_embedded = nc_writer.select_processing_source(dataset=nc_combined, processing_source="embedded")
-            nc_embedded = nc_writer.create_timeseries_variable(dataset=nc_embedded)
+            nc_embedded = Processor().select_processing_source(dataset=nc_combined, processing_source="embedded")
+            nc_embedded = Processor().create_timeseries_variable(dataset=nc_embedded)
 
             # SAVE nc file for each processing source
             nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined_hdr.nc")
