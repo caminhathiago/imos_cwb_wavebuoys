@@ -5,6 +5,8 @@ import os
 import sys
 import re
 from datetime import datetime, timedelta
+import pickle
+
 
 GENERAL_LOGGER = logging.getLogger("general_logger")
 SITE_LOGGER = logging.getLogger("site_logger")
@@ -143,3 +145,17 @@ class IMOSLogging:
         else:
             os.rename(file_path, new_file_name)
         GENERAL_LOGGER.info(f"{site_name} log file renamed as {new_file_name}")
+
+class generalTesting:
+    def generate_pickle_file(self, data, file_name: str, site_name: str):
+        file_path = f"tests/pickle_files/{site_name}_{file_name}.pkl"
+        with open(file_path, "wb") as pickle_file:
+            pickle.dump(data, pickle_file)
+            print(f"saved pkl as output_path/test_files/{site_name}_{file_name}.pkl")
+        
+    def open_pickle_file(self, file_name: str, site_name: str):
+        file_path = f"tests/pickle_files/{site_name}_{file_name}.pkl"
+        with open(file_path, "rb") as pickle_file:
+            data = pickle.load(pickle_file)
+            print(f"openned pkl as output_path/test_files/{site_name}_{file_name}.pkl")
+        return data
