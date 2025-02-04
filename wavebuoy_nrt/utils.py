@@ -147,13 +147,16 @@ class IMOSLogging:
         GENERAL_LOGGER.info(f"{site_name} log file renamed as {new_file_name}")
 
 class generalTesting:
-    def generate_pickle_file(self, data, file_name: str, site_name: str):
+    
+    @staticmethod
+    def generate_pickle_file(data, file_name: str, site_name: str):
         file_path = f"tests/pickle_files/{site_name}_{file_name}.pkl"
         with open(file_path, "wb") as pickle_file:
             pickle.dump(data, pickle_file)
             print(f"saved pkl as output_path/test_files/{site_name}_{file_name}.pkl")
-        
-    def open_pickle_file(self, file_name: str, site_name: str):
+    
+    @staticmethod
+    def open_pickle_file(file_name: str, site_name: str):
         file_path = f"tests/pickle_files/{site_name}_{file_name}.pkl"
         with open(file_path, "rb") as pickle_file:
             data = pickle.load(pickle_file)
