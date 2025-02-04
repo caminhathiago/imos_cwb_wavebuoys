@@ -7,10 +7,11 @@ import xarray as xr
 import pandas as pd
 from pandas.core.indexes.period import PeriodIndex
 import numpy as np
+import glob
 
 import wavebuoy_nrt.config as config
 from wavebuoy_nrt.wavebuoy import WaveBuoy
-from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE 
+from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, IRDS_PATH
 
 
 SITE_LOGGER = logging.getLogger("site_logger")
@@ -19,9 +20,20 @@ SITE_LOGGER = logging.getLogger("site_logger")
 
 
 class metaDataLoader:
+    def __init__(self, buoys_metadata: str):
+        self.buoys_metadata = buoys_metadata
+
+    def _get_deployment_metadata_region_folders(self, site_name: str) -> list:
+        region_folder = self.buoys_metadata.loc[site_name, "region"]
+        region_folder += "waves"
+        return region_folder
 
     @staticmethod
-    def _load_deployment_metadata() -> pd.DataFrame:
+    def _get_deployment_metadata_files() -> list:
+        pass
+
+    @staticmethod
+    def _load_deployment_metadata(site_name:str) -> pd.DataFrame:
         deployment_metadata_path = "\\\\drive.irds.uwa.edu.au\\OGS-COD-001\\CUTTLER_wawaves\\Data\\wawaves\\Hillarys\\metadata\\Hillarys_dep08_20240703.xlsx"
         deployment_metadata = pd.read_excel(deployment_metadata_path)
         
