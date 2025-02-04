@@ -132,53 +132,54 @@ if __name__ == "__main__":
 
             waves = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="waves")
             waves = wb.convert_to_datetime(data=waves)
+            generalTesting().generate_pickle_file(data=waves, file_name="waves_new_data_df", site_name=site.name)
             SITE_LOGGER.info(f"waves data converted to DataFrame and pre-processed")
 
             
 
-            if new_raw_data["surfaceTemp"]:
-                sst = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
-                sst = wb.convert_to_datetime(data=sst)
-                generalTesting().generate_pickle_file(data=sst, file_name="surfaceTemp_new_data", site_name=site.name)
-                SITE_LOGGER.info(f"sst data converted to DataFrame and pre-processed if exists")
+            # if new_raw_data["surfaceTemp"]:
+            #     sst = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
+            #     sst = wb.convert_to_datetime(data=sst)
+            #     generalTesting().generate_pickle_file(data=sst, file_name="surfaceTemp_new_data", site_name=site.name)
+            #     SITE_LOGGER.info(f"sst data converted to DataFrame and pre-processed if exists")
 
 
-            if not new_raw_data["surfaceTemp"] and site.version in ("smart_mooring", "half_smart_mooring"):
-                SITE_LOGGER.info(f"no sst available from spotter, grab smart mooring data since it is available (i.e. buoy version: {site.version})")
+            # if not new_raw_data["surfaceTemp"] and site.version in ("smart_mooring", "half_smart_mooring"):
+            #     SITE_LOGGER.info(f"no sst available from spotter, grab smart mooring data since it is available (i.e. buoy version: {site.version})")
                 
-                new_sensor_data_raw = sofar_api.get_sensor_data(spot_id=site.serial,
-                                                            token=site.sofar_token,
-                                                            start_date=window_start_time,
-                                                            end_date=window_end_date)
-                SITE_LOGGER.info(f"raw smart mooring data extracted from Sofar API")
+            #     new_sensor_data_raw = sofar_api.get_sensor_data(spot_id=site.serial,
+            #                                                 token=site.sofar_token,
+            #                                                 start_date=window_start_time,
+            #                                                 end_date=window_end_date)
+            #     SITE_LOGGER.info(f"raw smart mooring data extracted from Sofar API")
 
-                generalTesting().generate_pickle_file(data=new_sensor_data_raw, file_name="smart_mooring_raw", site_name=site.name)
+            #     generalTesting().generate_pickle_file(data=new_sensor_data_raw, file_name="smart_mooring_raw", site_name=site.name)
                 
-                sst_sm = wb.convert_smart_mooring_to_dataframe(raw_data=new_sensor_data_raw)
-                sst_sm = wb.convert_to_datetime(data=sst_sm)
-                sst_sm = wb.get_sst_from_smart_mooring(data=sst_sm, sensor_type="temperature")
-                sst_sm = wb.process_smart_mooring_columns(data=sst_sm)
-                sst = wb.round_parameter_values(data=sst_sm, parameter="SST")
+            #     sst_sm = wb.convert_smart_mooring_to_dataframe(raw_data=new_sensor_data_raw)
+            #     sst_sm = wb.convert_to_datetime(data=sst_sm)
+            #     sst_sm = wb.get_sst_from_smart_mooring(data=sst_sm, sensor_type="temperature")
+            #     sst_sm = wb.process_smart_mooring_columns(data=sst_sm)
+            #     sst = wb.round_parameter_values(data=sst_sm, parameter="SST")
                 
-                # TEMPORARY SETUP
-                sst["processing_source"] = "embedded"
-                sst2 = sst.copy()
-                sst2["processing_source"] = "hdr"
-                sst = pd.concat([sst, sst2], axis=0)
-                # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
+            #     # TEMPORARY SETUP
+            #     sst["processing_source"] = "embedded"
+            #     sst2 = sst.copy()
+            #     sst2["processing_source"] = "hdr"
+            #     sst = pd.concat([sst, sst2], axis=0)
+            #     # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
 
-                SITE_LOGGER.info("smart mooring data processed")
+            #     SITE_LOGGER.info("smart mooring data processed")
 
-            all_new_data_df = wb.merge_parameter_types(waves=waves,
-                                                       sst=sst,
-                                                       consider_processing_source=True)
+            # generalTesting().generate_pickle_file(data=sst, file_name="sst_new_data_df", site_name=site.name)
 
+            # all_new_data_df = wb.merge_parameter_types(waves=waves,
+            #                                            sst=sst,
+            #                                            consider_processing_source=True)
+            # generalTesting().generate_pickle_file(data=all_new_data_df, file_name="all_new_data_df", site_name=site.name)
 
-            generalTesting().generate_pickle_file(data=sst, file_name="sst_new_data_df", site_name=site.name)
-            generalTesting().generate_pickle_file(data=waves, file_name="waves_new_data_df", site_name=site.name)
-            generalTesting().generate_pickle_file(data=all_new_data_df, file_name="all_new_data_df", site_name=site.name)
+            # SITE_LOGGER.info("waves and sst/upper smart mooring temperature sensor merged")
 
-            SITE_LOGGER.info("waves and sst/upper smart mooring temperature sensor merged")
+            all_new_data_df = waves.copy()
 
             # TEMPORARY SETUP
             test = wb.test_duplicated(data=all_new_data_df)
