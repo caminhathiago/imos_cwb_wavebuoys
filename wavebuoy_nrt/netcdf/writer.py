@@ -20,11 +20,10 @@ SITE_LOGGER = logging.getLogger("site_logger")
 
 
 class metaDataLoader:
-    def __init__(self, buoys_metadata: str):
-        self.buoys_metadata = buoys_metadata
-
-    def _get_deployment_metadata_region_folders(self, site_name: str) -> list:
-        region_folder = self.buoys_metadata.loc[site_name, "region"]
+    
+    @staticmethod
+    def _get_deployment_metadata_region_folders(site_name: str, buoys_metadata: pd.DataFrame) -> list:
+        region_folder = buoys_metadata.loc[site_name, "region"]
         region_folder += "waves"
         return region_folder
 
@@ -33,7 +32,7 @@ class metaDataLoader:
         pass
 
     @staticmethod
-    def _load_deployment_metadata(site_name:str) -> pd.DataFrame:
+    def load_deployment_metadata(site_name:str) -> pd.DataFrame:
         deployment_metadata_path = "\\\\drive.irds.uwa.edu.au\\OGS-COD-001\\CUTTLER_wawaves\\Data\\wawaves\\Hillarys\\metadata\\Hillarys_dep08_20240703.xlsx"
         deployment_metadata = pd.read_excel(deployment_metadata_path)
         
@@ -62,143 +61,143 @@ class SpectralAttrs:
         return
 
 class AttrsExtractor:
-    def __init__(self):
-        self.deployment_metadata = metaDataLoader()._load_deployment_metadata()
+    # def __init__(self, buoys_metadata: pd.DataFrame):
+        # self.deployment_metadata = metaDataLoader(buoys_metadata=buoys_metadata)._load_deployment_metadata()
 
     # from the data itself -------------
-    def _extract_data_time_coverage_start(self, dataset: xr.Dataset) -> str:
+    def _extract_data_time_coverage_start(dataset: xr.Dataset) -> str:
         return str(dataset["TIME"].min().values)
     
-    def _extract_data_time_coverage_end(self, dataset: xr.Dataset) -> str:
+    def _extract_data_time_coverage_end(dataset: xr.Dataset) -> str:
         return str(dataset["TIME"].max().values)
     
-    def _extract_data_geospatial_lat_min(self, dataset: xr.Dataset) -> str:
+    def _extract_data_geospatial_lat_min(dataset: xr.Dataset) -> str:
         return float(dataset["LATITUDE"].min().values)
     
-    def _extract_data_geospatial_lat_max(self, dataset: xr.Dataset) -> str:
+    def _extract_data_geospatial_lat_max(dataset: xr.Dataset) -> str:
         return float(dataset["LATITUDE"].max().values)
     
-    def _extract_data_geospatial_lon_min(self, dataset: xr.Dataset) -> str:
+    def _extract_data_geospatial_lon_min(dataset: xr.Dataset) -> str:
         return float(dataset["LONGITUDE"].min().values)
     
-    def _extract_data_geospatial_lon_max(self, dataset: xr.Dataset) -> str:
+    def _extract_data_geospatial_lon_max(dataset: xr.Dataset) -> str:
         return float(dataset["LONGITUDE"].max().values)
 
-    def _extract_data_geospatial_lat_units(self, dataset: xr.Dataset) -> str:
+    def _extract_data_geospatial_lat_units(dataset: xr.Dataset) -> str:
         return "degrees_north"
 
-    def _extract_data_geospatial_long_units(self, dataset: xr.Dataset) -> str:
+    def _extract_data_geospatial_long_units(dataset: xr.Dataset) -> str:
         return "degrees_east"
 
-    def _extract_data_history(self, dataset: xr.Dataset) -> str:
+    def _extract_data_history(dataset: xr.Dataset) -> str:
         return "HISTORY_TEST"
     
-    def _extract_data_date_created(self, dataset: xr.Dataset) -> str:
+    def _extract_data_date_created(dataset: xr.Dataset) -> str:
         return "DATE_CREATED_TEST"
 
     # from buoys metadata ------------------
-    def _extract_buoys_metadata_site_name(self, site_name: str, buoys_metadata: pd.DataFrame) -> str:
+    def _extract_buoys_metadata_site_name(site_name: str, buoys_metadata: pd.DataFrame) -> str:
         return buoys_metadata.loc[site_name].name
     
-    def _extract_buoys_metadata_spot_id(self, site_name: str, buoys_metadata: pd.DataFrame) -> str:
+    def _extract_buoys_metadata_spot_id(site_name: str, buoys_metadata: pd.DataFrame) -> str:
         return buoys_metadata.loc[site_name].serial
 
     # from deployment metadata -------------
     
-    def  _extract_deployment_metadata_instrument(self, deployment_metadata: pd.DataFrame):
+    def  _extract_deployment_metadata_instrument(deployment_metadata: pd.DataFrame):
         return deployment_metadata.loc["Instrument", "metadata_wave_buoy"]
 
-    def  _extract_deployment_metadata_transmission(self, deployment_metadata: pd.DataFrame) -> str:
+    def  _extract_deployment_metadata_transmission(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Transmission", "metadata_wave_buoy"]
 
-    def _extract_deployment_metadata_hull_serial_number(self, deployment_metadata: pd.DataFrame) -> str:
+    def _extract_deployment_metadata_hull_serial_number(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Hull serial number", "metadata_wave_buoy"]
     
-    def _extract_deployment_metadata_water_depth(self, deployment_metadata: pd.DataFrame) -> str:
+    def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Water depth", "metadata_wave_buoy"]
     
-    def _extract_deployment_metadata_water_depth_units(self, deployment_metadata: pd.DataFrame) -> str:
+    def _extract_deployment_metadata_water_depth_units(deployment_metadata: pd.DataFrame) -> str:
         return "m"
 
-    def _extract_deployment_metadata_principal_investigator(self, deployment_metadata: pd.DataFrame) -> str:
+    def _extract_deployment_metadata_principal_investigator(deployment_metadata: pd.DataFrame) -> str:
         return "PRINCIPAL_INVESTIGATOR_TEST"
 
-    def _extract_deployment_metadata_principal_investigator_email(self, deployment_metadata: pd.DataFrame) -> str:
+    def _extract_deployment_metadata_principal_investigator_email(deployment_metadata: pd.DataFrame) -> str:
         return "PRINCIPAL_INVESTIGATOR_EMAIL_TEST"
 
-    def _extract_deployment_metadata_project(self, deployment_metadata: pd.DataFrame) -> str:
+    def _extract_deployment_metadata_project(deployment_metadata: pd.DataFrame) -> str:
         return "PROJECT_TEST"
     
-    def _extract_deployment_metadata_instrument_burst_duration(self, deployment_metadata: pd.DataFrame) -> str:
+    def _extract_deployment_metadata_instrument_burst_duration(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Instrument burst duration", "metadata_wave_buoy"]
 
-    def _extract_deployment_metadata_instrument_burst_interval(self, deployment_metadata: pd.DataFrame) -> str:
+    def _extract_deployment_metadata_instrument_burst_interval(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Instrument burst interval", "metadata_wave_buoy"]
     
-    def _extract_deployment_metadata_instrument_burst_units(self, deployment_metadata: pd.DataFrame) -> str:
+    def _extract_deployment_metadata_instrument_burst_units(deployment_metadata: pd.DataFrame) -> str:
         return "s"
     
-    def _extract_deployment_metadata_instrument_sampling_interval(self, deployment_metadata: pd.DataFrame) -> str:
+    def _extract_deployment_metadata_instrument_sampling_interval(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Instrument sampling interval", "metadata_wave_buoy"]
 
     # generally pre-defined --------------------
-    def _extract_general_author(self):
+    def _extract_general_author():
         return "GENERAL_AUTHOR_TEST"
     
-    def _extract_general_author_email(self) -> str:
+    def _extract_general_author_email() -> str:
         return "GENERAL_AUTHOR_EMAIL_TEST"
     
-    def _extract_general_data_centre(self) -> str:
+    def _extract_general_data_centre() -> str:
         return "GENERAL_DATA_CENTRE_TEST"
 
-    def _extract_general_data_centre_email(self) -> str:
+    def _extract_general_data_centre_email() -> str:
         return "_general_data_centre_email".upper()
 
-    def _extract_general_conventions(self) -> str:
+    def _extract_general_conventions() -> str:
         return "_general_conventions".upper()
 
-    def _extract_general_standard_name_vocabulary(self) -> str:
+    def _extract_general_standard_name_vocabulary() -> str:
         return "_general_standard_name_vocabulary".upper()
     
-    def _extract_general_naming_authority(self) -> str:
+    def _extract_general_naming_authority() -> str:
         return "_general_naming_authority".upper()
     
-    def _extract_general_citation(self) -> str:
+    def _extract_general_citation() -> str:
         return "_general_citation".upper()
     
-    def _extract_general_acknowledgement(self) -> str:
+    def _extract_general_acknowledgement() -> str:
         return "_general_acknowledgement".upper()
     
-    def _extract_general_disclaimer(self) -> str:
+    def _extract_general_disclaimer() -> str:
         return "_general_disclaimer".upper()
     
-    def _extract_general_license(self) -> str:
+    def _extract_general_license() -> str:
         return "_general_license".upper()
     
-    def _extract_general_cdm_data_type(self) -> str:
+    def _extract_general_cdm_data_type() -> str:
         return "_general_cdm_data_type".upper()
     
-    def _extract_general_platform(self) -> str:
+    def _extract_general_platform() -> str:
         return "_general_platform".upper()
     
-    def _extract_general_references(self) -> str:
+    def _extract_general_references() -> str:
         return  "_general_references".upper()
     
-    def _extract_general_wave_buoy_type(self) -> str:
+    def _extract_general_wave_buoy_type() -> str:
         return "_general_wave_buoy_type".upper()
     
-    def _extract_general_wave_motion_sensor_type(self) -> str:
+    def _extract_general_wave_motion_sensor_type() -> str:
         return "_general_wave_motion_sensor_type".upper()
     
-    def _extract_general_wave_sensor_serial_number(self) -> str:
+    def _extract_general_wave_sensor_serial_number() -> str:
         return "_general_wave_sensor_serial_number".upper()
 
 class AttrsComposer:
-    def __init__(self, buoys_metadata: pd.DataFrame):
-        self.deployment_metadata = metaDataLoader()._load_deployment_metadata()
-        self.template_imos = metaDataLoader()._get_template_imos(file_name="general_attrs.json")
+    def __init__(self, buoys_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame):
         self.buoys_metadata = buoys_metadata
-
+        self.deployment_metadata = deployment_metadata
+        self.template_imos = metaDataLoader()._get_template_imos(file_name="general_attrs.json")
+        
     def assign_variables_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
         variables = list(self.template_imos['variables'].keys())
         variables.remove("timeSeries")
@@ -221,12 +220,11 @@ class AttrsComposer:
     def _compose_general_attributes(self, site_name: str, dataset: xr.Dataset) -> dict:
         
         general_attributes = {}
-        attrsExtractor = AttrsExtractor()
 
-        for name in dir(attrsExtractor): 
+        for name in dir (AttrsExtractor): 
         
             if name.startswith("_extract_"): 
-                method = getattr(attrsExtractor, name)
+                method = getattr(AttrsExtractor, name)
                 if callable(method):
                     if name.startswith("_extract_buoys_metadata_"):
                         key = name.removeprefix("_extract_buoys_metadata_")
@@ -239,7 +237,7 @@ class AttrsComposer:
                         
                     elif name.startswith("_extract_deployment_metadata_"):
                         key = name.removeprefix("_extract_deployment_metadata_") 
-                        kwargs = {"deployment_metadata":attrsExtractor.deployment_metadata}
+                        kwargs = {"deployment_metadata":self.deployment_metadata}
                     
                     elif name.startswith("_extract_general_"):
                         key = name.removeprefix("_extract_general_") 
@@ -349,8 +347,8 @@ class Processor:
     @staticmethod
     def compose_dataset(data: pd.DataFrame) -> xr.Dataset:
         
-        coords = self._compose_coords_dimensions(data=data)
-        data_vars = self._compose_data_vars(data=data, dimensions=["TIME"])
+        coords = Processor._compose_coords_dimensions(data=data)
+        data_vars = Processor._compose_data_vars(data=data, dimensions=["TIME"])
         
         dataset = xr.Dataset(coords=coords, data_vars=data_vars)
 
