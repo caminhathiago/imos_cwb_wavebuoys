@@ -20,16 +20,35 @@ SITE_LOGGER = logging.getLogger("site_logger")
 
 
 class metaDataLoader:
-    
-    @staticmethod
-    def _get_deployment_metadata_region_folders(site_name: str, buoys_metadata: pd.DataFrame) -> list:
-        region_folder = buoys_metadata.loc[site_name, "region"]
+    def __init__(self, buoys_metadata: pd.DataFrame):
+        self.buoys_metadata = buoys_metadata
+
+    def _get_deployment_metadata_region_folders(self, site_name: str) -> list:
+        region_folder = self.buoys_metadata.loc[site_name, "region"].lower()
         region_folder += "waves"
         return region_folder
 
-    @staticmethod
-    def _get_deployment_metadata_files() -> list:
+    def _get_deployment_metadata_files(self, site_name: str, region_folder: str, file_extension: str = "*.xlsx") -> list:
+        
+        deployment_metadata_files_extension = file_extension
+        files_path = os.path.join(IRDS_PATH.format(region=region_folder), site_name)
+
+        if os.path.exists(os.path.join(files_path, "metadata")):
+            metadata_folder = "metadata"
+        elif os.path.exists(os.path.join(files_path, "AODN_metadata")):
+            SITE_LOGGER.warning(f"deployment metadata path for {site_name} is currently named as /AODN_metadata; rename it to /metadata")
+            metadata_folder = "AODN_metadata"
+        else:
+            print("test")
+            pass
+
+        files = glob.glob(os.path.join(files_path, metadata_folder, deployment_metadata_files_extension))
+
+        return files
+
+    def _get_latest_deployment_metadata(self, file_paths: list) -> list:
         pass
+
 
     @staticmethod
     def load_deployment_metadata(site_name:str) -> pd.DataFrame:
@@ -196,7 +215,7 @@ class AttrsComposer:
     def __init__(self, buoys_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame):
         self.buoys_metadata = buoys_metadata
         self.deployment_metadata = deployment_metadata
-        self.template_imos = metaDataLoader()._get_template_imos(file_name="general_attrs.json")
+        self.template_imos = metaDataLoader(buoys_metadata=buoys_metadata)._get_template_imos(file_name="general_attrs.json")
         
     def assign_variables_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
         variables = list(self.template_imos['variables'].keys())
