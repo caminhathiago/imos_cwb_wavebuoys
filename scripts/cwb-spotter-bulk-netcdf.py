@@ -50,7 +50,8 @@ if __name__ == "__main__":
             # Relevant loads ---------------------------------------
             SITE_LOGGER.info("LOADING STEP ====================================")
             
-            deployment_metadata = metaDataLoader.load_deployment_metadata(site_name=site.name)
+            meta_data_loader = metaDataLoader(buoys_metadata=wb.buoys_metadata)
+            deployment_metadata = meta_data_loader.load_deployment_metadata(site_name=site.name)
 
             latest_available_time = sofar_api.get_latest_available_time(spot_id=site.serial, token=site.sofar_token)
             SITE_LOGGER.info(f"grabed latest_available_time: {latest_available_time}")
