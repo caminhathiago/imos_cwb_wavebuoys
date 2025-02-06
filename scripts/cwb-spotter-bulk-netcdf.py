@@ -33,7 +33,7 @@ if __name__ == "__main__":
     imos_logging = IMOSLogging() 
     
     # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
-    wb.buoys_metadata = wb.buoys_metadata.loc[["Hillarys","Hillarys_HSM"]].copy()
+    wb.buoys_metadata = wb.buoys_metadata.loc[["Hillarys"]].copy()
     # END OF TEMPORARY SETUP
 
     for idx, site in wb.buoys_metadata.iterrows():
@@ -51,7 +51,7 @@ if __name__ == "__main__":
             SITE_LOGGER.info("LOADING STEP ====================================")
             
             meta_data_loader = metaDataLoader(buoys_metadata=wb.buoys_metadata)
-            deployment_metadata = meta_data_loader.load_deployment_metadata(site_name=site.name)
+            deployment_metadata = meta_data_loader.load_latest_deployment_metadata(site_name=site.name)
 
             latest_available_time = sofar_api.get_latest_available_time(spot_id=site.serial, token=site.sofar_token)
             SITE_LOGGER.info(f"grabed latest_available_time: {latest_available_time}")
@@ -288,6 +288,8 @@ if __name__ == "__main__":
             periods = Processor.extract_monthly_periods_dataset(dataset=nc_combined)
             dataset_objects = Processor.split_dataset_monthly(dataset=nc_combined,
                                                               periods=periods)
+            
+            
             nc_file_names = nc_writer.compose_file_names(institution=site.region,
                                         site_id=site.name.upper(),
                                         periods=periods)
