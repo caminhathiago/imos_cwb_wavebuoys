@@ -12,7 +12,7 @@ import glob
 
 import wavebuoy_nrt.config as config
 from wavebuoy_nrt.wavebuoy import WaveBuoy
-from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, IRDS_PATH
+from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, IRDS_PATH, OPERATING_INSTITUTIONS
 
 
 SITE_LOGGER = logging.getLogger("site_logger")
@@ -30,19 +30,28 @@ class metaDataLoader:
     def _get_deployment_metadata_files(self, site_name: str, region_folder: str, file_extension: str = "*.xlsx") -> list:
         
         deployment_metadata_files_extension = file_extension
-        files_path = os.path.join(IRDS_PATH.format(region=region_folder), site_name)
+        site_name_corrected = site_name.replace("_","")
+        files_path = os.path.join(IRDS_PATH, "Data", region_folder, site_name_corrected)
 
-        if os.path.exists(os.path.join(files_path, "metadata")):
-            metadata_folder = "metadata"
-        elif os.path.exists(os.path.join(files_path, "AODN_metadata")):
-            SITE_LOGGER.warning(f"deployment metadata path for {site_name} is currently named as /AODN_metadata; rename it to /metadata")
-            metadata_folder = "AODN_metadata"
+        if os.path.exists(files_path):
+            if os.path.exists(os.path.join(files_path, "metadata")):
+                metadata_folder = "metadata"
+            elif os.path.exists(os.path.join(files_path, "AODN_metadata")):
+                SITE_LOGGER.warning(f"deployment metadata path for {site_name} is currently named as /AODN_metadata; rename it to /metadata")
+                metadata_folder = "AODN_metadata"
+            else:
+                SITE_LOGGER.error(f"metadata folder for {site_name} not found. Please make sure it exists named as metadata and that it contains the relevant deployment metadata files.")
         else:
-            SITE_LOGGER.error(f"metadata folder for {site_name} not found. Please make sure it exists named as metadata and that it contains the relevant deployment metadata files.")
+            SITE_LOGGER.error(f"folder for {site_name} not found. Please make sure it exists and has the same name as in buoys_metadata.")
 
         files = glob.glob(os.path.join(files_path, metadata_folder, deployment_metadata_files_extension))
 
-        return files
+        if files:
+            return files
+        else:
+            error_message = f"No deployment metadata files provided for {site_name}. Please make sure at least the most recent one exists and matches the correct file naming standar."
+            SITE_LOGGER.error(error_message)
+            raise FileNotFoundError(error_message)
 
     def _get_latest_deployment_metadata(self, file_paths: list) -> list:
         
@@ -72,6 +81,19 @@ class metaDataLoader:
             error_message = "at least one of the deployment metadata files name is not conforming with the template: metadata_{site_name}_deploy{deployment_date}.xlsx. Make sure all of them are conforming."
             SITE_LOGGER.error(error_message)
             raise NameError(error_message)            
+
+    def load_latest_deployment_metadata(self, site_name:str) -> pd.DataFrame:
+        region_folder = self._get_deployment_metadata_region_folders(site_name=site_name)
+        file_paths = self._get_deployment_metadata_files(site_name=site_name, region_folder=region_folder)
+        file_path = self._get_latest_deployment_metadata(file_paths=file_paths)
+        
+        deployment_metadata = pd.read_excel(file_path)
+        metadata_wave_buoy_col = deployment_metadata.filter(regex="Metadata").columns
+        deployment_metadata = deployment_metadata.rename(columns={metadata_wave_buoy_col[0]:"metadata_wave_buoy",
+                                                                  "Parameter":"parameter"})
+        deployment_metadata = deployment_metadata.set_index("parameter")
+
+        return deployment_metadata
 
     @staticmethod
     def load_deployment_metadata(site_name:str) -> pd.DataFrame:
@@ -438,21 +460,31 @@ class Processor:
             dataset_objects.append(monthly_dataset)
         return tuple(dataset_objects)
 
-
-
 class Writer(WaveBuoy):
     def __init__(self, buoy_type):
         super().__init__(buoy_type=buoy_type)
 
-    def process_df(self, data: pd.DataFrame) -> pd.DataFrame:
-        # check if timeseries exists then create
-        # 
-        return
-
     def generate_nc_output_paths(self, dataframe: pd.DataFrame) -> list:
         nc_output_paths = []
         return nc_output_paths
-       
+
+    def _get_operating_institution(self, deployment_metadata: pd.DataFrame) -> str:
+        operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
+
+        if "(IMOS)" in operating_institution:
+            operating_institution = "IMOS_COASTAL-WAVE-BUOYS"
+        elif "(IMOS)" not in operating_institution:
+            try:
+                operating_institution = OPERATING_INSTITUTIONS[operating_institution]
+            except:
+                raise ValueError(f"{operating_institution} not valid. Please make sure the operating institution code is valid in the deployment metadata file")
+
+        return operating_institution
+
+    def _validate_operating_institution(self, deployment_metadata: pd.DataFrame):
+        operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
+        
+
     def compose_file_names(self,
                             institution:str,
                             site_id: str,
