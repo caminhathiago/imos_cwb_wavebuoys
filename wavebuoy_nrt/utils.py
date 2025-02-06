@@ -1,12 +1,13 @@
-import argparse
-import logging
-import tempfile
 import os
 import sys
+from datetime import datetime
+
+import argparse
+import logging
 import re
-from datetime import datetime, timedelta
 import pickle
 
+from wavebuoy_nrt.config.config import FILES_PATH
 
 GENERAL_LOGGER = logging.getLogger("general_logger")
 SITE_LOGGER = logging.getLogger("site_logger")
@@ -168,8 +169,22 @@ class generalTesting:
     
     @staticmethod
     def open_pickle_file(file_name: str, site_name: str):
+
         file_path = f"tests/pickle_files/{site_name}_{file_name}.pkl"
         with open(file_path, "rb") as pickle_file:
             data = pickle.load(pickle_file)
             print(f"openned pkl as output_path/test_files/{site_name}_{file_name}.pkl")
         return data
+    
+class FilesHandler():
+    def __init__(self):
+        pass
+
+    def _get_file_path(self, file_name):
+        if os.path.exists(os.path.join(FILES_PATH, file_name)):
+            return os.path.join(FILES_PATH, file_name)
+        else:
+            error_message = f"""Path for {file_name} does not exist.\nCheck if the correct path was provided, or if {file_name} was moved."""
+            print(error_message)
+            GENERAL_LOGGER.error(error_message)
+            raise FileNotFoundError(error_message)
