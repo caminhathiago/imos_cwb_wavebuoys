@@ -36,4 +36,4 @@ AODN_COLUMNS_TEMPLATE = {
     "value": 'SST'
 }
 
-IRDS_PATH = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves\Data"
+IRDS_PATH = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves\Data\{region}"
