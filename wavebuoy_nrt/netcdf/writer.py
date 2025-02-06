@@ -1,6 +1,7 @@
 import os
 import logging
 import json
+import re
 
 import netCDF4
 import xarray as xr
@@ -15,8 +16,6 @@ from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, IRDS_PATH
 
 
 SITE_LOGGER = logging.getLogger("site_logger")
-
-
 
 
 class metaDataLoader:
@@ -39,8 +38,7 @@ class metaDataLoader:
             SITE_LOGGER.warning(f"deployment metadata path for {site_name} is currently named as /AODN_metadata; rename it to /metadata")
             metadata_folder = "AODN_metadata"
         else:
-            print("test")
-            pass
+            SITE_LOGGER.error(f"metadata folder for {site_name} not found. Please make sure it exists named as metadata and that it contains the relevant deployment metadata files.")
 
         files = glob.glob(os.path.join(files_path, metadata_folder, deployment_metadata_files_extension))
 
@@ -48,9 +46,24 @@ class metaDataLoader:
 
     def _get_latest_deployment_metadata(self, file_paths: list) -> list:
         file_paths.sort(key=os.path.getctime)
-        return file_paths[-1]
-
+        latest_created_file = file_paths[-1]
         
+        try:
+            date_pattern = re.compile(r"_(\d{8}).xlsx")
+            latest_date_file = max(file_paths, key=lambda x: int(date_pattern.search(x).group(1)))
+        except:
+            SITE_LOGGER.warning("deployment metadata file date is set as YYYYmm. Try to include day of deployment.")
+            date_pattern = re.compile(r"_(\d{6}).xlsx")
+            latest_date_file = max(file_paths, key=lambda x: int(date_pattern.search(x).group(1)))
+        
+        if latest_created_file != latest_date_file:
+            SITE_LOGGER.warning("latest created deployment metadata file different from latest date.")
+       
+        return latest_date_file
+
+    def _validate_deployment_metadata_name(self, file_paths: list):
+        
+        return
 
 
     @staticmethod
