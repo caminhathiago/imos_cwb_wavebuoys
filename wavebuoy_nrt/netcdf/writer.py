@@ -47,7 +47,10 @@ class metaDataLoader:
         return files
 
     def _get_latest_deployment_metadata(self, file_paths: list) -> list:
-        pass
+        file_paths.sort(key=os.path.getctime)
+        return file_paths[-1]
+
+        
 
 
     @staticmethod
