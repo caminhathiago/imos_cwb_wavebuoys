@@ -45,6 +45,9 @@ class metaDataLoader:
         return files
 
     def _get_latest_deployment_metadata(self, file_paths: list) -> list:
+        
+        self._validate_deployment_metadata_file_name(file_paths=file_paths)
+        
         file_paths.sort(key=os.path.getctime)
         latest_created_file = file_paths[-1]
         
@@ -61,10 +64,14 @@ class metaDataLoader:
        
         return latest_date_file
 
-    def _validate_deployment_metadata_name(self, file_paths: list):
-        
-        return
+    def _validate_deployment_metadata_file_name(self, file_paths: list):
+        template = re.compile(r"metadata_[A-Za-z0-9]+_dep(\d{2})_(\d+).xlsx")
 
+        matches = [file for file in file_paths if template.search(file)]
+        if len(matches) < len(file_paths):
+            error_message = "at least one of the deployment metadata files name is not conforming with the template: metadata_{site_name}_deploy{deployment_date}.xlsx. Make sure all of them are conforming."
+            SITE_LOGGER.error(error_message)
+            raise NameError(error_message)            
 
     @staticmethod
     def load_deployment_metadata(site_name:str) -> pd.DataFrame:
