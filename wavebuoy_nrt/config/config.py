@@ -1,9 +1,14 @@
 FILES_OUTPUT_PATH = r"C:\Users\00116827\cwb\wavebuoy_aodn\output_path"
 FILES_PATH = r"C:\Users\00116827\cwb\wavebuoy_aodn\wavebuoy_nrt"
-NC_FILE_NAME_TEMPLATE = "{institution}_{monthly_datetime}_{site_id}_RT_WAVE-PARAMETERS_monthly.nc"
+NC_FILE_NAME_TEMPLATE = "{operating_institution}_{monthly_datetime}_{site_id}_RT_WAVE-PARAMETERS_monthly.nc"
 
 REGION_TO_INSTITUTION = {"VIC":"VIC-DEAKIN-UNI",
                          "WA":"IMOS_COASTAL-WAVE-BUOYS"}
+
+OPERATING_INSTITUTIONS = {"UWA":"",
+                          "Deakin":"VIC-DEAKIN-UNI",
+                          "NSW-DCCEEW" : "NSW-DPE",
+                          }
 
 # AODN_COLUMNS_TEMPLATE = {
 #     'TIME': "timestamp",
@@ -36,4 +41,4 @@ AODN_COLUMNS_TEMPLATE = {
     "value": 'SST'
 }
 
-IRDS_PATH = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves\Data\{region}"
+IRDS_PATH = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves"
