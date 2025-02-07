@@ -51,7 +51,7 @@ class NetCDFFileHandler():
         date_time_month_str = date_time_month.strftime("%Y%m%d")
         return NC_FILE_NAME_TEMPLATE.format(date_time_month=date_time_month_str,
                                             site_id=site_id+2,
-                                            institution=institution)
+                                            operating_institution=institution)
 
     def lookup_netcdf_files_needed(self, 
                             institution: str,
@@ -68,7 +68,7 @@ class NetCDFFileHandler():
                                                                 end_date=latest_available_datetime)
             nc_file_paths_needed = []
             for month in monthly_daterange:
-                nc_file_name = NC_FILE_NAME_TEMPLATE.format(institution=REGION_TO_INSTITUTION[institution],# Temporary data
+                nc_file_name = NC_FILE_NAME_TEMPLATE.format(operating_institution=REGION_TO_INSTITUTION[institution],# Temporary data
                                                     monthly_datetime=month.strftime("%Y%m%d"),
                                                     site_id=site_id.upper())
                 print(nc_file_name)
@@ -100,7 +100,7 @@ class NetCDFFileHandler():
 
     def get_available_nc_files(self, institution: str, site_id: str) -> list:
         
-        nc_file_filter = NC_FILE_NAME_TEMPLATE.format(institution=REGION_TO_INSTITUTION[institution],# Temporary data
+        nc_file_filter = NC_FILE_NAME_TEMPLATE.format(operating_institution=REGION_TO_INSTITUTION[institution],# Temporary data
                                                     monthly_datetime="*",
                                                     site_id=site_id.upper())
         nc_file_filter = f"{REGION_TO_INSTITUTION[institution]}*{site_id.upper()}*.nc"
