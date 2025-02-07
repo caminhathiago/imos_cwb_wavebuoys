@@ -89,21 +89,6 @@ class WaveBuoyQC():
             # SITE_LOGGER.error(error_message)
             raise ValueError(error_message)    
 
-    # def create_flags_columns(self, data: pd.DataFrame, parameters: list) -> pd.DataFrame:
-        
-    #     not_eval_flag = 2.0
-    #     wave_qc_column = "WAVE_quality_control"
-        
-    #     for param in parameters:
-    #         if param in self.waves_parameters:
-    #             if not wave_qc_column in data.columns:
-    #                 data[wave_qc_column] = not_eval_flag
-    #         else:
-    #             param_qc_column = param + "_quality_control"
-    #             data[param_qc_column] = not_eval_flag 
-        
-    #     return data
-
     def _create_flags_column(self, data: pd.DataFrame, parameter: str, test: str) -> pd.DataFrame:
         
         not_eval_flag = 2.0
@@ -116,9 +101,10 @@ class WaveBuoyQC():
         param_qc_column =  parameter + f"_{test}"
         if parameter in self.waves_parameters:
             param_qc_column = "WAVE_" + param_qc_column
+        
         data[param_qc_column] = not_eval_flag 
         
-        return data
+        return param_qc_column, data
 
     def fill_not_eval_flag(self, data: pd.DataFrame, not_eval_flag: int=2) -> pd.DataFrame:
         
@@ -176,9 +162,8 @@ class WaveBuoyQC():
                        qc_config[parameter]["gross_range_fail_max"]]
         )
 
-        param_qc_column = f"{parameter}_gross_range_test"
-        if not param_qc_column in data.columns:
-            data = self._create_flags_column(data=data, parameter=parameter, test="gross_range_test")
+        test_name = "gross_range_test"
+        param_qc_column, data = self._create_flags_column(data=data, parameter=parameter, test=test_name)
 
         data[param_qc_column] = results
 
@@ -197,10 +182,9 @@ class WaveBuoyQC():
             threshold=[qc_config[parameter]["rate_of_change_threshold"]]
         )
         
+        
         test_name = "rate_of_change_test"
-        param_qc_column = f"{parameter}_{test_name}"
-        if not param_qc_column in data.columns:
-            data = self._create_flags_column(data=data, parameter=parameter, test=test_name)
+        param_qc_column, data = self._create_flags_column(data=data, parameter=parameter, test=test_name)
 
         data[param_qc_column] = results
 
@@ -230,6 +214,10 @@ class WaveBuoyQC():
             qc_col_prefix = "SST"
 
         parameter_type_qc_columns = data.filter(regex=qc_col_prefix).columns
+
+        if parameter_type_qc_columns.empty:
+            return data
+
         for idx, row in data[parameter_type_qc_columns].iterrows():
             data.loc[idx, f"{qc_col_prefix}_quality_control"] = row.max()
 
@@ -274,3 +262,19 @@ class WaveBuoyQC():
     #                             suspect_span: [{qc_limit_suspect_min}, {qc_limit_suspect_max}]
     #                             fail_span: [{qc_limit_fail_min}, {qc_limit_fail_max}]
     #                             """
+
+
+    # def create_flags_columns(self, data: pd.DataFrame, parameters: list) -> pd.DataFrame:
+        
+    #     not_eval_flag = 2.0
+    #     wave_qc_column = "WAVE_quality_control"
+        
+    #     for param in parameters:
+    #         if param in self.waves_parameters:
+    #             if not wave_qc_column in data.columns:
+    #                 data[wave_qc_column] = not_eval_flag
+    #         else:
+    #             param_qc_column = param + "_quality_control"
+    #             data[param_qc_column] = not_eval_flag 
+        
+    #     return data

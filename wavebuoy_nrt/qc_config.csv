@@ -1,5 +1,5 @@
 id,config_id,parameter,gross_range_suspect_min,gross_range_suspect_max,gross_range_fail_min,gross_range_fail_max,rate_of_change_threshold
-1,1,WSSH,0.1,2.5,0,3,0.00028
+1,1,WSSH,10,20,9,30,0.00028
 2,1,WPFM,1,25,1,25,0.00028
 3,1,WPPE,1,25,1,25,0.00028
 4,1,WMDS,0,360,0,360,0.00028

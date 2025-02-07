@@ -117,11 +117,12 @@ if __name__ == "__main__":
             SITE_LOGGER.info("EXTRACTION STEP ====================================")
 
             window_end_date = latest_available_time + timedelta(hours=1)
-            new_raw_data = sofar_api.fetch_wave_data(spot_id=site.serial,
-                                            token=site.sofar_token,
-                                            start_date=window_start_time,
-                                            end_date=window_end_date)
-            generalTesting().generate_pickle_file(data=new_raw_data, file_name="new_data_raw", site_name=site.name)
+            # new_raw_data = sofar_api.fetch_wave_data(spot_id=site.serial,
+            #                                 token=site.sofar_token,
+            #                                 start_date=window_start_time,
+            #                                 end_date=window_end_date)
+            # generalTesting().generate_pickle_file(data=new_raw_data, file_name="new_data_raw", site_name=site.name)
+            new_raw_data = generalTesting().open_pickle_file(site_name=site.name, file_name="new_data_raw")
             SITE_LOGGER.info(f"raw spotter data extracted from Sofar API")
 
             if not new_raw_data["waves"]:
@@ -224,7 +225,7 @@ if __name__ == "__main__":
             qc = WaveBuoyQC(config_id=1)
 
             all_data_df = qc.create_global_qc_columns(data=all_data_df)
-
+            
             all_data_hdr = wb.select_processing_source(data=all_data_df, processing_source="hdr")
             all_data_embedded = wb.select_processing_source(data=all_data_df, processing_source="embedded")
 
@@ -259,7 +260,8 @@ if __name__ == "__main__":
                 qualified_data_hdr.to_csv(csv_file_path_hdr, index=False)
                 SITE_LOGGER.info(f"qualified data saved as '{csv_file_path_hdr}'")
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
-
+            
+            
             GENERAL_LOGGER.info("Starting qualification step")
             # Processing Nc File --------------------------------------------
             SITE_LOGGER.info("NC FILE PROCESSING STEP ====================================")
