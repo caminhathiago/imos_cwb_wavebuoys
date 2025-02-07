@@ -492,7 +492,7 @@ class Writer(WaveBuoy):
         periods_formated = periods.strftime("%Y%m")
         file_names = []
         for period in periods_formated:
-            file_name = NC_FILE_NAME_TEMPLATE.format(institution=institution,
+            file_name = NC_FILE_NAME_TEMPLATE.format(operating_institution=institution,
                                                      site_id=site_id,
                                                      monthly_datetime=period
                                                 )
