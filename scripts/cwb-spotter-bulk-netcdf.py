@@ -209,8 +209,6 @@ if __name__ == "__main__":
                     all_data_df = all_new_data_df
             else:
                 all_data_df = all_new_data_df
-
-
             
             # TEMPORARY SETUP (REMOVE WHEN DONE)
             csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_output.csv")
@@ -223,10 +221,13 @@ if __name__ == "__main__":
             # GENERAL_LOGGER.info("Starting qualification step")
             SITE_LOGGER.info("QUALIFICATION STEP ====================================")
 
+            qc = WaveBuoyQC(config_id=1)
+
+            all_data_df = qc.create_global_qc_columns(data=all_data_df)
+
             all_data_hdr = wb.select_processing_source(data=all_data_df, processing_source="hdr")
             all_data_embedded = wb.select_processing_source(data=all_data_df, processing_source="embedded")
 
-            qc = WaveBuoyQC(config_id=1)
             
             qc.load_data(data=all_data_embedded)
             parameters_to_qc = qc.get_parameters_to_qc(data=all_data_embedded, qc_config=qc.qc_config)      
