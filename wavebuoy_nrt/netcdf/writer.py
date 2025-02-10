@@ -3,7 +3,7 @@ import logging
 import json
 import re
 
-import netCDF4
+from netCDF4 import date2num
 import xarray as xr
 import pandas as pd
 from pandas.core.indexes.period import PeriodIndex
@@ -266,7 +266,10 @@ class AttrsComposer:
         variables = list(self.template_imos['variables'].keys())
         variables.remove("timeSeries")
         for variable in variables:
-            dataset[variable] = (dataset[variable].assign_attrs(self.template_imos['variables'][variable]))
+            if variable in list(dataset.variables):
+                if variable == "TIME":
+                    dataset["TIME"].encoding.pop("units", None)
+                dataset[variable] = (dataset[variable].assign_attrs(self.template_imos['variables'][variable]))
         
         return dataset
 
@@ -456,9 +459,24 @@ class Processor:
     def split_dataset_monthly(dataset: xr.Dataset, periods: PeriodIndex) -> tuple[xr.Dataset, ...]:
         dataset_objects = []
         for period in periods:
-            monthly_dataset = dataset.sel(TIME=str(period))
+            print(period)
+            monthly_dataset = dataset.sel(TIME=period)
             dataset_objects.append(monthly_dataset)
         return tuple(dataset_objects)
+
+    @staticmethod
+    def convert_time_to_num(dataset: xr.Dataset) -> xr.Dataset:
+        time = np.array(dataset["TIME"]
+                        .to_dataframe()["TIME"]
+                        .dt.to_pydatetime()
+        )
+        dataset["TIME"] = date2num(time,
+                            "days since 1950-01-01 00:00:00 UTC",
+                            "gregorian")
+        print(dataset["TIME"].data)
+
+        return dataset
+
 
 class Writer(WaveBuoy):
     def __init__(self, buoy_type):
@@ -484,7 +502,6 @@ class Writer(WaveBuoy):
     def _validate_operating_institution(self, deployment_metadata: pd.DataFrame):
         operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
         
-
     def compose_file_names(self,
                             institution:str,
                             site_id: str,

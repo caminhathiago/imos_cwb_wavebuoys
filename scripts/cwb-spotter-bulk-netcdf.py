@@ -278,13 +278,17 @@ if __name__ == "__main__":
             nc_combined = Processor.assing_processing_source_as_coord(combined_dataset=nc_combined)
             SITE_LOGGER.info("processing sources assigned as coordinate")
 
+            nc_combined = Processor.convert_time_to_num(dataset=nc_combined)
+            SITE_LOGGER.info("TIME variable values converted to num to comply to CF conventions")
+
 
             # ADD attributes
             nc_attrs_composer = AttrsComposer(buoys_metadata=wb.buoys_metadata, deployment_metadata=deployment_metadata)
             nc_combined = nc_attrs_composer.assign_general_attributes(dataset=nc_combined, site_name=site.name)
             SITE_LOGGER.info("general attributes assigned to combined dataset")
 
-            # nc_combined = nc_attrs_composer.assign_variables_attributes(dataset=nc_combined)
+            nc_combined = nc_attrs_composer.assign_variables_attributes(dataset=nc_combined)
+            SITE_LOGGER.info("variables attributes assigned to combined dataset")
 
 
             # SAVE combined nc file
