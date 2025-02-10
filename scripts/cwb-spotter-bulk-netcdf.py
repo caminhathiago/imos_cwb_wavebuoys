@@ -10,7 +10,7 @@ import pandas as pd
 from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
 from wavebuoy_nrt.qc.qcTests import WaveBuoyQC
-from wavebuoy_nrt.netcdf.writer import Writer, AttrsComposer, AttrsExtractor, Processor, metaDataLoader
+from wavebuoy_nrt.netcdf.writer import ncWriter, ncAttrsComposer, ncAttrsExtractor, ncProcessor, ncMetaDataLoader
 from wavebuoy_nrt.utils import args, IMOSLogging, generalTesting
 
 
@@ -50,7 +50,7 @@ if __name__ == "__main__":
             # Relevant loads ---------------------------------------
             SITE_LOGGER.info("LOADING STEP ====================================")
             
-            meta_data_loader = metaDataLoader(buoys_metadata=wb.buoys_metadata)
+            meta_data_loader = ncMetaDataLoader(buoys_metadata=wb.buoys_metadata)
             deployment_metadata = meta_data_loader.load_latest_deployment_metadata(site_name=site.name)
 
             latest_available_time = sofar_api.get_latest_available_time(spot_id=site.serial, token=site.sofar_token)
@@ -122,7 +122,7 @@ if __name__ == "__main__":
             #                                 start_date=window_start_time,
             #                                 end_date=window_end_date)
             # generalTesting().generate_pickle_file(data=new_raw_data, file_name="new_data_raw", site_name=site.name)
-            new_raw_data = generalTesting().open_pickle_file(site_name=site.name, file_name="new_data_raw")
+            new_raw_data = generalTesting().open_pickle_file(file_name=f"{site.name}_new_data_raw")
             SITE_LOGGER.info(f"raw spotter data extracted from Sofar API")
 
             if not new_raw_data["waves"]:
@@ -266,37 +266,40 @@ if __name__ == "__main__":
             # Processing Nc File --------------------------------------------
             SITE_LOGGER.info("NC FILE PROCESSING STEP ====================================")
 
-            nc_writer = Writer(buoy_type="sofar")
+            nc_writer = ncWriter(buoy_type="sofar")
 
-            ds_hdr = Processor.compose_dataset(data=qualified_data_hdr)
-            ds_embedded = Processor.compose_dataset(data=qualified_data_embedded)
+            ds_hdr = ncProcessor.compose_dataset(data=qualified_data_hdr)
+            ds_embedded = ncProcessor.compose_dataset(data=qualified_data_embedded)
             SITE_LOGGER.info("hdr and embedded datasets composed")
 
-            nc_combined = Processor.combine_datasets(dataset1=ds_hdr, dataset2=ds_embedded)
+            nc_combined = ncProcessor.combine_datasets(dataset1=ds_hdr, dataset2=ds_embedded)
             SITE_LOGGER.info("hdr and embedded datasets combined")
 
-            nc_combined = Processor.assing_processing_source_as_coord(combined_dataset=nc_combined)
+            nc_combined = ncProcessor.assing_processing_source_as_coord(combined_dataset=nc_combined)
             SITE_LOGGER.info("processing sources assigned as coordinate")
 
-            nc_combined = Processor.convert_time_to_num(dataset=nc_combined)
-            SITE_LOGGER.info("TIME variable values converted to num to comply to CF conventions")
-
-
+            
             # ADD attributes
-            nc_attrs_composer = AttrsComposer(buoys_metadata=wb.buoys_metadata, deployment_metadata=deployment_metadata)
+            nc_attrs_composer = ncAttrsComposer(buoys_metadata=wb.buoys_metadata, deployment_metadata=deployment_metadata)
             nc_combined = nc_attrs_composer.assign_general_attributes(dataset=nc_combined, site_name=site.name)
             SITE_LOGGER.info("general attributes assigned to combined dataset")
 
             nc_combined = nc_attrs_composer.assign_variables_attributes(dataset=nc_combined)
             SITE_LOGGER.info("variables attributes assigned to combined dataset")
 
+            nc_combined_before_split = generalTesting().generate_pickle_file(file_name="nc_combined_before_split", 
+                                                site_name=site.name,
+                                                data=nc_combined)
 
-            # SAVE combined nc file
-            periods = Processor.extract_monthly_periods_dataset(dataset=nc_combined)
-            dataset_objects = Processor.split_dataset_monthly(dataset=nc_combined,
+            # Split data monthly
+            periods = ncProcessor.extract_monthly_periods_dataset(dataset=nc_combined)
+            dataset_objects = ncProcessor.split_dataset_monthly(dataset=nc_combined,
                                                               periods=periods)
             
-            
+            dataset_objects = ncProcessor.process_time_to_CF_convention(dataset_objects=dataset_objects)
+            SITE_LOGGER.info("dataset objects time dimension processed to conform to CF conventions")
+
+            # SAVE combined nc file
             nc_file_names = nc_writer.compose_file_names(institution=site.region,
                                         site_id=site.name.upper(),
                                         periods=periods)
@@ -304,23 +307,19 @@ if __name__ == "__main__":
                                    file_names=nc_file_names,
                                    dataset_objects=dataset_objects)
             SITE_LOGGER.info(f"combined nc files saved as {nc_file_names}")
-
-
-            nc_hdr = Processor.select_processing_source(dataset=nc_combined, processing_source="hdr")
-            nc_hdr = Processor.create_timeseries_variable(dataset=nc_hdr)
-
-            nc_embedded = Processor.select_processing_source(dataset=nc_combined, processing_source="embedded")
-            nc_embedded = Processor.create_timeseries_variable(dataset=nc_embedded)
-
-            # SAVE nc file for each processing source
-            # nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined_hdr.nc")
-            # nc_hdr.to_netcdf(nc_file_path, engine="netcdf4")
-            # nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_nc_combined_embedded.nc")
-            # nc_embedded.to_netcdf(nc_file_path, engine="netcdf4")
             
+
+            nc_hdr = ncProcessor.select_processing_source(dataset=nc_combined, processing_source="hdr")
+            nc_hdr = ncProcessor.create_timeseries_variable(dataset=nc_hdr)
+
+            nc_embedded = ncProcessor.select_processing_source(dataset=nc_combined, processing_source="embedded")
+            nc_embedded = ncProcessor.create_timeseries_variable(dataset=nc_embedded)
+
+                    
             # SAVE hdr nc file
-            dataset_objects_hdr = Processor.split_dataset_monthly(dataset=nc_hdr,
+            dataset_objects_hdr = ncProcessor.split_dataset_monthly(dataset=nc_hdr,
                                                               periods=periods)
+            dataset_objects_hdr = ncProcessor.process_time_to_CF_convention(dataset_objects=dataset_objects_hdr)
             nc_file_names_hdr = nc_writer.compose_file_names_processing_source(file_names=nc_file_names,
                                                                                processing_source="hdr")
             nc_writer.save_nc_file(output_path=vargs.incoming_path,
@@ -353,7 +352,8 @@ if __name__ == "__main__":
             site_logger_file_path = imos_logging.get_log_file_path(SITE_LOGGER)
             imos_logging.logging_stop(logger=SITE_LOGGER)
             if e:
-                imos_logging.rename_log_file_if_error(site_name=site.name, file_path=site_logger_file_path)
+                imos_logging.rename_log_file_if_error(site_name=site.name, file_path=site_logger_file_path,
+                                                      add_runtime=False)
             
             continue
 
