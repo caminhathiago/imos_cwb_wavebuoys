@@ -197,7 +197,10 @@ class WaveBuoyQC():
         unique, counts = np.unique(results, return_counts=True)
         return dict(zip(unique, counts))
 
-    def summarize_flags(self, data: pd.DataFrame, parameter_type: str = "waves") -> pd.DataFrame:
+    def summarize_flags(self,
+                        data: pd.DataFrame,
+                        parameter_type: str = "waves",
+                        drop_parameters_qc_columns: bool = True) -> pd.DataFrame:
         
         """
         the main idea is to summarize qc flags for each parameter in one flag to be stored in WAVES_quality_control
@@ -221,9 +224,15 @@ class WaveBuoyQC():
         for idx, row in data[parameter_type_qc_columns].iterrows():
             data.loc[idx, f"{qc_col_prefix}_quality_control"] = row.max()
 
-        # data = data.drop(columns=parameter_type_qc_columns)
+        if drop_parameters_qc_columns:
+            data = self.drop_parameters_qc_columns(data=data, qc_col_prefix=qc_col_prefix)
 
         return data
+
+    def drop_parameters_qc_columns(self, data: pd.DataFrame, qc_col_prefix: str) -> pd.DataFrame:
+        qc_columns = data.filter(regex=qc_col_prefix).columns
+        parameters_qc_columns = [col for col in qc_columns if not col.endswith("_quality_control")]
+        return data.drop(columns=parameters_qc_columns)
 
     def create_global_qc_columns(self, data: pd.DataFrame) -> pd.DataFrame:
 
