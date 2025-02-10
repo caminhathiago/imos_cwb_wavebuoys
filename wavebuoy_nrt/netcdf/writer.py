@@ -2,6 +2,7 @@ import os
 import logging
 import json
 import re
+from typing import List, Tuple
 
 from netCDF4 import date2num
 import xarray as xr
@@ -18,7 +19,7 @@ from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, IRDS_PATH, OPERATI
 SITE_LOGGER = logging.getLogger("site_logger")
 
 
-class metaDataLoader:
+class ncMetaDataLoader:
     def __init__(self, buoys_metadata: pd.DataFrame):
         self.buoys_metadata = buoys_metadata
 
@@ -112,19 +113,19 @@ class metaDataLoader:
         with open(file_path) as j:
             return json.load(j)
 
-class GeneralAttrs:
+class ncGeneralAttrs:
     def __init__():
         return
 
-class BulkAttrs:
+class ncBulkAttrs:
     def __init__():
         return
     
-class SpectralAttrs:
+class ncSpectralAttrs:
     def __init__():
         return
 
-class AttrsExtractor:
+class ncAttrsExtractor:
     # def __init__(self, buoys_metadata: pd.DataFrame):
         # self.deployment_metadata = metaDataLoader(buoys_metadata=buoys_metadata)._load_deployment_metadata()
 
@@ -256,11 +257,11 @@ class AttrsExtractor:
     def _extract_general_wave_sensor_serial_number() -> str:
         return "_general_wave_sensor_serial_number".upper()
 
-class AttrsComposer:
+class ncAttrsComposer:
     def __init__(self, buoys_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame):
         self.buoys_metadata = buoys_metadata
         self.deployment_metadata = deployment_metadata
-        self.template_imos = metaDataLoader(buoys_metadata=buoys_metadata)._get_template_imos(file_name="general_attrs.json")
+        self.template_imos = ncMetaDataLoader(buoys_metadata=buoys_metadata)._get_template_imos(file_name="general_attrs.json")
         
     def assign_variables_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
         variables = list(self.template_imos['variables'].keys())
@@ -288,10 +289,10 @@ class AttrsComposer:
         
         general_attributes = {}
 
-        for name in dir (AttrsExtractor): 
+        for name in dir (ncAttrsExtractor): 
         
             if name.startswith("_extract_"): 
-                method = getattr(AttrsExtractor, name)
+                method = getattr(ncAttrsExtractor, name)
                 if callable(method):
                     if name.startswith("_extract_buoys_metadata_"):
                         key = name.removeprefix("_extract_buoys_metadata_")
@@ -335,7 +336,7 @@ class AttrsComposer:
                                 instrument=instrument,
                                 site_name=site_name)
 
-class Processor:
+class ncProcessor:
 
     @staticmethod
     def select_processing_source(data: pd.DataFrame, processing_source : str) -> pd.DataFrame:
@@ -414,8 +415,8 @@ class Processor:
     @staticmethod
     def compose_dataset(data: pd.DataFrame) -> xr.Dataset:
         
-        coords = Processor._compose_coords_dimensions(data=data)
-        data_vars = Processor._compose_data_vars(data=data, dimensions=["TIME"])
+        coords = ncProcessor._compose_coords_dimensions(data=data)
+        data_vars = ncProcessor._compose_data_vars(data=data, dimensions=["TIME"])
         
         dataset = xr.Dataset(coords=coords, data_vars=data_vars)
 
@@ -456,7 +457,7 @@ class Processor:
         return pd.to_datetime(dataset["TIME"].data).to_period("M").unique()
 
     @staticmethod
-    def split_dataset_monthly(dataset: xr.Dataset, periods: PeriodIndex) -> tuple[xr.Dataset, ...]:
+    def split_dataset_monthly(dataset: xr.Dataset, periods: PeriodIndex) -> Tuple[xr.Dataset, ...]:
         dataset_objects = []
         for period in periods:
             print(period)
@@ -465,20 +466,19 @@ class Processor:
         return tuple(dataset_objects)
 
     @staticmethod
-    def convert_time_to_num(dataset: xr.Dataset) -> xr.Dataset:
-        time = np.array(dataset["TIME"]
-                        .to_dataframe()["TIME"]
-                        .dt.to_pydatetime()
-        )
-        dataset["TIME"] = date2num(time,
-                            "days since 1950-01-01 00:00:00 UTC",
-                            "gregorian")
-        print(dataset["TIME"].data)
+    def process_time_to_CF_convention(dataset_objects: tuple) -> List[xr.Dataset]:
+        for dataset in dataset_objects:
+            time = np.array(dataset["TIME"]
+                            .to_dataframe()["TIME"]
+                            .dt.to_pydatetime()
+            )
+            dataset["TIME"] = date2num(time,
+                                "days since 1950-01-01 00:00:00 UTC",
+                                "gregorian")
+            
+        return dataset_objects
 
-        return dataset
-
-
-class Writer(WaveBuoy):
+class ncWriter(WaveBuoy):
     def __init__(self, buoy_type):
         super().__init__(buoy_type=buoy_type)
 
@@ -505,7 +505,7 @@ class Writer(WaveBuoy):
     def compose_file_names(self,
                             institution:str,
                             site_id: str,
-                            periods: PeriodIndex) -> str:
+                            periods: PeriodIndex) -> List[str]:
         periods_formated = periods.strftime("%Y%m")
         file_names = []
         for period in periods_formated:
