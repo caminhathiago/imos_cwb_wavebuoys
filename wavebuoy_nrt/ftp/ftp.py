@@ -1,5 +1,8 @@
-import ftplib
+import os
+from datetime import datetime, timedelta
 
+import ftplib
+import glob
 
 class ncPusher:
     def __init__(self,
@@ -9,21 +12,50 @@ class ncPusher:
         self._host = host
         self._user = user
         self._password = password
-        self._ftp_server = self.set_server()
+        # self._ftp_server = self.set_server()
 
-    def set_credentials(self):
-        return
+    @property
+    def host(self):
+        return self._host
     
-    def get_credentials(self):
-        return
+    @property
+    def user(self):
+        return self._user
+    
+    @property
+    def password(self):
+        return self._password
     
     def set_server(self):
-        ftp_server = ftplib.FTP()
+        ftp_server = ftplib.FTP(host=self._host,
+                                user=self._user,
+                                passwd=self._password)
         return ftp_server
     
-    def grab_files_to_push(self):
-        file_paths = []
-        return file_paths
+    def grab_nc_files_to_push(self, incoming_path: str) -> list:
+        
+        condition = os.path.join(incoming_path, "*.nc")
+        file_paths = glob.glob(condition)
+        file_times = []
+        for file_path in file_paths:
+            creation_date_time = datetime.fromtimestamp(os.path.getctime(file_path))
+            modification_date_time = datetime.fromtimestamp(os.path.getmtime(file_path))
+
+            file_times.append({"creation_time": creation_date_time, 
+                               "modification_time": modification_date_time,
+                               "file_path": file_path})
+
+        current_time = datetime.now()
+        last_hour_time = current_time - timedelta(hours=0.8)
+        print(last_hour_time)
+
+
+        files_to_push = []
+        for file_time in file_times:
+            if file_time["creation_time"] > last_hour_time or file_time["modification_time"] > last_hour_time:
+                files_to_push.append(file_time)
+
+        return tuple(files_to_push)
     
     def read_files_as_binary(self):
         binary_objects = []
