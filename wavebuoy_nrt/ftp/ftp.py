@@ -26,6 +26,10 @@ class ncPusher:
     def password(self):
         return self._password
     
+    @property
+    def server_dirs(self):
+        return self._ftp_server.dir()
+
     def set_server(self):
         ftp_server = ftplib.FTP(host=self._host,
                                 user=self._user,
@@ -68,6 +72,4 @@ class ncPusher:
     def load_binary_objects(self, binary_objects: list):
         for binary_obj in binary_objects:
             self.ftp_server.storbinary()
-
-    def get_server_dirs(self):
-        return self._ftp_server.dir()
+    
