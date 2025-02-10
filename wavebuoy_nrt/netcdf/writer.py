@@ -2,6 +2,7 @@ import os
 import logging
 import json
 import re
+from datetime import datetime
 from typing import List, Tuple
 
 from netCDF4 import date2num
@@ -14,6 +15,7 @@ import glob
 import wavebuoy_nrt.config as config
 from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, IRDS_PATH, OPERATING_INSTITUTIONS
+
 
 
 SITE_LOGGER = logging.getLogger("site_logger")
@@ -158,7 +160,7 @@ class ncAttrsExtractor:
         return "HISTORY_TEST"
     
     def _extract_data_date_created(dataset: xr.Dataset) -> str:
-        return "DATE_CREATED_TEST"
+        return datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # from buoys metadata ------------------
     def _extract_buoys_metadata_site_name(site_name: str, buoys_metadata: pd.DataFrame) -> str:
@@ -191,7 +193,9 @@ class ncAttrsExtractor:
         return "PRINCIPAL_INVESTIGATOR_EMAIL_TEST"
 
     def _extract_deployment_metadata_project(deployment_metadata: pd.DataFrame) -> str:
-        return "PROJECT_TEST"
+        project = "IMOS"
+        
+        return project
     
     def _extract_deployment_metadata_instrument_burst_duration(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Instrument burst duration", "metadata_wave_buoy"]
@@ -213,19 +217,21 @@ class ncAttrsExtractor:
         return "GENERAL_AUTHOR_EMAIL_TEST"
     
     def _extract_general_data_centre() -> str:
-        return "GENERAL_DATA_CENTRE_TEST"
+        return "Australian Ocean Data Network (AODN)"
 
     def _extract_general_data_centre_email() -> str:
-        return "_general_data_centre_email".upper()
+        return "info@aodn.org.au"
 
     def _extract_general_conventions() -> str:
         return "_general_conventions".upper()
 
     def _extract_general_standard_name_vocabulary() -> str:
-        return "_general_standard_name_vocabulary".upper()
+        return "NetCDF Climate and Forecast CF Standard Name Table Version 78"
     
     def _extract_general_naming_authority() -> str:
-        return "_general_naming_authority".upper()
+        naming_authority = "IMOS"
+        
+        return naming_authority
     
     def _extract_general_citation() -> str:
         return "_general_citation".upper()
