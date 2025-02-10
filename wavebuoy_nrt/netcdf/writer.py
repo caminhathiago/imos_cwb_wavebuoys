@@ -461,7 +461,7 @@ class ncProcessor:
         dataset_objects = []
         for period in periods:
             print(period)
-            monthly_dataset = dataset.sel(TIME=period)
+            monthly_dataset = dataset.sel(TIME=str(period))
             dataset_objects.append(monthly_dataset)
         return tuple(dataset_objects)
 
