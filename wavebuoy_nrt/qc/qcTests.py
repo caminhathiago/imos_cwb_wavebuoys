@@ -89,7 +89,7 @@ class WaveBuoyQC():
             # SITE_LOGGER.error(error_message)
             raise ValueError(error_message)    
 
-    def _create_flags_column(self, data: pd.DataFrame, parameter: str, test: str) -> pd.DataFrame:
+    def _create_parameters_qc_column(self, data: pd.DataFrame, parameter: str, test: str) -> pd.DataFrame:
         
         not_eval_flag = 2.0
         # wave_qc_column = "WAVE_quality_control"
@@ -163,7 +163,7 @@ class WaveBuoyQC():
         )
 
         test_name = "gross_range_test"
-        param_qc_column, data = self._create_flags_column(data=data, parameter=parameter, test=test_name)
+        param_qc_column, data = self._create_parameters_qc_column(data=data, parameter=parameter, test=test_name)
 
         data[param_qc_column] = results
 
@@ -184,7 +184,7 @@ class WaveBuoyQC():
         
         
         test_name = "rate_of_change_test"
-        param_qc_column, data = self._create_flags_column(data=data, parameter=parameter, test=test_name)
+        param_qc_column, data = self._create_parameters_qc_column(data=data, parameter=parameter, test=test_name)
 
         data[param_qc_column] = results
 
@@ -220,6 +220,8 @@ class WaveBuoyQC():
 
         for idx, row in data[parameter_type_qc_columns].iterrows():
             data.loc[idx, f"{qc_col_prefix}_quality_control"] = row.max()
+
+        # data = data.drop(columns=parameter_type_qc_columns)
 
         return data
 
