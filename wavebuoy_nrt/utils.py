@@ -145,11 +145,13 @@ class IMOSLogging:
     def get_log_file_path(self, logger):
         return logger.handlers[0].baseFilename
     
-    def rename_log_file_if_error(self, site_name: str, file_path):
+    def rename_log_file_if_error(self, site_name: str, file_path, add_runtime: bool = True):
         site_name = site_name.upper()
         runtime = datetime.now().strftime("%Y%m%dT%H%M%S")
         pattern = f"{site_name}"
-        new_name = f"{runtime}_{site_name}_error"
+        new_name = f"{site_name}_error"
+        if add_runtime:
+            new_name = {runtime} + new_name
 
         new_file_name = re.sub(pattern, new_name, file_path)
         if os.path.exists(new_file_name):
@@ -165,16 +167,17 @@ class generalTesting:
         file_path = f"tests/pickle_files/{site_name}_{file_name}.pkl"
         with open(file_path, "wb") as pickle_file:
             pickle.dump(data, pickle_file)
-            print(f"saved pkl as output_path/test_files/{site_name}_{file_name}.pkl")
+            print(f"saved pkl as {file_path}")
     
     @staticmethod
-    def open_pickle_file(file_name: str, site_name: str):
-
-        file_path = f"tests/pickle_files/{site_name}_{file_name}.pkl"
+    def open_pickle_file(file_name: str):
+        file_path = f"tests/pickle_files/{file_name}.pkl"
         with open(file_path, "rb") as pickle_file:
             data = pickle.load(pickle_file)
-            print(f"openned pkl as output_path/test_files/{site_name}_{file_name}.pkl")
+            print(f"openned pkl as {file_path}")
         return data
+    
+
     
 class FilesHandler():
     def __init__(self):
