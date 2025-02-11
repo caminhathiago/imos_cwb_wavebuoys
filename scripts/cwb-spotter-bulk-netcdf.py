@@ -130,7 +130,7 @@ if __name__ == "__main__":
                 break
 
             # Processing ---------------------------------------
-            SITE_LOGGER.info("PROCESSING STEP ====================================")
+            SITE_LOGGER.info("PRE-PROCESSING STEP ====================================")
 
             # split_raw_data = wb.split_processing_source(raw_data=new_raw_data)
 
@@ -261,8 +261,6 @@ if __name__ == "__main__":
                 SITE_LOGGER.info(f"qualified data saved as '{csv_file_path_hdr}'")
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
             
-            
-            GENERAL_LOGGER.info("Starting qualification step")
             # Processing Nc File --------------------------------------------
             SITE_LOGGER.info("NC FILE PROCESSING STEP ====================================")
 
@@ -293,9 +291,9 @@ if __name__ == "__main__":
 
             # Split data monthly
             periods = ncProcessor.extract_monthly_periods_dataset(dataset=nc_combined)
-            dataset_objects = ncProcessor.split_dataset_monthly(dataset=nc_combined,
-                                                              periods=periods)
-            
+            dataset_objects = ncProcessor.split_dataset_monthly(dataset=nc_combined, periods=periods)
+            SITE_LOGGER.info(f"combined dataset split monthly for periods {periods}")
+
             dataset_objects = ncProcessor.process_time_to_CF_convention(dataset_objects=dataset_objects)
             SITE_LOGGER.info("dataset objects time dimension processed to conform to CF conventions")
 
@@ -306,39 +304,27 @@ if __name__ == "__main__":
             nc_writer.save_nc_file(output_path=vargs.output_path,
                                    file_names=nc_file_names,
                                    dataset_objects=dataset_objects)
-            SITE_LOGGER.info(f"combined nc files saved as {nc_file_names}")
+            SITE_LOGGER.info(f"combined nc files saved to the output path as {nc_file_names}")
             
 
             nc_hdr = ncProcessor.select_processing_source(dataset=nc_combined, processing_source="hdr")
             nc_hdr = ncProcessor.create_timeseries_variable(dataset=nc_hdr)
+            SITE_LOGGER.info(f"hdr dataset extracted from combined dataset")
 
             nc_embedded = ncProcessor.select_processing_source(dataset=nc_combined, processing_source="embedded")
             nc_embedded = ncProcessor.create_timeseries_variable(dataset=nc_embedded)
+            SITE_LOGGER.info(f"embedded dataset extracted from combined dataset")
 
                     
             # SAVE hdr nc file
-            dataset_objects_hdr = ncProcessor.split_dataset_monthly(dataset=nc_hdr,
-                                                              periods=periods)
+            dataset_objects_hdr = ncProcessor.split_dataset_monthly(dataset=nc_hdr, periods=periods)
             dataset_objects_hdr = ncProcessor.process_time_to_CF_convention(dataset_objects=dataset_objects_hdr)
             nc_file_names_hdr = nc_writer.compose_file_names_processing_source(file_names=nc_file_names,
                                                                                processing_source="hdr")
             nc_writer.save_nc_file(output_path=vargs.incoming_path,
                                    file_names=nc_file_names_hdr,
                                    dataset_objects=dataset_objects_hdr)
-            SITE_LOGGER.info(f"HDR nc files saved as {nc_file_names_hdr}")
-            # BREAK NC FILES INTO 
-
-
-
-            # all_data_df_qualified = wb.
-            # dataset = wb.convert_dataframe_to_dataset(data=all_data_df_qualified)
-
-            # Loading -------------------
-
-            # dataset = all_data_df_qualified.to_xarray()
-            # nc_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_qualified.nc")
-            # dataset.to_netcdf(nc_file_path, engine="netcdf4")
-            # SITE_LOGGER.info(f"raw nc file (no attributes) saved as '{nc_file_path}'")
+            SITE_LOGGER.info(f"hdr nc files saved to the incoming path as {nc_file_names_hdr}")
 
             GENERAL_LOGGER.info(f"Processing successful")
             imos_logging.logging_stop(logger=SITE_LOGGER)
