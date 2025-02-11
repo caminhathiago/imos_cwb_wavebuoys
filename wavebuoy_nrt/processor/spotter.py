@@ -39,7 +39,8 @@ class SpotterWaveBuoy():
     def merge_parameter_types(self,
                               waves: pd.DataFrame, 
                               sst: pd.DataFrame = None,
-                              consider_processing_source: bool = True) -> pd.DataFrame: # wind: pd.DataFrame
+                              consider_processing_source: bool = True,
+                              how: str = "left") -> pd.DataFrame: # wind: pd.DataFrame
         # # IN PROGRESS
         # if wind:
         #     wind = wind.drop(columns=["latitude","longitude", "processing_source"])
@@ -51,7 +52,7 @@ class SpotterWaveBuoy():
         if sst is not None:
             if not sst.empty:
                 sst = sst.drop(columns=["latitude","longitude"])
-                waves = waves.merge(sst, on=merge_condition, how='outer')
+                waves = waves.merge(sst, on=merge_condition, how=how)
 
         waves = waves.sort_values(merge_condition)
 
