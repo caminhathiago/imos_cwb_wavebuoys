@@ -27,7 +27,7 @@ class WaveBuoyQC():
         else:
             error_message = "qc limits file not found, make sure it is in the relevant path."
             SITE_LOGGER.error(error_message)
-            raise Exception(error_message)
+            raise FileNotFoundError(error_message)
         
     def select_qc_config(self, qc_configs: pd.DataFrame, config_id: int) -> pd.DataFrame:
         return qc_configs.loc[qc_configs["config_id"] == config_id]
