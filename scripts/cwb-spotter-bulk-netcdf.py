@@ -141,11 +141,11 @@ if __name__ == "__main__":
 
             
 
-            # if new_raw_data["surfaceTemp"]:
-            #     sst = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
-            #     sst = wb.convert_to_datetime(data=sst)
-            #     generalTesting().generate_pickle_file(data=sst, file_name="surfaceTemp_new_data", site_name=site.name)
-            #     SITE_LOGGER.info(f"sst data converted to DataFrame and pre-processed if exists")
+            if new_raw_data["surfaceTemp"]:
+                sst = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
+                sst = wb.convert_to_datetime(data=sst)
+                generalTesting().generate_pickle_file(data=sst, file_name="surfaceTemp_new_data", site_name=site.name)
+                SITE_LOGGER.info(f"sst data converted to DataFrame and pre-processed if exists")
 
 
             # if not new_raw_data["surfaceTemp"] and site.version in ("smart_mooring", "half_smart_mooring"):
@@ -176,14 +176,14 @@ if __name__ == "__main__":
 
             # generalTesting().generate_pickle_file(data=sst, file_name="sst_new_data_df", site_name=site.name)
 
-            # all_new_data_df = wb.merge_parameter_types(waves=waves,
-            #                                            sst=sst,
-            #                                            consider_processing_source=True)
+            all_new_data_df = wb.merge_parameter_types(waves=waves,
+                                                       sst=sst,
+                                                       consider_processing_source=True)
             # generalTesting().generate_pickle_file(data=all_new_data_df, file_name="all_new_data_df", site_name=site.name)
 
             # SITE_LOGGER.info("waves and sst/upper smart mooring temperature sensor merged")
 
-            all_new_data_df = waves.copy()
+            # all_new_data_df = waves.copy()
 
             # TEMPORARY SETUP
             test = wb.test_duplicated(data=all_new_data_df)
