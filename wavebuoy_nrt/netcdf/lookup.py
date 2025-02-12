@@ -11,7 +11,7 @@ import re
 from typing import Union, List
 
 
-from wavebuoy_nrt.config.config import FILES_OUTPUT_PATH, NC_FILE_NAME_TEMPLATE, REGION_TO_INSTITUTION
+from wavebuoy_nrt.config.config import FILES_OUTPUT_PATH, NC_FILE_NAME_TEMPLATE, OPERATING_INSTITUTIONS
 
 GENERAL_LOGGER = logging.getLogger("general_logger")
 SITE_LOGGER = logging.getLogger("site_logger")
@@ -54,29 +54,32 @@ class NetCDFFileHandler():
                                             operating_institution=institution)
 
     def lookup_netcdf_files_needed(self, 
-                            institution: str,
+                            deployment_metadata: pd.DataFrame,
                             site_id: str, 
                             latest_available_datetime: datetime,
                             #minimum_datetime_recursion:datetime=datetime(2020,1,1), # This should be less than the minimum Datetime of the first spotter we ever deployed
                             window: int=24,
                             window_unit: str="hours") -> str:
             
-            window_start_date = self.generate_window_start_time(latest_available_datetime=latest_available_datetime,
-                                                                    window=window,
-                                                                    window_unit=window_unit)
-            monthly_daterange = self._generate_monthly_daterange(start_date=window_start_date,
-                                                                end_date=latest_available_datetime)
-            nc_file_paths_needed = []
-            for month in monthly_daterange:
-                nc_file_name = NC_FILE_NAME_TEMPLATE.format(operating_institution=REGION_TO_INSTITUTION[institution],# Temporary data
-                                                    monthly_datetime=month.strftime("%Y%m%d"),
-                                                    site_id=site_id.upper())
-                print(nc_file_name)
-                nc_file_path = os.path.join(FILES_OUTPUT_PATH, nc_file_name)
-                nc_file_paths_needed.append(nc_file_path)
+        window_start_date = self.generate_window_start_time(latest_available_datetime=latest_available_datetime,
+                                                                window=window,
+                                                                window_unit=window_unit)
+        monthly_daterange = self._generate_monthly_daterange(start_date=window_start_date,
+                                                            end_date=latest_available_datetime)
+        
+        operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata)
+        
+        nc_file_paths_needed = []
+        for month in monthly_daterange:
+            nc_file_name = NC_FILE_NAME_TEMPLATE.format(operating_institution=operating_institution,# Temporary data
+                                                monthly_datetime=month.strftime("%Y%m%d"),
+                                                site_id=site_id.upper())
+            print(nc_file_name)
+            nc_file_path = os.path.join(FILES_OUTPUT_PATH, nc_file_name)
+            nc_file_paths_needed.append(nc_file_path)
 
-            return nc_file_paths_needed
-    
+        return nc_file_paths_needed
+
     def generate_window_start_time(self,
                                        latest_available_datetime: datetime, 
                                        window: int, 
@@ -98,21 +101,34 @@ class NetCDFFileHandler():
 
         return monthly_daterange    
 
-    def get_available_nc_files(self, institution: str, site_id: str) -> list:
-        
-        nc_file_filter = NC_FILE_NAME_TEMPLATE.format(operating_institution=REGION_TO_INSTITUTION[institution],# Temporary data
+    def _get_operating_institution(self, deployment_metadata: pd.DataFrame) -> str:
+        operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
+        print(operating_institution)
+        if "IMOS" in operating_institution:
+            operating_institution = "IMOS_COASTAL-WAVE-BUOYS"
+        elif "IMOS" not in operating_institution:
+            try:
+                operating_institution = OPERATING_INSTITUTIONS[operating_institution]
+            except:
+                raise ValueError(f"{operating_institution} not valid. Please make sure the operating institution code is valid in the deployment metadata file")
+
+        return operating_institution
+
+    def get_available_nc_files(self, deployment_metadata: pd.DataFrame, site_id: str) -> list:
+        operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata)
+        nc_file_filter = NC_FILE_NAME_TEMPLATE.format(operating_institution=operating_institution,# Temporary data
                                                     monthly_datetime="*",
                                                     site_id=site_id.upper())
-        nc_file_filter = f"{REGION_TO_INSTITUTION[institution]}*{site_id.upper()}*.nc"
+        nc_file_filter = f"{operating_institution}*{site_id.upper()}*.nc"
         nc_file_path = os.path.join(FILES_OUTPUT_PATH, nc_file_filter)
 
         return glob.glob(nc_file_path)
     
-    def get_latest_nc_file_available(self, institution:str, site_id:str) -> str:
+    def get_latest_nc_file_available(self, deployment_metadata: pd.DataFrame, site_id:str) -> str:
         
-        available_nc_files = self.get_available_nc_files(institution=institution,
+        available_nc_files = self.get_available_nc_files(deployment_metadata=deployment_metadata,
                                                           site_id=site_id)
-        date_pattern = re.compile(r"_(\d{8})_")
+        date_pattern = re.compile(r"(\d{8})")
         most_recent_file_path = max(available_nc_files, key=lambda x: int(date_pattern.search(x).group(1)))
 
         return most_recent_file_path

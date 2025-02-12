@@ -64,11 +64,11 @@ class ncMetaDataLoader:
         latest_created_file = file_paths[-1]
         
         try:
-            date_pattern = re.compile(r"_(\d{8}).xlsx")
+            date_pattern = re.compile(r"(\d{8}).xlsx")
             latest_date_file = max(file_paths, key=lambda x: int(date_pattern.search(x).group(1)))
         except:
             SITE_LOGGER.warning("deployment metadata file date is set as YYYYmm. Try to include day of deployment.")
-            date_pattern = re.compile(r"_(\d{6}).xlsx")
+            date_pattern = re.compile(r"(\d{6}).xlsx")
             latest_date_file = max(file_paths, key=lambda x: int(date_pattern.search(x).group(1)))
         
         if latest_created_file != latest_date_file:
@@ -77,7 +77,7 @@ class ncMetaDataLoader:
         return latest_date_file
 
     def _validate_deployment_metadata_file_name(self, file_paths: list):
-        template = re.compile(r"metadata_[A-Za-z0-9]+_dep(\d{2})_(\d+).xlsx")
+        template = re.compile(r"metadata_[A-Za-z0-9]+_deploy(\d+).xlsx")
 
         matches = [file for file in file_paths if template.search(file)]
         if len(matches) < len(file_paths):
@@ -271,14 +271,26 @@ class ncAttrsComposer:
         
     def assign_variables_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
         variables = list(self.template_imos['variables'].keys())
-        variables.remove("timeSeries")
+        # variables.remove("timeSeries")
         for variable in variables:
+            
             if variable in list(dataset.variables):
-                if variable == "TIME":
-                    dataset["TIME"].encoding.pop("units", None)
-                dataset[variable] = (dataset[variable].assign_attrs(self.template_imos['variables'][variable]))
+                variables_attributes = self.template_imos['variables'][variable]
+                
+                # for var_attr in variables_attributes:
+                #     if var_attr.startswith("_"):
+                #         del variables_attributes[var_attr] 
+                # print(variables_attributes)
+                # print("===================")
+                dataset[variable] = (dataset[variable].assign_attrs(variables_attributes))
         
         return dataset
+
+    def assign_variables_attributes_dataset_objects(self, dataset_objects: xr.Dataset) -> xr.Dataset:
+        for dataset in dataset_objects:
+            dataset = self.assign_variables_attributes(dataset=dataset)
+
+        return dataset_objects
 
     def assign_general_attributes(self, dataset: xr.Dataset, site_name: str) -> xr.Dataset:
         
@@ -446,7 +458,7 @@ class ncProcessor:
 
     @staticmethod
     def create_timeseries_variable(dataset: xr.Dataset) -> xr.Dataset:
-        dataset["timeSeries"] = np.repeat(float(1), len(dataset["TIME"]))
+        dataset["timeSeries"] = [np.int64(1)]
         return dataset
 
     @staticmethod
@@ -485,6 +497,7 @@ class ncProcessor:
         return dataset_objects
 
 class ncWriter(WaveBuoy):
+
     def __init__(self, buoy_type):
         super().__init__(buoy_type=buoy_type)
 
@@ -494,10 +507,10 @@ class ncWriter(WaveBuoy):
 
     def _get_operating_institution(self, deployment_metadata: pd.DataFrame) -> str:
         operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
-
-        if "(IMOS)" in operating_institution:
+        print(operating_institution)
+        if "IMOS" in operating_institution:
             operating_institution = "IMOS_COASTAL-WAVE-BUOYS"
-        elif "(IMOS)" not in operating_institution:
+        elif "IMOS" not in operating_institution:
             try:
                 operating_institution = OPERATING_INSTITUTIONS[operating_institution]
             except:
@@ -505,17 +518,22 @@ class ncWriter(WaveBuoy):
 
         return operating_institution
 
-    def _validate_operating_institution(self, deployment_metadata: pd.DataFrame):
-        operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
+    # def _validate_operating_institution(self, deployment_metadata: pd.DataFrame):
+    #     operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
+    #     if not operating_institution in self.OPERATING_INSTITUTIONS.values():
+    #         error_message = f""
         
     def compose_file_names(self,
-                            institution:str,
                             site_id: str,
+                            deployment_metadata: pd.DataFrame,
                             periods: PeriodIndex) -> List[str]:
         periods_formated = periods.strftime("%Y%m")
         file_names = []
+
+        operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata)
+
         for period in periods_formated:
-            file_name = NC_FILE_NAME_TEMPLATE.format(operating_institution=institution,
+            file_name = NC_FILE_NAME_TEMPLATE.format(operating_institution=operating_institution,
                                                      site_id=site_id,
                                                      monthly_datetime=period
                                                 )
