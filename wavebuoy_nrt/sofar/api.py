@@ -105,7 +105,7 @@ class SofarAPI:
                     include_partition_data: bool = True,
                     include_barometer_data: bool = True,
                     include_track: bool = False,
-                    processing_sources="embedded"
+                    processing_sources="all"
                     )-> dict:
         
         kwargs_query_params = {
@@ -250,10 +250,13 @@ class SofarAPI:
         CONSIDER SMART MOORING
         """
         latest_data = self.get_latest_data(spot_id=spot_id, token=token)
-        try:
-            latest_available_time = latest_data["waves"][-1]["timestamp"]
-        except:
-            latest_available_time = latest_data["track"][-1]["timestamp"]
+        SITE_LOGGER.warning(latest_data)
+        latest_available_time = latest_data["waves"][-1]["timestamp"]
+
+        # try:
+        #     latest_available_time = latest_data["waves"][-1]["timestamp"]
+        # except:
+        #     latest_available_time = latest_data["track"][-1]["timestamp"]
 
         latest_available_time = datetime.strptime(latest_available_time, "%Y-%m-%dT%H:%M:%S.%fZ")
         
@@ -304,8 +307,8 @@ class SofarAPI:
         return base_url + endpoint
         
 
-    def check_new_data(self, raw_data: dict) -> bool:
-        return bool(raw_data and raw_data.get("waves"))
+    def check_new_data(self, raw_data: dict, dataset_type: str = "waves") -> bool:
+        return bool(raw_data and raw_data.get(dataset_type))
 
                 
 
