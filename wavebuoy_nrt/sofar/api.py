@@ -105,7 +105,7 @@ class SofarAPI:
                     include_partition_data: bool = True,
                     include_barometer_data: bool = True,
                     include_track: bool = False,
-                    processing_sources="all"
+                    processing_sources="embedded"
                     )-> dict:
         
         kwargs_query_params = {
@@ -139,7 +139,8 @@ class SofarAPI:
         page = 1
         current_start_date = start_date
         needs_pagination = True
-        
+        raw_data = None
+
         SITE_LOGGER.info("Starting Sofar API requests, paginating if needed:")
         while needs_pagination:
             SITE_LOGGER.info(f"Page: {page} | Start: {current_start_date} | End: {end_date}")
@@ -151,18 +152,25 @@ class SofarAPI:
                 **kwargs
             )
 
+            print("ANOTHER TEST")
+            print(new_raw_data)
+            print("ANOTHER TEST")
+
             if not new_raw_data["waves"]:
                 SITE_LOGGER.info(f"No more data available after Page: {page}")
                 break
             
             if page == 1:
                 raw_data = new_raw_data
+                
             else:
                 raw_data = self._extend_raw_data(global_output=raw_data, current_page=new_raw_data)
 
             latest_extracted_time = datetime.strptime(new_raw_data["waves"][-1]["timestamp"],
                                                     "%Y-%m-%dT%H:%M:%S.%fZ")
             
+            # print(raw_data)
+
             if latest_extracted_time >= end_date:
                 SITE_LOGGER.info("End of API calls pagination.")
                 needs_pagination = False
@@ -295,6 +303,14 @@ class SofarAPI:
     def _compose_request_url(self, base_url: str, endpoint: str) -> str:
         return base_url + endpoint
         
+
+    # def check_new_data(raw_data: dict) -> bool:
+    #     if raw_data is None:
+    #         return False
+    #     else:
+    #         try:
+    #             raw_data
+
     
     # def get_wave_data2(self,
     #                 spot_id: str,
