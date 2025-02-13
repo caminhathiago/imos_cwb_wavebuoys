@@ -304,12 +304,11 @@ class SofarAPI:
         return base_url + endpoint
         
 
-    # def check_new_data(raw_data: dict) -> bool:
-    #     if raw_data is None:
-    #         return False
-    #     else:
-    #         try:
-    #             raw_data
+    def check_new_data(self, raw_data: dict) -> bool:
+        return bool(raw_data and raw_data.get("waves"))
+
+                
+
 
     
     # def get_wave_data2(self,
