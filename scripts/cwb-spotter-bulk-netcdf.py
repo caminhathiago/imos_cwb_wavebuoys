@@ -33,7 +33,8 @@ if __name__ == "__main__":
     imos_logging = IMOSLogging() 
     
     # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
-    wb.buoys_metadata = wb.buoys_metadata.loc[["Central","MtEliza"]].copy()
+    # "MtEliza", "Hillarys", "Central"
+    wb.buoys_metadata = wb.buoys_metadata.loc[["MtEliza"]].copy()
     # END OF TEMPORARY SETUP
 
     for idx, site in wb.buoys_metadata.iterrows():
@@ -74,20 +75,29 @@ if __name__ == "__main__":
 
 
                 latest_nc_file_available = wb.get_latest_nc_file_available(deployment_metadata=deployment_metadata, site_id=site.name)
+                SITE_LOGGER.info(f"latest_nc_file_available: {latest_nc_file_available}")
 
                 latest_processed_time = wb.get_latest_processed_time(nc_file_path=latest_nc_file_available)
                 SITE_LOGGER.info(f"latest processed time: {latest_processed_time}")
 
+                if latest_processed_time == latest_available_time:
+                    SITE_LOGGER.info("No data for the desired period. Aborting processing for this site")
+                    GENERAL_LOGGER.info(f"Processing successful")
+                    imos_logging.logging_stop(logger=SITE_LOGGER)
+                    continue
 
                 availability_check, nc_file_paths = wb.check_nc_files_needed_available(nc_files_needed=nc_files_needed,
                                                                             nc_files_available=nc_files_available)
-                
+
+
                 if availability_check:
                     SITE_LOGGER.info("any or all needed nc files are available.")
-                    earliest_nc_file_available = wb.get_earliest_nc_file_available(institution=site.region,
+                    earliest_nc_file_available = wb.get_earliest_nc_file_available(deployment_metadata=deployment_metadata,
                                                                                 site_id=site.name)
                     earliest_available_time = wb.get_earliest_processed_time(nc_file_path=latest_nc_file_available)
                     
+                    SITE_LOGGER.warning(f"window_start_time {window_start_time}")
+                    SITE_LOGGER.warning(f"earliest_available_time {earliest_available_time}")
                     if window_start_time < earliest_available_time:
                         SITE_LOGGER.info("desired window start time is older than earliest available time, extract new data and overwrite all available nc files.")
                         nc_to_load = None
@@ -105,7 +115,8 @@ if __name__ == "__main__":
                         SITE_LOGGER.info("no Backfilling as backfill argument is set to {vargs.backfill}. Only creating new nc files with newly extracted data.")
                         
                         nc_to_load = None
-            
+
+                
                 previous_data_df = wb.load_datasets(nc_file_paths=nc_to_load)
                 window_start_time = latest_processed_time
                 SITE_LOGGER.info(f"considering window start time as lastest processed time ({window_start_time}) as previous nc files are being loaded.")
@@ -116,18 +127,26 @@ if __name__ == "__main__":
             # Extraction ---------------------------------------
             SITE_LOGGER.info("EXTRACTION STEP ====================================")
 
-            window_end_date = latest_available_time #+ timedelta(hours=1)
+            window_end_date = latest_available_time + timedelta(hours=1)
             new_raw_data = sofar_api.fetch_wave_data(spot_id=site.serial,
                                             token=site.sofar_token,
                                             start_date=window_start_time,
-                                            end_date=window_end_date)
+                                            end_date=window_end_date,
+                                            processing_sources="embedded")
+
             generalTesting().generate_pickle_file(data=new_raw_data, file_name="new_data_raw", site_name=site.name)
             # new_raw_data = generalTesting().open_pickle_file(file_name=f"{site.name}_new_data_raw")
-            SITE_LOGGER.info(f"raw spotter data extracted from Sofar API")
-
-            if not new_raw_data["waves"]:
+            # SITE_LOGGER.info(f"raw spotter data extracted from Sofar API\n {pd.DataFrame(new_raw_data["waves"])}")
+            # print(new_raw_data)
+            # print("======================")
+            # if not new_raw_data:
+            #     SITE_LOGGER.info("No data for the desired period. Aborting processing for this site")
+            #     break
+            if not sofar_api.check_new_data(raw_data=new_raw_data, dataset_type="waves"):
                 SITE_LOGGER.info("No data for the desired period. Aborting processing for this site")
-                break
+                GENERAL_LOGGER.info(f"Processing successful")
+                imos_logging.logging_stop(logger=SITE_LOGGER)
+                continue
 
             # Processing ---------------------------------------
             SITE_LOGGER.info("PRE-PROCESSING STEP ====================================")
@@ -293,8 +312,8 @@ if __name__ == "__main__":
                                         site_id=site.name.upper(),
                                         periods=periods_embedded,
                                         deployment_metadata=deployment_metadata)
-            nc_file_names_embedded = nc_writer.compose_file_names_processing_source(file_names=nc_file_names_embedded,
-                                                                                    processing_source="embedded")           
+            # nc_file_names_embedded = nc_writer.compose_file_names_processing_source(file_names=nc_file_names_embedded,
+            #                                                                         processing_source="embedded")           
             nc_writer.save_nc_file(output_path=vargs.incoming_path,
                                    file_names=nc_file_names_embedded,
                                    dataset_objects=ds_objects_embedded)
@@ -332,8 +351,9 @@ if __name__ == "__main__":
                                     dataset_objects=ds_objects_hdr)
                 SITE_LOGGER.info(f"hdr nc files saved to the output path as {nc_file_names_hdr}")
 
-                GENERAL_LOGGER.info(f"Processing successful")
-                imos_logging.logging_stop(logger=SITE_LOGGER)
+
+            GENERAL_LOGGER.info(f"Processing successful")
+            imos_logging.logging_stop(logger=SITE_LOGGER)
 
         except Exception as e:
             error_message = IMOSLogging().unexpected_error_message.format(site_name=site.name.upper())
