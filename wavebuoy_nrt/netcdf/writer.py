@@ -2,7 +2,7 @@ import os
 import logging
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Tuple
 
 from netCDF4 import date2num
@@ -153,23 +153,18 @@ class ncAttrsExtractor:
     def _extract_data_geospatial_lat_units(dataset: xr.Dataset) -> str:
         return "degrees_north"
 
-    def _extract_data_geospatial_long_units(dataset: xr.Dataset) -> str:
+    def _extract_data_geospatial_lon_units(dataset: xr.Dataset) -> str:
         return "degrees_east"
-
-    def _extract_data_history(dataset: xr.Dataset) -> str:
-        return "HISTORY_TEST"
     
     def _extract_data_date_created(dataset: xr.Dataset) -> str:
-        return datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # from buoys metadata ------------------
-    def _extract_buoys_metadata_site_name(site_name: str, buoys_metadata: pd.DataFrame) -> str:
-        return buoys_metadata.loc[site_name].name
     
-    def _extract_buoys_metadata_spot_id(site_name: str, buoys_metadata: pd.DataFrame) -> str:
-        return buoys_metadata.loc[site_name].serial
 
     # from deployment metadata -------------
+    def _extract_deployment_metadata_site_name(deployment_metadata: pd.DataFrame) -> str:
+        return deployment_metadata.loc["Site Name", "metadata_wave_buoy"]
     
     def  _extract_deployment_metadata_instrument(deployment_metadata: pd.DataFrame):
         return deployment_metadata.loc["Instrument", "metadata_wave_buoy"]
@@ -180,6 +175,9 @@ class ncAttrsExtractor:
     def _extract_deployment_metadata_hull_serial_number(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Hull serial number", "metadata_wave_buoy"]
     
+    def _extract_deployment_metadata_institution(deployment_metadata: pd.DataFrame) -> str:
+        return deployment_metadata.loc["Operating institution", "metadata_wave_buoy"]
+
     def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Water depth", "metadata_wave_buoy"]
     
@@ -209,12 +207,20 @@ class ncAttrsExtractor:
     def _extract_deployment_metadata_instrument_sampling_interval(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Instrument sampling interval", "metadata_wave_buoy"]
 
+    def _extract_deployment_metadata_spotter_id(deployment_metadata: pd.DataFrame) -> str:
+        SITE_LOGGER.warning(deployment_metadata)
+        return deployment_metadata.loc["Spotter_id ", "metadata_wave_buoy"]
+
     # generally pre-defined --------------------
+    def _extract_data_history(dataset: xr.Dataset) -> str:
+        # return f"this file was file created on: {datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M%SZ")}"
+        return f"this file was file created on: {ncAttrsExtractor._extract_data_date_created(dataset=dataset)}"
+    
     def _extract_general_author():
-        return "GENERAL_AUTHOR_TEST"
+        return "AODN"
     
     def _extract_general_author_email() -> str:
-        return "GENERAL_AUTHOR_EMAIL_TEST"
+        return "info@aodn.org.au"
     
     def _extract_general_data_centre() -> str:
         return "Australian Ocean Data Network (AODN)"
@@ -243,25 +249,37 @@ class ncAttrsExtractor:
         return "_general_disclaimer".upper()
     
     def _extract_general_license() -> str:
-        return "_general_license".upper()
+        return 'http://creativecommons.org/licenses/by/4.0/'
     
     def _extract_general_cdm_data_type() -> str:
-        return "_general_cdm_data_type".upper()
+        return "Station".upper()
     
     def _extract_general_platform() -> str:
-        return "_general_platform".upper()
+        return 'moored surface buoy'
     
     def _extract_general_references() -> str:
-        return  "_general_references".upper()
+        return  'http://www.imos.org.au'
     
     def _extract_general_wave_buoy_type() -> str:
-        return "_general_wave_buoy_type".upper()
+        return 'directional'
     
     def _extract_general_wave_motion_sensor_type() -> str:
-        return "_general_wave_motion_sensor_type".upper()
+        return "GPS"
     
     def _extract_general_wave_sensor_serial_number() -> str:
         return "_general_wave_sensor_serial_number".upper()
+
+    def _extract_deployment_metadata_title(deployment_metadata: pd.DataFrame) -> str:
+        base_title = """Near real time integral wave parameters from wave buoys collected by {operating_institution} using a {instrument} at {site_name}"""
+        operating_institution = ncAttrsExtractor._extract_deployment_metadata_institution(deployment_metadata=deployment_metadata)
+        instrument = ncAttrsExtractor._extract_deployment_metadata_instrument(deployment_metadata=deployment_metadata)
+        site_name = ncAttrsExtractor._extract_deployment_metadata_site_name(deployment_metadata=deployment_metadata)
+        return base_title.format(operating_institution=operating_institution,
+                                instrument=instrument,
+                                site_name=site_name)
+
+    def _extract_deployment_metadata_abstract(deployment_metadata: pd.DataFrame) -> str:
+        return ncAttrsExtractor._extract_deployment_metadata_title(deployment_metadata=deployment_metadata)
 
 class ncAttrsComposer:
     def __init__(self, buoys_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame):
@@ -342,11 +360,7 @@ class ncAttrsComposer:
     def _get_attribute_from_template(self, attribute_name: str, attributes_template: dict) -> dict:
         return attributes_template[attribute_name]
 
-    def _compose_title(self, institution: str, instrument: str, site_name:str) -> str:
-        base_title = """Near real time integral wave parameters from wave buoys collected by {institution} using a {instrument} at {site_name}"""
-        return base_title.format(institution=institution,
-                                instrument=instrument,
-                                site_name=site_name)
+    
 
     def _compose_abstract(self, institution: str, instrument: str, site_name:str) -> str:
         base_abstact = """Near real time integral wave parameters from wave buoys collected by {institution} using a {instrument} at {site_name}"""
@@ -523,11 +537,16 @@ class ncWriter(WaveBuoy):
     #     if not operating_institution in self.OPERATING_INSTITUTIONS.values():
     #         error_message = f""
         
+    def _format_periods(self, periods: PeriodIndex) -> PeriodIndex:
+        day = "01"
+        return periods.strftime("%Y%m") + day
+        
+
     def compose_file_names(self,
                             site_id: str,
                             deployment_metadata: pd.DataFrame,
                             periods: PeriodIndex) -> List[str]:
-        periods_formated = periods.strftime("%Y%m")
+        periods_formated = self._format_periods(periods=periods)
         file_names = []
 
         operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata)
