@@ -115,11 +115,11 @@ class NetCDFFileHandler():
         return operating_institution
 
     def get_available_nc_files(self, deployment_metadata: pd.DataFrame, site_id: str) -> list:
-        operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata)
-        nc_file_filter = NC_FILE_NAME_TEMPLATE.format(operating_institution=operating_institution,# Temporary data
-                                                    monthly_datetime="*",
-                                                    site_id=site_id.upper())
-        nc_file_filter = f"{operating_institution}*{site_id.upper()}*.nc"
+        # operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata)
+        # nc_file_filter = NC_FILE_NAME_TEMPLATE.format(operating_institution=operating_institution,# Temporary data
+        #                                             monthly_datetime="*",
+        #                                             site_id=site_id.upper())
+        nc_file_filter = f"*{site_id.upper()}*.nc"
         nc_file_path = os.path.join(FILES_OUTPUT_PATH, nc_file_filter)
 
         return glob.glob(nc_file_path)
@@ -128,7 +128,7 @@ class NetCDFFileHandler():
         
         available_nc_files = self.get_available_nc_files(deployment_metadata=deployment_metadata,
                                                           site_id=site_id)
-        date_pattern = re.compile(r"(\d{8})")
+        date_pattern = re.compile(r"_(\d{8})_")
         most_recent_file_path = max(available_nc_files, key=lambda x: int(date_pattern.search(x).group(1)))
 
         return most_recent_file_path
@@ -141,9 +141,9 @@ class NetCDFFileHandler():
                        .values)
                     ).to_pydatetime()
 
-    def get_earliest_nc_file_available(self, institution:str, site_id:str) -> str:
+    def get_earliest_nc_file_available(self, deployment_metadata: pd.DataFrame, site_id:str) -> str:
         
-        available_nc_files = self.get_available_nc_files(institution=institution,
+        available_nc_files = self.get_available_nc_files(deployment_metadata=deployment_metadata,
                                                           site_id=site_id)
         date_pattern = re.compile(r"_(\d{8})_")
         most_recent_file_path = min(available_nc_files, key=lambda x: int(date_pattern.search(x).group(1)))
