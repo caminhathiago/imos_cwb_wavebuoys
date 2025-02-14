@@ -6,6 +6,9 @@ import argparse
 import logging
 import re
 import pickle
+from netCDF4 import Dataset
+import numpy as np
+import json
 
 from wavebuoy_nrt.config.config import FILES_PATH
 
@@ -191,3 +194,81 @@ class FilesHandler():
             print(error_message)
             GENERAL_LOGGER.error(error_message)
             raise FileNotFoundError(error_message)
+        
+
+class ncAttributesValidator:
+    def __init__(self):
+        pass
+
+    def compare_variables_attributes(self, aodn_sample_dataset: Dataset, dataset: Dataset):
+        
+        to_revize = {}
+        
+        for variable in aodn_sample_dataset.variables.keys():
+            print(f"{variable} -----------------")
+            for attr in aodn_sample_dataset.variables[variable].ncattrs():
+                to_revize.update({variable:{"correct":{}, "incorrect":{}, "missing":{}}})
+                print(f"AODN.{attr}: {getattr( aodn_sample_dataset.variables[variable],attr)}")
+                if hasattr(dataset[variable],attr):
+                    print(f"CWB.{attr}: {getattr(dataset[variable],attr)}")
+                
+                    comparison = getattr( aodn_sample_dataset.variables[variable],attr) == getattr(dataset.variables[variable],attr)
+                    if isinstance(comparison, np.ndarray) or isinstance(comparison, list):
+                        comparison = comparison.all()
+
+                    if comparison:
+                        to_revize[variable]["correct"].update( 
+                                         {attr: {
+                                            "AODN": getattr(aodn_sample_dataset[variable],attr),
+                                            "CWB":getattr(dataset[variable],attr)
+                                            }})
+                    
+                    else:
+                        to_revize[variable]["incorrect"].update(
+                                           
+                                         {attr: {
+                                            "AODN": getattr(aodn_sample_dataset[variable],attr),
+                                            "CWB":getattr(dataset[variable],attr)
+                                            }})
+                else:
+                    to_revize[variable]["missing"].update(
+                                           
+                                         {attr: {
+                                            "AODN": getattr(aodn_sample_dataset[variable],attr),
+                                            "CWB":"MISSING"
+                                            }})
+        
+        return to_revize
+
+    def compare_global_attributes(self, aodn_sample_dataset: Dataset, dataset: Dataset):
+        
+        to_revize = {"correct":{}, "incorrect":{}, "missing":{}}
+
+        for attr in aodn_sample_dataset.ncattrs():
+            print(f"AODN.{attr}: {getattr(aodn_sample_dataset,attr)}")
+            
+            if hasattr(dataset,attr):
+                print(f"CWB.{attr}: {getattr(dataset,attr)}")
+                
+                comparison = getattr(aodn_sample_dataset,attr) == getattr(dataset,attr)
+                if isinstance(comparison, np.ndarray) or isinstance(comparison, list):
+                    comparison = comparison.all()
+
+                if comparison:
+                    to_revize["correct"].update({attr: 
+                                        {"AODN": getattr(aodn_sample_dataset,attr),
+                                        "CWB":getattr(dataset,attr)}})
+                else:
+                    to_revize["incorrect"].update({attr: {"AODN": getattr(aodn_sample_dataset,attr), "CWB":getattr(dataset,attr)}})
+            # except:
+            #     print(f"CWB.{attr}: NOT AVAILABLE")
+            #     to_revize.update({attr: {"AODN": getattr(aodn_sample_dataset,attr), "CWB": "NOT AVAILABLE"}})
+            else:
+                to_revize["missing"].update({attr: 
+                                        {"AODN": getattr(aodn_sample_dataset,attr),
+                                        "CWB":"MISSING"}})
+            
+
+            print("-==================")
+        
+        return to_revize
