@@ -14,6 +14,7 @@ import glob
 
 import wavebuoy_nrt.config as config
 from wavebuoy_nrt.wavebuoy import WaveBuoy
+from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
 from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, IRDS_PATH, OPERATING_INSTITUTIONS
 
 
@@ -176,8 +177,8 @@ class ncAttrsExtractor:
         return deployment_metadata.loc["Hull serial number", "metadata_wave_buoy"]
     
     def _extract_deployment_metadata_institution(deployment_metadata: pd.DataFrame) -> str:
-        return deployment_metadata.loc["Operating institution", "metadata_wave_buoy"]
-
+        return NetCDFFileHandler()._get_operating_institution(deployment_metadata=deployment_metadata)
+    
     def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Water depth", "metadata_wave_buoy"]
     
@@ -208,8 +209,22 @@ class ncAttrsExtractor:
         return deployment_metadata.loc["Instrument sampling interval", "metadata_wave_buoy"]
 
     def _extract_deployment_metadata_spotter_id(deployment_metadata: pd.DataFrame) -> str:
-        SITE_LOGGER.warning(deployment_metadata)
         return deployment_metadata.loc["Spotter_id ", "metadata_wave_buoy"]
+    
+    def _extract_deployment_metadata_wave_sensor_serial_number(deployment_metadata: pd.DataFrame) -> str:
+        return deployment_metadata.loc["Wave sensor serial number", "metadata_wave_buoy"]
+
+    def _extract_deployment_metadata_title(deployment_metadata: pd.DataFrame) -> str:
+        base_title = """Near real time integral wave parameters from wave buoys collected by {operating_institution} using a {instrument} at {site_name}"""
+        operating_institution = ncAttrsExtractor._extract_deployment_metadata_institution(deployment_metadata=deployment_metadata)
+        instrument = ncAttrsExtractor._extract_deployment_metadata_instrument(deployment_metadata=deployment_metadata)
+        site_name = ncAttrsExtractor._extract_deployment_metadata_site_name(deployment_metadata=deployment_metadata)
+        return base_title.format(operating_institution=operating_institution,
+                                instrument=instrument,
+                                site_name=site_name)
+
+    def _extract_deployment_metadata_abstract(deployment_metadata: pd.DataFrame) -> str:
+        return ncAttrsExtractor._extract_deployment_metadata_title(deployment_metadata=deployment_metadata)
 
     # generally pre-defined --------------------
     def _extract_data_history(dataset: xr.Dataset) -> str:
@@ -228,8 +243,8 @@ class ncAttrsExtractor:
     def _extract_general_data_centre_email() -> str:
         return "info@aodn.org.au"
 
-    def _extract_general_conventions() -> str:
-        return "_general_conventions".upper()
+    def _extract_general_Conventions() -> str:
+        return 'CF-1.6'
 
     def _extract_general_standard_name_vocabulary() -> str:
         return "NetCDF Climate and Forecast CF Standard Name Table Version 78"
@@ -252,7 +267,7 @@ class ncAttrsExtractor:
         return 'http://creativecommons.org/licenses/by/4.0/'
     
     def _extract_general_cdm_data_type() -> str:
-        return "Station".upper()
+        return "Station"
     
     def _extract_general_platform() -> str:
         return 'moored surface buoy'
@@ -266,20 +281,7 @@ class ncAttrsExtractor:
     def _extract_general_wave_motion_sensor_type() -> str:
         return "GPS"
     
-    def _extract_general_wave_sensor_serial_number() -> str:
-        return "_general_wave_sensor_serial_number".upper()
-
-    def _extract_deployment_metadata_title(deployment_metadata: pd.DataFrame) -> str:
-        base_title = """Near real time integral wave parameters from wave buoys collected by {operating_institution} using a {instrument} at {site_name}"""
-        operating_institution = ncAttrsExtractor._extract_deployment_metadata_institution(deployment_metadata=deployment_metadata)
-        instrument = ncAttrsExtractor._extract_deployment_metadata_instrument(deployment_metadata=deployment_metadata)
-        site_name = ncAttrsExtractor._extract_deployment_metadata_site_name(deployment_metadata=deployment_metadata)
-        return base_title.format(operating_institution=operating_institution,
-                                instrument=instrument,
-                                site_name=site_name)
-
-    def _extract_deployment_metadata_abstract(deployment_metadata: pd.DataFrame) -> str:
-        return ncAttrsExtractor._extract_deployment_metadata_title(deployment_metadata=deployment_metadata)
+    
 
 class ncAttrsComposer:
     def __init__(self, buoys_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame):
