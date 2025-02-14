@@ -152,10 +152,6 @@ class SofarAPI:
                 **kwargs
             )
 
-            print("ANOTHER TEST")
-            print(new_raw_data)
-            print("ANOTHER TEST")
-
             if not new_raw_data["waves"]:
                 SITE_LOGGER.info(f"No more data available after Page: {page}")
                 break
@@ -169,7 +165,13 @@ class SofarAPI:
             latest_extracted_time = datetime.strptime(new_raw_data["waves"][-1]["timestamp"],
                                                     "%Y-%m-%dT%H:%M:%S.%fZ")
             
-            # print(raw_data)
+            # Dealing with not owned spotters
+            test_not_owned = self._test_not_owned_spotter(raw_data, new_raw_data)
+            if test_not_owned:
+                SITE_LOGGER.info(f"Not owned Spotter, pagination not necessary")
+                break
+
+
 
             if latest_extracted_time >= end_date:
                 SITE_LOGGER.info("End of API calls pagination.")
@@ -181,6 +183,28 @@ class SofarAPI:
 
         return raw_data
     
+    def _test_not_owned_spotter(self, raw_data: dict, new_raw_data: dict) -> bool:
+        if raw_data is None or new_raw_data is None:
+            return False  
+
+        if "waves" not in raw_data or "waves" not in new_raw_data:
+            return False
+
+        if not raw_data["waves"] or not new_raw_data["waves"]:
+            return False
+
+        raw_data_times = (
+            datetime.strptime(raw_data["waves"][0]["timestamp"], "%Y-%m-%dT%H:%M:%S.%fZ"),
+            datetime.strptime(raw_data["waves"][-1]["timestamp"], "%Y-%m-%dT%H:%M:%S.%fZ")
+        )
+
+        new_raw_data_times = (
+            datetime.strptime(new_raw_data["waves"][0]["timestamp"], "%Y-%m-%dT%H:%M:%S.%fZ"),
+            datetime.strptime(new_raw_data["waves"][-1]["timestamp"], "%Y-%m-%dT%H:%M:%S.%fZ")
+        )
+
+        return raw_data_times == new_raw_data_times
+
     def _extend_raw_data(self, 
                         global_output: dict,
                         current_page: dict,
