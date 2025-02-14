@@ -34,7 +34,7 @@ if __name__ == "__main__":
     
     # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
     # "MtEliza", "Hillarys", "Central"
-    wb.buoys_metadata = wb.buoys_metadata.loc[["MtEliza"]].copy()
+    wb.buoys_metadata = wb.buoys_metadata.loc[["MtEliza", "Hillarys", "Central"]].copy()
     # END OF TEMPORARY SETUP
 
     for idx, site in wb.buoys_metadata.iterrows():
@@ -81,7 +81,7 @@ if __name__ == "__main__":
                 SITE_LOGGER.info(f"latest processed time: {latest_processed_time}")
 
                 if latest_processed_time == latest_available_time:
-                    SITE_LOGGER.info("No data for the desired period. Aborting processing for this site")
+                    SITE_LOGGER.info("No new data available. Aborting processing for this site")
                     GENERAL_LOGGER.info(f"Processing successful")
                     imos_logging.logging_stop(logger=SITE_LOGGER)
                     continue
@@ -127,7 +127,7 @@ if __name__ == "__main__":
             # Extraction ---------------------------------------
             SITE_LOGGER.info("EXTRACTION STEP ====================================")
 
-            window_end_date = latest_available_time + timedelta(hours=1)
+            window_end_date = latest_available_time
             new_raw_data = sofar_api.fetch_wave_data(spot_id=site.serial,
                                             token=site.sofar_token,
                                             start_date=window_start_time,
@@ -155,6 +155,10 @@ if __name__ == "__main__":
 
             waves = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="waves")
             waves = wb.convert_to_datetime(data=waves)
+
+            # 
+            # waves = wb.filter_new_data(data=waves)
+
             generalTesting().generate_pickle_file(data=waves, file_name="waves_new_data_df", site_name=site.name)
             SITE_LOGGER.info(f"waves data converted to DataFrame and pre-processed")
 
