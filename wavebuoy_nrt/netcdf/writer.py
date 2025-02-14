@@ -134,10 +134,10 @@ class ncAttrsExtractor:
 
     # from the data itself -------------
     def _extract_data_time_coverage_start(dataset: xr.Dataset) -> str:
-        return str(dataset["TIME"].min().values)
+        return pd.to_datetime(dataset["TIME"].min().values).strftime("%Y-%m-%dT%H:%M:%SZ")
     
     def _extract_data_time_coverage_end(dataset: xr.Dataset) -> str:
-        return str(dataset["TIME"].max().values)
+        return pd.to_datetime(dataset["TIME"].max().values).strftime("%Y-%m-%dT%H:%M:%SZ")
     
     def _extract_data_geospatial_lat_min(dataset: xr.Dataset) -> str:
         return float(dataset["LATITUDE"].min().values)
