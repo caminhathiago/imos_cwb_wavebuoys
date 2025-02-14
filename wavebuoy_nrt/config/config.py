@@ -1,5 +1,7 @@
 FILES_OUTPUT_PATH = r"C:\Users\00116827\cwb\wavebuoy_aodn\output_path\final_testing"
 FILES_PATH = r"C:\Users\00116827\cwb\wavebuoy_aodn\wavebuoy_nrt"
+IRDS_PATH = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves"
+
 NC_FILE_NAME_TEMPLATE = "{operating_institution}_{monthly_datetime}_{site_id}_RT_WAVE-PARAMETERS_monthly.nc"
 
 OPERATING_INSTITUTIONS = {"UWA":"",
@@ -8,24 +10,8 @@ OPERATING_INSTITUTIONS = {"UWA":"",
                           "IMOS":"IMOS_COASTAL-WAVE-BUOYS"
                           }
 
-# AODN_COLUMNS_TEMPLATE = {
-#     'TIME': "timestamp",
-#     'timeSeries': None,
-#     'LATITUDE': "longitude",
-#     'LONGITUDE': "latitude",
-#     'SSWMD': "meanDirection",
-#     'WAVE_quality_control': None,
-#     'WMDS': "meanDirectionalSpread",
-#     'WPDI': "peakDirection",
-#     'WPDS': "peakDirectionalSpread",
-#     'WPFM': "meanPeriod",
-#     'WPPE': "peakPeriod",
-#     'WSSH': "significantWaveHeight"
-# }
-
 AODN_COLUMNS_TEMPLATE = {
     "timestamp": 'TIME',
-    # None: ['timeSeries', 'WAVE_quality_control'],
     "longitude": 'LONGITUDE',
     "latitude": 'LATITUDE',
     "meanDirection": 'SSWMD',
@@ -35,8 +21,6 @@ AODN_COLUMNS_TEMPLATE = {
     "meanPeriod": 'WPFM',
     "peakPeriod": 'WPPE',
     "significantWaveHeight": 'WSSH',
-    "degrees": 'SST',
-    "value": 'SST'
+    "degrees": 'SST', # Spotter SST
+    "value": 'SST' # SM surface temperature
 }
-
-IRDS_PATH = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves"
