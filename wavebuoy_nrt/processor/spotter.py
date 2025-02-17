@@ -38,7 +38,7 @@ class SpotterWaveBuoy():
 
     def merge_parameter_types(self,
                               waves: pd.DataFrame, 
-                              sst: pd.DataFrame = None,
+                              temp: pd.DataFrame = None,
                               consider_processing_source: bool = True,
                               how: str = "left") -> pd.DataFrame: # wind: pd.DataFrame
         # # IN PROGRESS
@@ -49,10 +49,10 @@ class SpotterWaveBuoy():
         if consider_processing_source:
             merge_condition.append("processing_source")
         
-        if sst is not None:
-            if not sst.empty:
-                sst = sst.drop(columns=["latitude","longitude"])
-                waves = waves.merge(sst, on=merge_condition, how=how)
+        if temp is not None:
+            if not temp.empty:
+                temp = temp.drop(columns=["latitude","longitude"])
+                waves = waves.merge(temp, on=merge_condition, how=how)
 
         waves = waves.sort_values(merge_condition)
 
@@ -73,7 +73,7 @@ class SpotterWaveBuoy():
         for parameter_type in parameters_types:
             pass
 
-    def get_sst_from_smart_mooring(self, 
+    def get_temp_from_smart_mooring(self, 
                                    data : pd.DataFrame,
                                    sensor_type : str = "temperature") -> pd.DataFrame:
         
@@ -94,7 +94,7 @@ class SpotterWaveBuoy():
     def process_smart_mooring_columns(self, data: pd.DataFrame) -> pd.DataFrame:
         cols_to_drop = ["sensorPosition","units","unit_type","data_type_name"]
         data = data.drop(columns=cols_to_drop)
-        data = data.rename(columns={"value":"SST"})
+        data = data.rename(columns={"value":"temp"})
         return data
     
     def round_parameter_values(self, data: pd.DataFrame, parameter: str, decimals: int = 2) -> pd.DataFrame:

@@ -44,9 +44,9 @@ class WaveBuoyQC():
 
     def drop_unwanted_variables(self, data: pd.DataFrame) -> pd.DataFrame:
         variables_to_drop = ['TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE', 
-                             'check', 'processing_source'] # TEMPORARY SETUP
+                             'check','processing_source'] # TEMPORARY SETUP
             
-        qc_cols = ['WAVE_quality_control', 'SST_quality_control']
+        qc_cols = ['WAVE_quality_control', 'TEMP_quality_control']
         qc_cols = [col for col in qc_cols if col in data.columns]
 
         variables_to_drop.extend(qc_cols)
@@ -102,7 +102,9 @@ class WaveBuoyQC():
         # else:
         param_qc_column =  parameter + f"_{test}"
         if parameter in self.waves_parameters:
-            param_qc_column = "WAVE_" + param_qc_column
+            param_qc_column = "WAVE_QC_" + param_qc_column
+        else:
+            param_qc_column = "TEMP_QC_" + param_qc_column
         
         data[param_qc_column] = not_eval_flag 
         
@@ -143,9 +145,10 @@ class WaveBuoyQC():
                 data = self.rate_of_change_test(data=data,
                                                 parameter=param,
                                                 qc_config=self.qc_config_dict)
-
+        
         data = self.summarize_flags(data=data, parameter_type="waves")
-        data = self.summarize_flags(data=data, parameter_type="sst")
+        data = self.summarize_flags(data=data, parameter_type="temp")
+
 
         return data
     
@@ -214,17 +217,23 @@ class WaveBuoyQC():
         """
         
         if parameter_type == "waves":
-            qc_col_prefix = "WAVE" 
-        elif parameter_type == "sst":
-            qc_col_prefix = "SST"
+            qc_col_prefix = "WAVE_QC_"
+            global_qc_column = "WAVE_quality_control"
+        elif parameter_type == "temp":
+            qc_col_prefix = "TEMP_QC_"
+            global_qc_column = "TEMP_quality_control"
+
 
         parameter_type_qc_columns = data.filter(regex=qc_col_prefix).columns
 
+        SITE_LOGGER.warning(f"SUMMARIZE: {data.columns}")
+        SITE_LOGGER.warning(f"SUMMARIZE: {parameter_type_qc_columns}")
+        
         if parameter_type_qc_columns.empty:
             return data
 
         for idx, row in data[parameter_type_qc_columns].iterrows():
-            data.loc[idx, f"{qc_col_prefix}_quality_control"] = row.max()
+            data.loc[idx, global_qc_column] = row.max()
 
         if drop_parameters_qc_columns:
             data = self.drop_parameters_qc_columns(data=data, qc_col_prefix=qc_col_prefix)
@@ -234,16 +243,17 @@ class WaveBuoyQC():
     def drop_parameters_qc_columns(self, data: pd.DataFrame, qc_col_prefix: str) -> pd.DataFrame:
         qc_columns = data.filter(regex=qc_col_prefix).columns
         parameters_qc_columns = [col for col in qc_columns if not col.endswith("_quality_control")]
+        SITE_LOGGER.warning(f"DROP PARAMETERS: {parameters_qc_columns}")
         return data.drop(columns=parameters_qc_columns)
 
     def create_global_qc_columns(self, data: pd.DataFrame) -> pd.DataFrame:
 
         wave_qc_column = "WAVE_quality_control"
-        sst_qc_column = "SST_quality_control"
+        temp_qc_column = "TEMP_quality_control"
 
         data[wave_qc_column] = 2.0
-        if "SST" in data.columns:
-            data[sst_qc_column] = 2.0
+        if "TEMP" in data.columns:
+            data[temp_qc_column] = 2.0
 
         return data
 
