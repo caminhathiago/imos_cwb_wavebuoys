@@ -32,6 +32,7 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
             buoys_metadata = self._select_buoy_type(buoy_type=buoy_type, buoys_metadata=buoys_metadata)
             buoys_metadata["region"] = self._get_regions(buoys_metadata=buoys_metadata)
             buoys_metadata = buoys_metadata.set_index('name')
+            buoys_metadata = self._exclude_drifters(buoys_metadata=buoys_metadata)
             GENERAL_LOGGER.info("Buoys metadata grabbed successfully")
             return buoys_metadata
 
@@ -41,6 +42,11 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
         
     def _select_buoy_type(self, buoy_type:str, buoys_metadata:pd.DataFrame) -> pd.DataFrame:
         return buoys_metadata.loc[buoys_metadata["type"] == buoy_type]
+
+    def _exclude_drifters(self, buoys_metadata: pd.DataFrame) -> pd.DataFrame:
+        name_constraint = "drift".upper()
+        indexes = [index for index in buoys_metadata.index if name_constraint not in index.upper()]
+        return buoys_metadata.loc[indexes]
 
     def _get_site_ids(self, buoys_metadata=pd.DataFrame) -> list:
         return buoys_metadata.index.values
