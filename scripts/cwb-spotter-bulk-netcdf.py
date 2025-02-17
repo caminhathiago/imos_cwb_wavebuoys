@@ -34,7 +34,7 @@ if __name__ == "__main__":
     
     # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
     # "MtEliza", "Hillarys", "Central"
-    # wb.buoys_metadata = wb.buoys_metadata.loc[["MtEliza", "Hillarys", "Central"]].copy()
+    wb.buoys_metadata = wb.buoys_metadata.loc[["Hillarys"]].copy()
     # END OF TEMPORARY SETUP
 
     for idx, site in wb.buoys_metadata.iterrows():
@@ -170,13 +170,13 @@ if __name__ == "__main__":
             
 
             if new_raw_data["surfaceTemp"]:
-                sst = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
-                sst = wb.convert_to_datetime(data=sst)
-                generalTesting().generate_pickle_file(data=sst, file_name="surfaceTemp_new_data", site_name=site.name)
-                SITE_LOGGER.info(f"sst data converted to DataFrame and pre-processed if exists")
+                temp = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
+                temp = wb.convert_to_datetime(data=temp)
+                generalTesting().generate_pickle_file(data=temp, file_name="surfaceTemp_new_data", site_name=site.name)
+                SITE_LOGGER.info(f"temp data converted to DataFrame and pre-processed if exists")
 
                 all_new_data_df = wb.merge_parameter_types(waves=waves,
-                                                       sst=sst,
+                                                       temp=temp,
                                                        consider_processing_source=True)
             else:
                 all_new_data_df = waves.copy()
@@ -259,13 +259,13 @@ if __name__ == "__main__":
             all_data_hdr = wb.select_processing_source(data=all_data_df, processing_source="hdr")
             all_data_embedded = wb.select_processing_source(data=all_data_df, processing_source="embedded")
 
-            
             qc.load_data(data=all_data_embedded)
             parameters_to_qc = qc.get_parameters_to_qc(data=all_data_embedded, qc_config=qc.qc_config)      
             qualified_data_embedded = qc.qualify(data=all_data_embedded,
                                         parameters=parameters_to_qc,
                                         gross_range_test=True,
                                         rate_of_change_test=True)
+            
 
             if not all_data_hdr.empty:
                 qc = WaveBuoyQC(config_id=1)
