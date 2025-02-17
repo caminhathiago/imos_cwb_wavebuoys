@@ -34,8 +34,7 @@ if __name__ == "__main__":
     
     # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
     # "MtEliza", "Hillarys", "Central"
-    print(wb.buoys_metadata)
-    wb.buoys_metadata = wb.buoys_metadata.loc[["MtEliza", "Hillarys", "Central"]].copy()
+    # wb.buoys_metadata = wb.buoys_metadata.loc[["MtEliza", "Hillarys", "Central"]].copy()
     # END OF TEMPORARY SETUP
 
     for idx, site in wb.buoys_metadata.iterrows():
