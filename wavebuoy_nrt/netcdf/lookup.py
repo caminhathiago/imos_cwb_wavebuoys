@@ -136,7 +136,7 @@ class NetCDFFileHandler():
 
     def get_latest_processed_time(self, nc_file_path: str) -> datetime:
         
-        return pd.to_datetime((xr.open_dataset(nc_file_path)
+        return pd.to_datetime((xr.open_dataset(nc_file_path, engine="netcdf4")
                        ["TIME"]
                        .max()
                        .values)
