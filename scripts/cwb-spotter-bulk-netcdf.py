@@ -34,6 +34,7 @@ if __name__ == "__main__":
     
     # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
     # "MtEliza", "Hillarys", "Central"
+    print(wb.buoys_metadata)
     wb.buoys_metadata = wb.buoys_metadata.loc[["MtEliza", "Hillarys", "Central"]].copy()
     # END OF TEMPORARY SETUP
 
@@ -62,7 +63,9 @@ if __name__ == "__main__":
                                                                 window_unit=vargs.window_unit)
             SITE_LOGGER.info(f"window start generated as {latest_available_time} minus {vargs.window} {vargs.window_unit}: {window_start_time}")
 
-            nc_files_available = wb.get_available_nc_files(site_id=site.name, deployment_metadata=deployment_metadata)
+            nc_files_available = wb.get_available_nc_files(site_id=site.name,
+                                                           files_path=vargs.incoming_path,
+                                                           deployment_metadata=deployment_metadata)
             SITE_LOGGER.info(f"available nc files: {nc_files_available}")
 
             if nc_files_available:
@@ -74,7 +77,9 @@ if __name__ == "__main__":
                 SITE_LOGGER.info(f"nc files needed based on defined window: {nc_files_needed}")
 
 
-                latest_nc_file_available = wb.get_latest_nc_file_available(deployment_metadata=deployment_metadata, site_id=site.name)
+                latest_nc_file_available = wb.get_latest_nc_file_available(deployment_metadata=deployment_metadata,
+                                                                           site_id=site.name,
+                                                                           files_path=vargs.incoming_path)
                 SITE_LOGGER.info(f"latest_nc_file_available: {latest_nc_file_available}")
 
                 latest_processed_time = wb.get_latest_processed_time(nc_file_path=latest_nc_file_available)
@@ -93,7 +98,8 @@ if __name__ == "__main__":
                 if availability_check:
                     SITE_LOGGER.info("any or all needed nc files are available.")
                     earliest_nc_file_available = wb.get_earliest_nc_file_available(deployment_metadata=deployment_metadata,
-                                                                                site_id=site.name)
+                                                                                site_id=site.name,
+                                                                                files_path=vargs.incoming_path)
                     earliest_available_time = wb.get_earliest_processed_time(nc_file_path=latest_nc_file_available)
                     
                     SITE_LOGGER.warning(f"window_start_time {window_start_time}")
