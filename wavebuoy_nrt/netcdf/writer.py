@@ -575,7 +575,8 @@ class ncWriter(WaveBuoy):
         file_paths = self._compose_file_paths(output_path=output_path,
                                                  file_names=file_names)
         for file_path, dataset in zip(file_paths, dataset_objects):
-            dataset.to_netcdf(file_path, engine="netcdf4")
+            dataset.to_netcdf(file_path, engine="netcdf4",
+                                encoding={"TIME":{"_FillValue":None}})
 
         
     
