@@ -172,7 +172,7 @@ class NetCDFFileHandler():
             
         return availability_check, nc_file_paths 
         
-    def load_datasets(self, nc_file_paths: Union[List[str], str]) -> pd.DataFrame:
+    def load_datasets(self, nc_file_paths: Union[List[str], str], flag_previous_new: str = False) -> pd.DataFrame:
 
         if not nc_file_paths:
             return pd.DataFrame()
@@ -189,8 +189,8 @@ class NetCDFFileHandler():
                                 .to_dataframe()
                                 .reset_index())
 
-        # TEMPORARY SETUP
-        global_dataframe["check"] = "prev"
+        if flag_previous_new:
+            global_dataframe["flag_previous_new"] = "prev"
 
         return global_dataframe
 

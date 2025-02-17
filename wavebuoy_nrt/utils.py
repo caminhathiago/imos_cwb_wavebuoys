@@ -55,9 +55,16 @@ def args():
     parser.add_argument('-bf', '--backfill', dest='backfill', action="store_true",
                         help="wether the user wants to backfill the data from the latest available time back to the last processed time.",
                         required=False)
+    
+    parser.add_argument('-fpn', '--flag-previous-new', dest='flag_previous_new', action="store_true",
+                        help="wether the user wants to flag previous/new data in the data products generated",
+                        required=False)
+    
     # parser.add_argument('-p', '--push-to-incoming', dest='incoming_path', type=str, default=None,
     #                     help="incoming directory for files to be ingested by AODN pipeline (Optional)",
     #                     required=False)
+
+
     
     vargs = parser.parse_args()
 
@@ -78,12 +85,6 @@ def args():
             raise ValueError('{path} not a valid path'.format(path=vargs.incoming_path))
             sys.exit(1)
 
-    # if vargs.incoming_path:
-    #     if not os.path.exists(vargs.incoming_path):
-    # #         raise ValueError('{path} not a valid path'.format(path=vargs.incoming_path))
-    # else:
-    #     vargs.incoming_path = None
-
     if vargs.period_to_process:
         vargs.period_to_process = vargs.period_to_process.split()
         vargs.period_to_process_start_date = datetime.strptime(vargs.period_to_process[0],"%Y-%m-%dT%H:%M")
@@ -98,6 +99,11 @@ def args():
         backfill = True
     else:
         backfill = False
+
+    if vargs.flag_previous_new:
+        flag_previous_new = True
+    else:
+        flag_previous_new = False
 
     return vargs
 

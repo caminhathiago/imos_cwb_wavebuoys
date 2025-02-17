@@ -43,13 +43,15 @@ class WaveBuoyQC():
         self.data = data
 
     def drop_unwanted_variables(self, data: pd.DataFrame) -> pd.DataFrame:
-        variables_to_drop = ['TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE', 
-                             'check','processing_source'] # TEMPORARY SETUP
+        variables_to_drop = ['TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE', 'processing_source'] # TEMPORARY SETUP
             
         qc_cols = ['WAVE_quality_control', 'TEMP_quality_control']
         qc_cols = [col for col in qc_cols if col in data.columns]
 
         variables_to_drop.extend(qc_cols)
+
+        if "flag_previous_new" in data.columns:
+            variables_to_drop.append("flag_previous_new")
 
         data = data.drop(columns=variables_to_drop) 
 

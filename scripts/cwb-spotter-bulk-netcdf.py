@@ -122,7 +122,7 @@ if __name__ == "__main__":
                         nc_to_load = None
 
                 
-                previous_data_df = wb.load_datasets(nc_file_paths=nc_to_load)
+                previous_data_df = wb.load_datasets(nc_file_paths=nc_to_load, flag_previous_new=vargs.flag_previous_new)
                 window_start_time = latest_processed_time
                 SITE_LOGGER.info(f"considering window start time as lastest processed time ({window_start_time}) as previous nc files are being loaded.")
             
@@ -224,9 +224,9 @@ if __name__ == "__main__":
             all_new_data_df = wb.conform_columns_names_aodn(data=all_new_data_df)
             all_new_data_df = wb.sort_datetimes(data=all_new_data_df)
 
-            # TEMPORARY SETUP
-            all_new_data_df["check"] = "new"
-            # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
+            if vargs.flag_previous_new:
+                all_new_data_df["flag_previous_new"] = "new"
+
             print(nc_files_available)
             if nc_files_available:
                 if not previous_data_df.empty:
