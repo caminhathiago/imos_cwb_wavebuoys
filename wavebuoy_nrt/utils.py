@@ -186,9 +186,10 @@ class FilesHandler():
     def __init__(self):
         pass
 
-    def _get_file_path(self, file_name):
-        if os.path.exists(os.path.join(FILES_PATH, file_name)):
-            return os.path.join(FILES_PATH, file_name)
+    def _get_file_path(self, file_name: str, file_path: str = FILES_PATH):
+        if os.path.exists(os.path.join(file_path, file_name)):
+            # print(os.path.join(file_path, file_name))
+            return os.path.join(file_path, file_name)
         else:
             error_message = f"""Path for {file_name} does not exist.\nCheck if the correct path was provided, or if {file_name} was moved."""
             print(error_message)

@@ -8,7 +8,7 @@ import numpy as np
 
 from wavebuoy_nrt.processor.spotter import SpotterWaveBuoy
 from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
-from wavebuoy_nrt.config.config import FILES_PATH, AODN_COLUMNS_TEMPLATE
+from wavebuoy_nrt.config.config import FILES_PATH, AODN_COLUMNS_TEMPLATE, IRDS_PATH
 from wavebuoy_nrt.utils import args, FilesHandler
 
 GENERAL_LOGGER = logging.getLogger("general_logger")
@@ -22,9 +22,12 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
         # self.site_ids = self._get_site_ids(buoys_metadata=self.buoys_metadata)
         # self.sites_per_region = self._get_sites_per_region(buoys_metadata=self.buoys_metadata)
 
-    def _get_buoys_metadata(self, buoy_type:str,buoys_metadata_file_name:str):
+    def _get_buoys_metadata(self, buoy_type:str, buoys_metadata_file_name:str):
         try:
-            buoys_metadata_path = self._get_file_path(file_name=buoys_metadata_file_name)
+            file_path = os.path.join(IRDS_PATH, "Data", "website", "auswaves")
+            if not os.path.exists(file_path):
+                raise FileNotFoundError("No such directory for buoys metadata: {}")
+            buoys_metadata_path = self._get_file_path(file_name=buoys_metadata_file_name, file_path=file_path)
             buoys_metadata = pd.read_csv(buoys_metadata_path)
             buoys_metadata = self._select_buoy_type(buoy_type=buoy_type, buoys_metadata=buoys_metadata)
             buoys_metadata["region"] = self._get_regions(buoys_metadata=buoys_metadata)
