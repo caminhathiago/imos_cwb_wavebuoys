@@ -629,9 +629,7 @@ class ncWriter(WaveBuoy):
         for file_path, dataset in zip(file_paths, dataset_objects):
             dataset.to_netcdf(file_path, engine="netcdf4",
                                 encoding=self.ENCODING_ENFORCEMENT)
-                            #               "WAVE_quality_control":{"coordinates":None}
-                            #             }
-                            # )
+
 
         
     
