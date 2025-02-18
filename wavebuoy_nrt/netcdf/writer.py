@@ -81,10 +81,17 @@ class ncMetaDataLoader:
         template = re.compile(r"metadata_[A-Za-z0-9]+_deploy(\d+).xlsx")
 
         matches = [file for file in file_paths if template.search(file)]
-        if len(matches) < len(file_paths):
-            error_message = "at least one of the deployment metadata files name is not conforming with the template: metadata_{site_name}_deploy{deployment_date}.xlsx. Make sure all of them are conforming."
+        if not matches:
+            error_message = "No deployment metadata files found."
             SITE_LOGGER.error(error_message)
-            raise NameError(error_message)            
+            raise FileNotFoundError(error_message)
+
+        elif matches and len(matches) < len(file_paths):
+            error_message = "At least one of the deployment metadata files name is not conforming with the expected template (metadata_{site_name}_deploy{YYYYmmdd}.xlsx). Make sure all of them are conforming."
+            SITE_LOGGER.error(error_message)
+            raise NameError(error_message)
+        
+
 
     def load_latest_deployment_metadata(self, site_name:str) -> pd.DataFrame:
         region_folder = self._get_deployment_metadata_region_folders(site_name=site_name)
@@ -453,7 +460,8 @@ class ncProcessor:
         data_vars = ncProcessor._compose_data_vars(data=data, dimensions=["TIME"])
         
         dataset = xr.Dataset(coords=coords, data_vars=data_vars)
-
+        
+        SITE_LOGGER.warning(dataset["WAVE_quality_control"].attrs)
         # dataset = self._assign_attributes_variables(dataset=dataset)
         # dataset = self._assign_general_attributes(dataset=dataset)
 
@@ -512,7 +520,49 @@ class ncProcessor:
             
         return dataset_objects
 
+    @staticmethod
+    def convert_dtypes(dataset_objects: tuple) -> List[xr.Dataset]:
+        
+        dtypes_dict = {'WSSH':{"dtype":np.float64},
+                        'WPPE':{"dtype":np.float64},
+                        'WPFM':{"dtype":np.float64},
+                        'WPDI':{"dtype":np.float64},
+                        'WPDS':{"dtype":np.float64},
+                        'SSWMD':{"dtype":np.float64},
+                        'WMDS':{"dtype":np.float64},
+                        'TEMP':{"dtype":np.float64},
+                        'WAVE_quality_control':{"dtype":np.int8},
+                        'TEMP_quality_control':{"dtype":np.int8},
+                        'TIME':{"dtype":np.float64},
+                        'LATITUDE':{"dtype":np.float64},
+                        'LONGITUDE':{"dtype":np.float64},
+                        'timeSeries':{"dtype":np.int16}}
+        
+        for dataset in dataset_objects:
+            dataset = dataset.map(lambda x: x.astype(dtypes_dict[x.name]["dtype"]) if x.name in dtypes_dict else x )
+            SITE_LOGGER.warning(dataset.dtypes)
+        return dataset_objects
+
+
+
 class ncWriter(WaveBuoy):
+
+    ENCODING_ENFORCEMENT = {"TIME":{"_FillValue":None},
+                            'WSSH':{"dtype":np.float64},
+                            'WPPE':{"dtype":np.float64},
+                            'WPFM':{"dtype":np.float64},
+                            'WPDI':{"dtype":np.float64},
+                            'WPDS':{"dtype":np.float64},
+                            'SSWMD':{"dtype":np.float64},
+                            'WMDS':{"dtype":np.float64},
+                            'TEMP':{"dtype":np.float64},
+                            'WAVE_quality_control':{"dtype":np.int8},
+                            'TEMP_quality_control':{"dtype":np.int8},
+                            'TIME':{"dtype":np.float64},
+                            'LATITUDE':{"dtype":np.float64},
+                            'LONGITUDE':{"dtype":np.float64},
+                            'timeSeries':{"dtype":np.int16}
+                    }
 
     def __init__(self, buoy_type):
         super().__init__(buoy_type=buoy_type)
@@ -567,16 +617,21 @@ class ncWriter(WaveBuoy):
 
     def _compose_file_paths(self, file_names: list, output_path: str) -> list:
         return [os.path.join(output_path, file_name) for file_name in file_names]
-
+    
     def save_nc_file(self, 
                      output_path: str,
                      file_names: str,
                      dataset_objects: xr.Dataset):
         file_paths = self._compose_file_paths(output_path=output_path,
                                                  file_names=file_names)
+        
+        
         for file_path, dataset in zip(file_paths, dataset_objects):
             dataset.to_netcdf(file_path, engine="netcdf4",
-                                encoding={"TIME":{"_FillValue":None}})
+                                encoding=self.ENCODING_ENFORCEMENT)
+                            #               "WAVE_quality_control":{"coordinates":None}
+                            #             }
+                            # )
 
         
     
