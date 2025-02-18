@@ -352,7 +352,7 @@ if __name__ == "__main__":
                 ds_objects_hdr = nc_attrs_composer.assign_variables_attributes_dataset_objects(dataset_objects=ds_objects_hdr)
                 SITE_LOGGER.info("variables attributes assigned to datasets")
                 
-                ds_objects_embedded = ncProcessor.convert_dtypes(dataset_objects=ds_objects_embedded)
+                ds_objects_hdr = ncProcessor.convert_dtypes(dataset_objects=ds_objects_hdr)
                 SITE_LOGGER.info("variables dtypes converted and now conforming to template")
 
                 nc_file_names_hdr = nc_writer.compose_file_names(
