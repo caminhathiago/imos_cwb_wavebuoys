@@ -6,7 +6,7 @@ import logging
 import pandas as pd
 import numpy as np
 
-from wavebuoy_nrt.config.config import  AODN_COLUMNS_TEMPLATE
+from wavebuoy_nrt.config.config import  AODN_COLUMNS_TEMPLATE, AODN_SPECTRAL_COLUMNS_TEMPLATE
 
 GENERAL_LOGGER = logging.getLogger("general_logger")
 SITE_LOGGER = logging.getLogger("site_logger")
@@ -58,8 +58,13 @@ class SpotterWaveBuoy():
 
         return waves    
 
-    def conform_columns_names_aodn(self, data: pd.DataFrame) -> pd.DataFrame:
-        rename_dict = {k: v for k, v in AODN_COLUMNS_TEMPLATE.items() if v is not None}
+    def conform_columns_names_aodn(self, data: pd.DataFrame, parameters_type: str = "bulk") -> pd.DataFrame:
+        if parameters_type == "bulk":
+            columns_template = AODN_COLUMNS_TEMPLATE
+        elif parameters_type == "spectral":
+            columns_template = AODN_SPECTRAL_COLUMNS_TEMPLATE
+
+        rename_dict = {k: v for k, v in columns_template.items() if v is not None}
         return data.rename(columns=rename_dict)
 
     def drop_unwanted_columns(self, data: pd.DataFrame) -> pd.DataFrame:

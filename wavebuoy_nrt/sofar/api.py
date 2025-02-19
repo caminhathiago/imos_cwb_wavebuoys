@@ -98,6 +98,7 @@ class SofarAPI:
                     end_date: datetime = datetime.now(),
                     add_wave_params: bool = True,
                     limit: int = 500,
+                    include_waves: bool = True,
                     include_surface_temp_data: bool = True,
                     include_wind_data: bool = True,
                     include_frequency_data: bool = True,
@@ -141,6 +142,11 @@ class SofarAPI:
         needs_pagination = True
         raw_data = None
 
+        # if kwargs["include_waves"] and not kwargs["include_frequency_data"]:
+        #     data_type = "waves"
+        # elif not kwargs["include_waves"] and kwargs["include_frequency_data"]:
+        #     data_type = "frequencyData"
+
         SITE_LOGGER.info("Starting Sofar API requests, paginating if needed:")
         while needs_pagination:
             SITE_LOGGER.info(f"Page: {page} | Start: {current_start_date} | End: {end_date}")
@@ -151,10 +157,10 @@ class SofarAPI:
                 end_date=end_date,
                 **kwargs
             )
-
+            
             if not new_raw_data["waves"]:
-                SITE_LOGGER.info(f"No more data available after Page: {page}")
-                break
+                    SITE_LOGGER.info(f"No more data available after Page: {page}")
+                    break
             
             if page == 1:
                 raw_data = new_raw_data
@@ -269,13 +275,14 @@ class SofarAPI:
             print(f"Unsuccessfull API call, status {response.status_code}")
             return
 
-    def get_latest_available_time(self, spot_id: str, token: str) -> datetime:
+    def get_latest_available_time(self, spot_id: str, token: str, dataset_type: str = "waves") -> datetime:
         """
         CONSIDER SMART MOORING
         """
         latest_data = self.get_latest_data(spot_id=spot_id, token=token)
         SITE_LOGGER.warning(latest_data)
-        latest_available_time = latest_data["waves"][-1]["timestamp"]
+        # return latest_data[dataset_type]
+        latest_available_time = latest_data[dataset_type][-1]["timestamp"]
 
         # try:
         #     latest_available_time = latest_data["waves"][-1]["timestamp"]
@@ -295,6 +302,7 @@ class SofarAPI:
                                 end_date: datetime = None,
                                 add_wave_params: bool = True,
                                 limit: int = 500,
+                                include_waves: bool = True,
                                 include_surface_temp_data: bool = True,
                                 include_wind_data: bool = True,
                                 include_frequency_data: bool = False,
@@ -315,6 +323,7 @@ class SofarAPI:
         if add_wave_params:
             query_params.update({
                 "limit": str(limit),
+                "includeWaves": str(include_waves).lower(),
                 "includeSurfaceTempData": str(include_surface_temp_data).lower(),
                 "includeWindData": str(include_wind_data).lower(),
                 "includeFrequencyData": str(include_frequency_data).lower(),

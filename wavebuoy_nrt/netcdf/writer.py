@@ -15,7 +15,7 @@ import glob
 import wavebuoy_nrt.config as config
 from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
-from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, IRDS_PATH, OPERATING_INSTITUTIONS
+from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, NC_SPECTRAL_FILE_NAME_TEMPLATE, IRDS_PATH, OPERATING_INSTITUTIONS
 
 
 
@@ -461,7 +461,6 @@ class ncProcessor:
         
         dataset = xr.Dataset(coords=coords, data_vars=data_vars)
         
-        SITE_LOGGER.warning(dataset["WAVE_quality_control"].attrs)
         # dataset = self._assign_attributes_variables(dataset=dataset)
         # dataset = self._assign_general_attributes(dataset=dataset)
 
@@ -547,7 +546,7 @@ class ncProcessor:
 
 class ncWriter(WaveBuoy):
 
-    ENCODING_ENFORCEMENT = {"TIME":{"_FillValue":None},
+    ENCODING_ENFORCEMENT_BULK = {"TIME":{"_FillValue":None},
                             'WSSH':{"dtype":np.float64},
                             'WPPE':{"dtype":np.float64},
                             'WPFM':{"dtype":np.float64},
@@ -563,6 +562,10 @@ class ncWriter(WaveBuoy):
                             'LONGITUDE':{"dtype":np.float64},
                             'timeSeries':{"dtype":np.int16}
                     }
+
+    ENCODING_ENFORCEMENT_SPECTRAL = {"TIME":{"_FillValue":None},
+                                }
+
 
     def __init__(self, buoy_type):
         super().__init__(buoy_type=buoy_type)
@@ -597,14 +600,21 @@ class ncWriter(WaveBuoy):
     def compose_file_names(self,
                             site_id: str,
                             deployment_metadata: pd.DataFrame,
-                            periods: PeriodIndex) -> List[str]:
+                            periods: PeriodIndex,
+                            parameters_type: str = "bulk") -> List[str]:
+        
+        if parameters_type == "bulk":
+            file_name_template = NC_FILE_NAME_TEMPLATE
+        elif parameters_type == "spectral":
+            file_name_template = NC_SPECTRAL_FILE_NAME_TEMPLATE
+        
         periods_formated = self._format_periods(periods=periods)
         file_names = []
 
         operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata)
 
         for period in periods_formated:
-            file_name = NC_FILE_NAME_TEMPLATE.format(operating_institution=operating_institution,
+            file_name = file_name_template.format(operating_institution=operating_institution,
                                                      site_id=site_id,
                                                      monthly_datetime=period
                                                 )
@@ -621,14 +631,20 @@ class ncWriter(WaveBuoy):
     def save_nc_file(self, 
                      output_path: str,
                      file_names: str,
-                     dataset_objects: xr.Dataset):
+                     dataset_objects: xr.Dataset,
+                     parameters_type: str = "bulk"):
         file_paths = self._compose_file_paths(output_path=output_path,
                                                  file_names=file_names)
         
+        if parameters_type == "bulk":
+            encoding = self.ENCODING_ENFORCEMENT_BULK
+        elif parameters_type == "spectral":
+            encoding = self.ENCODING_ENFORCEMENT_SPECTRAL
+
         
         for file_path, dataset in zip(file_paths, dataset_objects):
             dataset.to_netcdf(file_path, engine="netcdf4",
-                                encoding=self.ENCODING_ENFORCEMENT)
+                                encoding=encoding)
 
 
         
