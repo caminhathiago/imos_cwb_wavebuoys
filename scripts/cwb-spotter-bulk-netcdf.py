@@ -103,8 +103,6 @@ if __name__ == "__main__":
                                                                                 files_path=vargs.incoming_path)
                     earliest_available_time = wb.get_earliest_processed_time(nc_file_path=latest_nc_file_available)
                     
-                    SITE_LOGGER.warning(f"window_start_time {window_start_time}")
-                    SITE_LOGGER.warning(f"earliest_available_time {earliest_available_time}")
                     if window_start_time < earliest_available_time:
                         SITE_LOGGER.info("desired window start time is older than earliest available time, extract new data and overwrite all available nc files.")
                         nc_to_load = None
@@ -229,7 +227,6 @@ if __name__ == "__main__":
             if vargs.flag_previous_new:
                 all_new_data_df["flag_previous_new"] = "new"
 
-            print(nc_files_available)
             if nc_files_available:
                 if not previous_data_df.empty:
                     # TEMPORARY SETUP
@@ -325,7 +322,8 @@ if __name__ == "__main__":
             nc_file_names_embedded = nc_writer.compose_file_names(
                                         site_id=site.name.upper(),
                                         periods=periods_embedded,
-                                        deployment_metadata=deployment_metadata)
+                                        deployment_metadata=deployment_metadata,
+                                        parameters_type="bulk")
             # nc_file_names_embedded = nc_writer.compose_file_names_processing_source(file_names=nc_file_names_embedded,
             #                                                                         processing_source="embedded")           
             nc_writer.save_nc_file(output_path=vargs.incoming_path,
