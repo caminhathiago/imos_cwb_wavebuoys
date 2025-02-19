@@ -23,9 +23,9 @@ PACKAGE_DATA = {
     'wavebuoy.': ['*.csv'],
 }
 
-SCRIPTS = [
-    'scripts/cwb-spotter-netcdf.py',
-    'scripts/cwb-netcdf-aodn.py']
+SCRIPTS = []
+    # 'scripts/cwb-spotter-netcdf.py',
+    # 'scripts/cwb-netcdf-aodn.py']
 
 setup(
     name=PACKAGE_NAME,
