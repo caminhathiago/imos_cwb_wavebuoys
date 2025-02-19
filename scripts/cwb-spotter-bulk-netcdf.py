@@ -73,7 +73,8 @@ if __name__ == "__main__":
                                                             site_id=site.name,
                                                             latest_available_datetime=latest_available_time,
                                                             window=int(vargs.window),
-                                                            window_unit=vargs.window_unit)
+                                                            window_unit=vargs.window_unit,
+                                                            data_type="bulk")
                 SITE_LOGGER.info(f"nc files needed based on defined window: {nc_files_needed}")
 
 

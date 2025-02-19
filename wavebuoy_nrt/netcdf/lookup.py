@@ -11,7 +11,10 @@ import re
 from typing import Union, List
 
 
-from wavebuoy_nrt.config.config import FILES_OUTPUT_PATH, NC_FILE_NAME_TEMPLATE, OPERATING_INSTITUTIONS
+from wavebuoy_nrt.config.config import (FILES_OUTPUT_PATH,
+                                        NC_FILE_NAME_TEMPLATE,
+                                        OPERATING_INSTITUTIONS,
+                                        NC_SPECTRAL_FILE_NAME_TEMPLATE)
 
 GENERAL_LOGGER = logging.getLogger("general_logger")
 SITE_LOGGER = logging.getLogger("site_logger")
@@ -59,7 +62,8 @@ class NetCDFFileHandler():
                             latest_available_datetime: datetime,
                             #minimum_datetime_recursion:datetime=datetime(2020,1,1), # This should be less than the minimum Datetime of the first spotter we ever deployed
                             window: int=24,
-                            window_unit: str="hours") -> str:
+                            window_unit: str="hours",
+                            data_type: str = "bulk") -> str:
             
         window_start_date = self.generate_window_start_time(latest_available_datetime=latest_available_datetime,
                                                                 window=window,
@@ -69,9 +73,18 @@ class NetCDFFileHandler():
         
         operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata)
         
+        if data_type == "bulk":
+            file_name_template = NC_FILE_NAME_TEMPLATE
+        elif data_type == "spectral":
+            file_name_template = NC_SPECTRAL_FILE_NAME_TEMPLATE
+        else:
+            error = "Please select a valid data type: 'bulk' or 'spectral'"
+            SITE_LOGGER.error(error)
+            raise TypeError(error)
+
         nc_file_paths_needed = []
         for month in monthly_daterange:
-            nc_file_name = NC_FILE_NAME_TEMPLATE.format(operating_institution=operating_institution,# Temporary data
+            nc_file_name = file_name_template.format(operating_institution=operating_institution,# Temporary data
                                                 monthly_datetime=month.strftime("%Y%m%d"),
                                                 site_id=site_id.upper())
             print(nc_file_name)
@@ -125,8 +138,9 @@ class NetCDFFileHandler():
         elif data_type == "spectral":
             nc_file_filter = f"*{site_id.upper()}_RT_SPECTRAL-PARAMETERS*.nc"
         else:
-            error = ""
-            raise TypeError()
+            error = "Please select a valid data type: 'bulk' or 'spectral'"
+            SITE_LOGGER.error(error)
+            raise TypeError(error)
 
         nc_file_path = os.path.join(files_path, nc_file_filter)
 
