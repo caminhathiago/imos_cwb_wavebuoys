@@ -64,7 +64,8 @@ if __name__ == "__main__":
 
             nc_files_available = wb.get_available_nc_files(site_id=site.name,
                                                            files_path=vargs.incoming_path,
-                                                           deployment_metadata=deployment_metadata)
+                                                           deployment_metadata=deployment_metadata,
+                                                           data_type="bulk")
             SITE_LOGGER.info(f"available nc files: {nc_files_available}")
 
             if nc_files_available:

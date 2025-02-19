@@ -114,12 +114,20 @@ class NetCDFFileHandler():
 
         return operating_institution
 
-    def get_available_nc_files(self, files_path: str, deployment_metadata: pd.DataFrame, site_id: str) -> list:
+    def get_available_nc_files(self, files_path: str, deployment_metadata: pd.DataFrame, site_id: str, data_type: str = "bulk") -> list:
         # operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata)
         # nc_file_filter = NC_FILE_NAME_TEMPLATE.format(operating_institution=operating_institution,# Temporary data
         #                                             monthly_datetime="*",
         #                                             site_id=site_id.upper())
-        nc_file_filter = f"*{site_id.upper()}*.nc"
+        
+        if data_type == "bulk":
+            nc_file_filter = f"*{site_id.upper()}_RT_WAVE-PARAMETERS*.nc"
+        elif data_type == "spectral":
+            nc_file_filter = f"*{site_id.upper()}_RT_SPECTRAL-PARAMETERS*.nc"
+        else:
+            error = ""
+            raise TypeError()
+
         nc_file_path = os.path.join(files_path, nc_file_filter)
 
         return glob.glob(nc_file_path)
