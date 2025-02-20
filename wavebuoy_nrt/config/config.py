@@ -37,4 +37,5 @@ AODN_SPECTRAL_COLUMNS_TEMPLATE = {
     "varianceDensity": 'ENERGY',
     "direction": 'DIRECTION',
     "directionalSpread": 'DIRSPREAD',
+    "df": "DIFFREQUENCY"
 }
