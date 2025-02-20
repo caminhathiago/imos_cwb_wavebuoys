@@ -131,9 +131,16 @@ class ncBulkAttrs:
     def __init__():
         return
     
-class ncSpectralAttrs:
-    def __init__():
-        return
+class ncSpectralAttrsExtractor:
+    def _extract_general_spectral_analysis_technique() -> str:
+        return "Fast Fourier Transform"
+    
+    def _extract_general_spectral_analysis_technique_reference() -> str:
+        return "Kuik, A. J., van Vledder, G. P., & Holthuijsen, L. H. (1988).\
+                A Method for the Routine Analysis of Pitch-and-Roll Buoy Wave Data,\
+                Journal of Physical Oceanography, 18(7), 1020-1034. \
+                Retrieved Feb 21, 2022, from https://journals.ametsoc.org/view/journals/phoc/18/7/1520-0485_1988_018_1020_amftra_2_0_co_2.xml"
+    
 
 class ncAttrsExtractor:
     # def __init__(self, buoys_metadata: pd.DataFrame):
@@ -288,21 +295,28 @@ class ncAttrsExtractor:
     def _extract_general_wave_motion_sensor_type() -> str:
         return "GPS"
     
-    
-
 class ncAttrsComposer:
-    def __init__(self, buoys_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame):
+    def __init__(self, 
+                 buoys_metadata: pd.DataFrame,
+                 deployment_metadata: pd.DataFrame,
+                 parameters_type: str = "bulk"):
+        
+        self.parameters_type = parameters_type
         self.buoys_metadata = buoys_metadata
         self.deployment_metadata = deployment_metadata
-        self.template_imos = ncMetaDataLoader(buoys_metadata=buoys_metadata)._get_template_imos(file_name="general_attrs.json")
-        
+        self.attrs_templates_files = {"bulk": "bulk_attrs.json",
+                                "spectral":"spectral_attrs.json"}
+        self.attrs_template = (ncMetaDataLoader(buoys_metadata=buoys_metadata)
+                              ._get_template_imos(file_name=self.attrs_templates_files[self.parameters_type])
+                        )
+    
     def assign_variables_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
-        variables = list(self.template_imos['variables'].keys())
+        variables = list(self.attrs_template['variables'].keys())
         # variables.remove("timeSeries")
         for variable in variables:
             
             if variable in list(dataset.variables):
-                variables_attributes = self.template_imos['variables'][variable]
+                variables_attributes = self.attrs_template['variables'][variable]
                 
                 # for var_attr in variables_attributes:
                 #     if var_attr.startswith("_"):
@@ -360,16 +374,27 @@ class ncAttrsComposer:
                         extracted = method(**kwargs)
                     except:
                         SITE_LOGGER.warning(f"grabing attribute from general_attrs.json for {key}")
-                        extracted = self._get_attribute_from_template(attribute_name=key, attributes_template=self.template_imos)
+                        extracted = self._get_attribute_from_template(attribute_name=key, attributes_template=self.attrs_template)
                     
                     general_attributes.update({key:extracted})
+
+        if self.parameters_type == "spectral":
+            # extracted = ncSpectralAttrsExtractor._extract_general_spectral_analysis_technique()
+            for name in dir(ncSpectralAttrsExtractor): 
+                if name.startswith("_extract_"): 
+                    method = getattr(ncSpectralAttrsExtractor, name)
+                    if callable(method):
+                        if name.startswith("_extract_general_"):
+                                key = name.removeprefix("_extract_general_") 
+                                kwargs = {}
+
+                        extracted = method(**kwargs)
+                        general_attributes.update({key:extracted})
 
         return general_attributes  
 
     def _get_attribute_from_template(self, attribute_name: str, attributes_template: dict) -> dict:
         return attributes_template[attribute_name]
-
-    
 
     def _compose_abstract(self, institution: str, instrument: str, site_name:str) -> str:
         base_abstact = """Near real time integral wave parameters from wave buoys collected by {institution} using a {instrument} at {site_name}"""
@@ -384,80 +409,45 @@ class ncProcessor:
         return data[data["processing_source"] == processing_source]
 
     @staticmethod
-    def _compose_coords_dimensions(data: pd.DataFrame) -> dict:
-        # hdr = self.select_processing_source(data=data, processing_source="hdr")
-        # embedded = self.select_processing_source(data=data, processing_source="embedded")
+    def _compose_coords_dimensions(data: pd.DataFrame, parameters_type: str = "bulk") -> dict:
 
-        # times = [hdr["TIME"].to_list(),embedded["TIME"].to_list()]
-        # latitudes = [hdr["TIME"].to_list(),embedded["TIME"].to_list()]
-        # longitudes = [hdr["TIME"].to_list(),embedded["TIME"].to_list()]
-        # timeSeries = [hdr["TIME"].to_list(),embedded["TIME"].to_list()]
+        coords = {
+                "TIME":("TIME", data["TIME"]),
+                "LATITUDE":("TIME", data["LATITUDE"]),
+                "LONGITUDE":("TIME", data["LONGITUDE"])
+            }
 
-        # return {
-        #     "processing_source":["hdr", "embedded"],
-        #     "TIME": (["processing_source", "TIME"], times),
-        #     "LATITUDE": (["processing_source", "TIME"], latitudes),
-        #     "LONGITUDE": (["processing_source", "TIME"], longitudes),
-        #     "timeSeries": (["processing_source", "TIME"], timeSeries),
+        if parameters_type == "spectral":
+            coords.update({"FREQUENCY": ("FREQUENCY", data["FREQUENCY"].iloc[0])})
 
-        # }
-
-        # return {
-        #     "processing_source":("processing_source",["hdr", "embedded"]),
-        #     "TIME":("TIME", [hdr["TIME"], embedded["TIME"]], {"nested":True}),
-        #     "timeSeries":("timeSeries", [hdr["timeSeries"], embedded["timeSeries"]], {"nested":True}),
-        #     "LATITUDE":("LATITUDE", [hdr["LATITUDE"], embedded["LATITUDE"]], {"nested":True}),
-        #     "LONGITUDE":("LONGITUDE", [hdr["LONGITUDE"], embedded["LONGITUDE"]], {"nested":True}),
-        # }
-        
-        # return {
-        #     "processing_source":("processing_source", ["hdr"]),
-        #     "TIME":("TIME", data["TIME"]),
-        #     "timeSeries":("timeSeries", data["timeSeries"]),
-        #     "LATITUDE":("TIME", data["LATITUDE"]),
-        #     "LONGITUDE":("TIME", data["LONGITUDE"])
-        # }
-    
-        return {
-            "TIME":("TIME", data["TIME"]),
-            # "timeSeries":("timeSeries", data["timeSeries"]),
-            "LATITUDE":("TIME", data["LATITUDE"]),
-            "LONGITUDE":("TIME", data["LONGITUDE"])
-        }
+        return coords 
 
     @staticmethod
-    def _compose_data_vars(data: pd.DataFrame, dimensions: list) -> dict:
-
-        # hdr = self.select_processing_source(data=data, processing_source="hdr")
-        # embedded = self.select_processing_source(data=data, processing_source="embedded")
-
-        # data_vars = {}
-        # vars_to_include = data.drop(columns=['processing_source','TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE']).columns
-        # for var in vars_to_include:
-        #     data_list = [hdr[var].to_list(),embedded[var].to_list()]
-        #     data_vars.update({var:(dimensions, data_list)})
-        # return data_vars 
-
-        # hdr = self.select_processing_source(data=data, processing_source="hdr")
-        # embedded = self.select_processing_source(data=data, processing_source="embedded")
-        
-        # data_vars = {}
-        # vars_to_include = data.drop(columns=['processing_source','TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE']).columns
-        # for var in vars_to_include:
-        #     data_vars.update({var:(dimensions, [hdr[var],embedded[var]])})
-        # return data_vars  
-        
+    def _compose_data_vars(data: pd.DataFrame, parameters_type: str = "bulk") -> dict:
+      
         data_vars = {}
-        vars_to_include = data.drop(columns=['TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE', "processing_source"]).columns
+        cols_to_drop = ['TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE', "processing_source"]
+        dimensions = ["TIME"]
+
+        if parameters_type == "spectral":
+            cols_to_drop.extend(["FREQUENCY", "DIFFREQUENCY"])
+            dimensions.append("FREQUENCY")
+
+        vars_to_include = data.drop(columns=cols_to_drop).columns
+
         for var in vars_to_include:
-            data_vars.update({var:(dimensions, data[var])})
-        return data_vars  
+            if parameters_type == "bulk":
+                data_vars.update({var:(tuple(dimensions), data[var])})
+            elif parameters_type == "spectral":
+                data_vars.update({var:(tuple(dimensions), np.vstack(data[var].values))})
+        
+        return data_vars
     
     @staticmethod
-    def compose_dataset(data: pd.DataFrame) -> xr.Dataset:
+    def compose_dataset(data: pd.DataFrame, parameters_type: str = "bulk") -> xr.Dataset:
         
-        coords = ncProcessor._compose_coords_dimensions(data=data)
-        data_vars = ncProcessor._compose_data_vars(data=data, dimensions=["TIME"])
+        coords = ncProcessor._compose_coords_dimensions(data=data,parameters_type=parameters_type)
+        data_vars = ncProcessor._compose_data_vars(data=data, parameters_type=parameters_type)
         
         dataset = xr.Dataset(coords=coords, data_vars=data_vars)
         
