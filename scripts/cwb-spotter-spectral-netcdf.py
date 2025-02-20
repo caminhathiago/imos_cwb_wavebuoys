@@ -150,7 +150,7 @@ if __name__ == "__main__":
             SITE_LOGGER.info(f"waves data converted to DataFrame and pre-processed")
 
             spectra = wb.create_timeseries_aodn_column(data=spectra)
-            spectra = wb.conform_columns_names_aodn(data=spectra)
+            spectra = wb.conform_columns_names_aodn(data=spectra, parameters_type="spectral")
             spectra = wb.sort_datetimes(data=spectra)
 
             if vargs.flag_previous_new:
@@ -170,8 +170,7 @@ if __name__ == "__main__":
             spectra.reset_index().to_csv(csv_file_path, index=False)
             SITE_LOGGER.info(f"processed data saved as '{csv_file_path}'")
 
-            GENERAL_LOGGER.info(f"Processing successful")
-            imos_logging.logging_stop(logger=SITE_LOGGER)
+            
 
             # Qualification ---------------------------------------
             # GENERAL_LOGGER.info("Starting qualification step")
@@ -182,13 +181,15 @@ if __name__ == "__main__":
             SITE_LOGGER.info("NC FILE PROCESSING STEP ====================================")
 
             nc_writer = ncWriter(buoy_type="sofar")
-            nc_attrs_composer = ncAttrsComposer(buoys_metadata=wb.buoys_metadata, deployment_metadata=deployment_metadata)
-
-            ds_embedded = ncProcessor.compose_dataset(data=spectra)
+            nc_attrs_composer = ncAttrsComposer(buoys_metadata=wb.buoys_metadata,
+                                                deployment_metadata=deployment_metadata,
+                                                parameters_type="spectral")
+    
+            ds_embedded = ncProcessor.compose_dataset(data=spectra, parameters_type="spectral")
             SITE_LOGGER.info("embedded dataset composed")
 
-            # ds_embedded = nc_attrs_composer.assign_general_attributes(dataset=ds_embedded, site_name=site.name)
-            # SITE_LOGGER.info("general attributes assigned to embedded dataset")
+            ds_embedded = nc_attrs_composer.assign_general_attributes(dataset=ds_embedded, site_name=site.name)
+            SITE_LOGGER.info("general attributes assigned to embedded dataset")
             
             ds_embedded = ncProcessor.create_timeseries_variable(dataset=ds_embedded)
             SITE_LOGGER.info("time series variable created in embedded dataset")
@@ -200,11 +201,11 @@ if __name__ == "__main__":
             ds_objects_embedded = ncProcessor.process_time_to_CF_convention(dataset_objects=ds_objects_embedded)
             SITE_LOGGER.info("dataset objects time dimension processed to conform to CF conventions")
 
-            # ds_objects_embedded = nc_attrs_composer.assign_variables_attributes_dataset_objects(dataset_objects=ds_objects_embedded)
-            # SITE_LOGGER.info("variables attributes assigned to datasets")
+            ds_objects_embedded = nc_attrs_composer.assign_variables_attributes_dataset_objects(dataset_objects=ds_objects_embedded)
+            SITE_LOGGER.info("variables attributes assigned to datasets")
 
-            # ds_objects_embedded = ncProcessor.convert_dtypes(dataset_objects=ds_objects_embedded)
-            # SITE_LOGGER.info("variables dtypes converted and now conforming to template")
+            # # ds_objects_embedded = ncProcessor.convert_dtypes(dataset_objects=ds_objects_embedded)
+            # # SITE_LOGGER.info("variables dtypes converted and now conforming to template")
 
             nc_file_names_embedded = nc_writer.compose_file_names(
                                         site_id=site.name.upper(),
@@ -217,6 +218,9 @@ if __name__ == "__main__":
                                    file_names=nc_file_names_embedded,
                                    dataset_objects=ds_objects_embedded,
                                    parameters_type="spectral")
+
+            GENERAL_LOGGER.info(f"Processing successful")
+            imos_logging.logging_stop(logger=SITE_LOGGER)
 
         except Exception as e:
             error_message = IMOSLogging().unexpected_error_message.format(site_name=site.name.upper())
