@@ -9,7 +9,7 @@ OPERATING_INSTITUTIONS = {"UWA":"UWA",
                           }
 
 NC_FILE_NAME_TEMPLATE = "{operating_institution}_{monthly_datetime}_{site_id}_RT_WAVE-PARAMETERS_monthly.nc"
-NC_SPECTRAL_FILE_NAME_TEMPLATE = "{operating_institution}_{monthly_datetime}_{site_id}_RT_SPECTRAL-PARAMETERS_monthly.nc"
+NC_SPECTRAL_FILE_NAME_TEMPLATE = "{operating_institution}_{monthly_datetime}_{site_id}_RT_SPECTRAL_monthly.nc"
 
 AODN_COLUMNS_TEMPLATE = {
     "timestamp": 'TIME',
