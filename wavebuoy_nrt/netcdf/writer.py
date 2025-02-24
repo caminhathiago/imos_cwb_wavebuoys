@@ -618,6 +618,12 @@ class ncWriter(WaveBuoy):
     def _compose_file_paths(self, file_names: list, output_path: str) -> list:
         return [os.path.join(output_path, file_name) for file_name in file_names]
     
+    def _remove_coordinates_qc_variables(self, dataset: xr.Dataset) -> xr.Dataset:
+        qc_variables = [var for var in list(dataset.variables.keys()) if var.endswith("quality_control")]
+        for qc_var in qc_variables:
+            dataset[qc_var].encoding["coordinates"] = None
+        return dataset
+
     def save_nc_file(self, 
                      output_path: str,
                      file_names: str,
@@ -633,6 +639,7 @@ class ncWriter(WaveBuoy):
 
         
         for file_path, dataset in zip(file_paths, dataset_objects):
+            dataset = self._remove_coordinates_qc_variables(dataset=dataset)
             dataset.to_netcdf(file_path, engine="netcdf4",
                                 encoding=encoding)
 
