@@ -11,16 +11,16 @@ from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
 from wavebuoy_nrt.qc.qcTests import WaveBuoyQC
 from wavebuoy_nrt.netcdf.writer import ncWriter, ncAttrsComposer, ncAttrsExtractor, ncProcessor, ncMetaDataLoader
-from wavebuoy_nrt.utils import args, IMOSLogging, generalTesting
+from wavebuoy_nrt.utils import args_processing, IMOSLogging, generalTesting
 
 
 load_dotenv()
 
 
-if __name__ == "__main__":
+def main():
 
     # Args handling
-    vargs = args()
+    vargs = args_processing()
 
     # Start general logging
     
@@ -65,7 +65,7 @@ if __name__ == "__main__":
             nc_files_available = wb.get_available_nc_files(site_id=site.name,
                                                            files_path=vargs.incoming_path,
                                                            deployment_metadata=deployment_metadata,
-                                                           data_type="bulk")
+                                                           parameters_type="bulk")
             SITE_LOGGER.info(f"available nc files: {nc_files_available}")
 
             if nc_files_available:
@@ -80,7 +80,8 @@ if __name__ == "__main__":
 
                 latest_nc_file_available = wb.get_latest_nc_file_available(deployment_metadata=deployment_metadata,
                                                                            site_id=site.name,
-                                                                           files_path=vargs.incoming_path)
+                                                                           files_path=vargs.incoming_path,
+                                                                           parameters_type="bulk")
                 SITE_LOGGER.info(f"latest_nc_file_available: {latest_nc_file_available}")
 
                 latest_processed_time = wb.get_latest_processed_time(nc_file_path=latest_nc_file_available)
@@ -156,18 +157,8 @@ if __name__ == "__main__":
             # Processing ---------------------------------------
             SITE_LOGGER.info("PRE-PROCESSING STEP ====================================")
 
-            # split_raw_data = wb.split_processing_source(raw_data=new_raw_data)
-
             waves = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="waves")
-            waves = wb.convert_to_datetime(data=waves)
-
-            # 
-            # waves = wb.filter_new_data(data=waves)
-
-            generalTesting().generate_pickle_file(data=waves, file_name="waves_new_data_df", site_name=site.name)
-            SITE_LOGGER.info(f"waves data converted to DataFrame and pre-processed")
-
-            
+            waves = wb.convert_to_datetime(data=waves)          
 
             if new_raw_data["surfaceTemp"]:
                 temp = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
@@ -180,46 +171,7 @@ if __name__ == "__main__":
                                                        consider_processing_source=True)
             else:
                 all_new_data_df = waves.copy()
-            # if not new_raw_data["surfaceTemp"] and site.version in ("smart_mooring", "half_smart_mooring"):
-            #     SITE_LOGGER.info(f"no sst available from spotter, grab smart mooring data since it is available (i.e. buoy version: {site.version})")
-                
-            #     new_sensor_data_raw = sofar_api.get_sensor_data(spot_id=site.serial,
-            #                                                 token=site.sofar_token,
-            #                                                 start_date=window_start_time,
-            #                                                 end_date=window_end_date)
-            #     SITE_LOGGER.info(f"raw smart mooring data extracted from Sofar API")
-
-            #     generalTesting().generate_pickle_file(data=new_sensor_data_raw, file_name="smart_mooring_raw", site_name=site.name)
-                
-            #     sst_sm = wb.convert_smart_mooring_to_dataframe(raw_data=new_sensor_data_raw)
-            #     sst_sm = wb.convert_to_datetime(data=sst_sm)
-            #     sst_sm = wb.get_sst_from_smart_mooring(data=sst_sm, sensor_type="temperature")
-            #     sst_sm = wb.process_smart_mooring_columns(data=sst_sm)
-            #     sst = wb.round_parameter_values(data=sst_sm, parameter="SST")
-                
-            #     # TEMPORARY SETUP
-            #     sst["processing_source"] = "embedded"
-            #     sst2 = sst.copy()
-            #     sst2["processing_source"] = "hdr"
-            #     sst = pd.concat([sst, sst2], axis=0)
-            #     # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
-
-            #     SITE_LOGGER.info("smart mooring data processed")
-
-            # generalTesting().generate_pickle_file(data=sst, file_name="sst_new_data_df", site_name=site.name)
-
             
-            # generalTesting().generate_pickle_file(data=all_new_data_df, file_name="all_new_data_df", site_name=site.name)
-
-            # SITE_LOGGER.info("waves and sst/upper smart mooring temperature sensor merged")
-
-            # all_new_data_df = waves.copy()
-
-            # TEMPORARY SETUP
-            test = wb.test_duplicated(data=all_new_data_df)
-            SITE_LOGGER.warning(f"data has duplicated values? R: {test}")
-            # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
-
             all_new_data_df = wb.create_timeseries_aodn_column(data=all_new_data_df)
             all_new_data_df = wb.conform_columns_names_aodn(data=all_new_data_df)
             all_new_data_df = wb.sort_datetimes(data=all_new_data_df)
@@ -229,9 +181,8 @@ if __name__ == "__main__":
 
             if nc_files_available:
                 if not previous_data_df.empty:
-                    # TEMPORARY SETUP
-                    previous_data_df["processing_source"] = "embedded"
-                    # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
+                    if vargs.flag_previous_new:
+                        previous_data_df["processing_source"] = "embedded"
                     all_data_df = wb.concat_previous_new(previous_data=previous_data_df,
                                                     new_data=all_new_data_df)
                     SITE_LOGGER.info("concatenate new data with previous since available")
@@ -387,6 +338,6 @@ if __name__ == "__main__":
         GENERAL_LOGGER.info(f"=========== {site.name.upper()} successfully processed. ===========")
 
 
-
-
+if __name__ == "__main__":
+    main()
 
