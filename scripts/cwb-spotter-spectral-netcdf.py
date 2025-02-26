@@ -8,7 +8,7 @@ from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
 from wavebuoy_nrt.qc.qcTests import WaveBuoyQC
 from wavebuoy_nrt.netcdf.writer import ncWriter, ncAttrsComposer, ncAttrsExtractor, ncProcessor, ncMetaDataLoader
-from wavebuoy_nrt.utils import args, IMOSLogging, generalTesting
+from wavebuoy_nrt.utils import args_processing, IMOSLogging, generalTesting
 
 
 load_dotenv()
@@ -17,7 +17,7 @@ load_dotenv()
 if __name__ == "__main__":
 
     # Args handling
-    vargs = args()
+    vargs = args_processing()
 
     # Start general logging
     
@@ -61,7 +61,8 @@ if __name__ == "__main__":
 
             nc_files_available = wb.get_available_nc_files(site_id=site.name,
                                                            files_path=vargs.incoming_path,
-                                                           deployment_metadata=deployment_metadata)
+                                                           deployment_metadata=deployment_metadata,
+                                                           parameters_type="spectral")
             SITE_LOGGER.info(f"available nc files: {nc_files_available}")
 
             if nc_files_available:
@@ -75,7 +76,8 @@ if __name__ == "__main__":
 
                 latest_nc_file_available = wb.get_latest_nc_file_available(deployment_metadata=deployment_metadata,
                                                                            site_id=site.name,
-                                                                           files_path=vargs.incoming_path)
+                                                                           files_path=vargs.incoming_path,
+                                                                           parameters_type="spectral")
                 SITE_LOGGER.info(f"latest_nc_file_available: {latest_nc_file_available}")
 
                 latest_processed_time = wb.get_latest_processed_time(nc_file_path=latest_nc_file_available)
