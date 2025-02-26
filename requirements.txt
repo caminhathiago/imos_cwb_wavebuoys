@@ -15,5 +15,6 @@ boto3
 awscli
 pytest
 openpyxl
+ioos_qc
 
 # install plugins with conda 'netcdf4', 'h5netcdf', 'scipy'
