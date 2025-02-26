@@ -16,7 +16,7 @@ GENERAL_LOGGER = logging.getLogger("general_logger")
 SITE_LOGGER = logging.getLogger("site_logger")
 
 
-def args():
+def args_processing():
     """
     Returns the script arguments
 
@@ -104,6 +104,41 @@ def args():
         flag_previous_new = True
     else:
         flag_previous_new = False
+
+    return vargs
+
+def args_pushing():
+    parser = argparse.ArgumentParser(description="pushes files to AODN FTP server. ")
+    
+    parser.add_argument('-o', '--output-path', dest='output_path', type=str, default=None,
+                        help="output directory of netcdf file",
+                        required=True)
+    
+    parser.add_argument('-i', '--incoming-path', dest='incoming_path', type=str, default=None,
+                        help="directory to store netcdf file to be pushed to AODN",
+                        required=True)
+    
+    parser.add_argument('-lh', '--lookback-hours', dest='lookback_hours', type=str, default=1,
+                        help="desired window from present backwards to be processed and qualified. Default to 24, please check argument --window-unit for the right desired unit.",
+                        required=False)
+
+    vargs = parser.parse_args()
+
+    if not os.path.exists(vargs.output_path):
+        try:
+            os.makedirs(vargs.output_path)
+        except Exception:
+            raise ValueError('{path} not a valid path'.format(path=vargs.output_path))
+            sys.exit(1)
+
+    if not os.path.exists(vargs.incoming_path):
+        try:
+            os.makedirs(vargs.incoming_path)
+        except Exception:
+            raise ValueError('{path} not a valid path'.format(path=vargs.incoming_path))
+            sys.exit(1)
+
+    vargs.lookback_hours = int(vargs.lookback_hours)
 
     return vargs
 
