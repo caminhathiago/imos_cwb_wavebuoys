@@ -26,6 +26,32 @@ class ncMetaDataLoader:
     def __init__(self, buoys_metadata: pd.DataFrame):
         self.buoys_metadata = buoys_metadata
 
+    def load_buoys_metadata(self, buoy_type:str):
+        try:
+            file_path = os.path.join(IRDS_PATH, "Data", "website", "auswaves", "buoys_metadata.csv")
+            if not os.path.exists(file_path):
+                raise FileNotFoundError("No such directory for buoys metadata: {}")
+           
+            buoys_metadata = pd.read_csv(file_path)
+            
+            buoys_metadata = buoys_metadata.loc[buoys_metadata["type"] == buoy_type]
+            
+            buoys_metadata["region"] = (buoys_metadata['archive_path']
+                                    .str.extract(r'\\auswaves\\([a-z]+)waves')[0]
+                                    .str.upper())
+            
+            buoys_metadata = buoys_metadata.set_index('name')
+            
+            name_constraint = "drift".upper()
+            indexes = [index for index in buoys_metadata.index if name_constraint not in index.upper()]
+            buoys_metadata = buoys_metadata.loc[indexes]
+            
+            return buoys_metadata
+
+        except:
+            error_message = "Loading and processing buoys_metadata.csv unsuccessful. Check if the file is corrupted or if its structure has been changed"
+
+
     def _get_deployment_metadata_region_folders(self, site_name: str) -> list:
         region_folder = self.buoys_metadata.loc[site_name, "region"].lower()
         region_folder += "waves"
@@ -90,8 +116,6 @@ class ncMetaDataLoader:
             error_message = "At least one of the deployment metadata files name is not conforming with the expected template (metadata_{site_name}_deploy{YYYYmmdd}.xlsx). Make sure all of them are conforming."
             SITE_LOGGER.error(error_message)
             raise NameError(error_message)
-        
-
 
     def load_latest_deployment_metadata(self, site_name:str) -> pd.DataFrame:
         region_folder = self._get_deployment_metadata_region_folders(site_name=site_name)
