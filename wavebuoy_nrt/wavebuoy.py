@@ -9,7 +9,7 @@ import numpy as np
 from wavebuoy_nrt.processor.spotter import SpotterWaveBuoy
 from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
 from wavebuoy_nrt.config.config import FILES_PATH, AODN_COLUMNS_TEMPLATE, IRDS_PATH
-from wavebuoy_nrt.utils import args, FilesHandler
+from wavebuoy_nrt.utils import FilesHandler
 
 GENERAL_LOGGER = logging.getLogger("general_logger")
 SITE_LOGGER = logging.getLogger("site_logger")
