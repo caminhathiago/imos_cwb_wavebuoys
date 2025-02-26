@@ -275,14 +275,19 @@ class SofarAPI:
             print(f"Unsuccessfull API call, status {response.status_code}")
             return
 
-    def get_latest_available_time(self, spot_id: str, token: str, dataset_type: str = "waves") -> datetime:
+    def get_latest_available_time(self, spot_id: str, token: str, dataset_type: str = "bulk") -> datetime:
         """
         CONSIDER SMART MOORING
         """
         latest_data = self.get_latest_data(spot_id=spot_id, token=token)
         SITE_LOGGER.warning(latest_data)
         # return latest_data[dataset_type]
-        latest_available_time = latest_data[dataset_type][-1]["timestamp"]
+        if dataset_type == "bulk":
+            parameters_type = "waves"
+        elif dataset_type == "spectral":
+            parameters_type = "frequencyData"
+
+        latest_available_time = latest_data[parameters_type][-1]["timestamp"]
 
         # try:
         #     latest_available_time = latest_data["waves"][-1]["timestamp"]
