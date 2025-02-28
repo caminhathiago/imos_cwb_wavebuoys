@@ -204,6 +204,21 @@ class IMOSLogging:
             os.rename(file_path, new_file_name)
         GENERAL_LOGGER.info(f"{site_name} log file renamed as {new_file_name}")
 
+    def rename_push_log_if_error(self, file_path: str, add_runtime: bool = True):
+        runtime = datetime.now().strftime("%Y%m%dT%H%M%S")
+        pattern = "aodn_ftp_push"
+        new_name = f"ERROR_aodn_ftp_push"
+        if add_runtime:
+            new_name += f"_{runtime}"
+
+        new_file_name = re.sub(pattern, new_name, file_path)
+        if os.path.exists(new_file_name):
+            os.replace(file_path, new_file_name)
+        else:
+            os.rename(file_path, new_file_name)
+
+        return os.path.join(file_path, new_file_name)
+
 class generalTesting:
     
     @staticmethod
