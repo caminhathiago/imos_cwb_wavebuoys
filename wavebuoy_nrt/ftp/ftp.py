@@ -2,8 +2,11 @@ import os
 from datetime import datetime, timedelta
 import ssl
 import ftplib
+import logging
 
 import glob
+
+LOGGER = logging.getLogger("aodn_ftp_push_logger")
 
 class ncPusher:
     def __init__(self,
@@ -40,7 +43,11 @@ class ncPusher:
         return self._ftp.dir()
 
     def _start_server(self):
-        return MyFTP_TLS(timeout=30, context=self._context)
+        try:
+            return MyFTP_TLS(timeout=30, context=self._context)
+        except Exception as e:
+            LOGGER.error(str(e), exc_info=True)
+            raise e
     
     def _connect(self, port=21):
         return self._ftp.connect(host= self._host, port=port)
@@ -49,15 +56,29 @@ class ncPusher:
         return self._ftp.auth()
     
     def _login(self):
-        return self._ftp.login(self._user, self._password)
+        try:
+            return self._ftp.login(self._user, self._password)
+        except Exception as e:
+            # LOGGER.error(str(e), exc_info=True)
+            raise e
+            
     
     def _secure_data_connection(self):
-        return self._ftp.prot_p()
+        self._ftp.prot_p()
+        LOGGER.info("data transter properly secured with 'ftp.prot_p()'")
 
     def _configure_server(self):
-        self._connect()
-        self._auth()
-        self._login()
+        try:
+            self._connect()
+            LOGGER.info("connected to server")
+            self._auth()
+            LOGGER.info("connection authenticated")
+            self._login()
+            LOGGER.info("login successful")
+        except Exception as e:
+            # LOGGER.error(str(e), exc_info=True)
+            raise e
+            
 
     def change_dir(self, path: str):
         self._secure_data_connection()
@@ -122,6 +143,20 @@ class ncPusher:
     def check_size(self, file1_name: str, file2_name: str) -> bool:
         return self._ftp.size(file1_name) == self._ftp.size(file2_name)
     
+    def create_files_report(self) -> dict:
+        return {"files_pushed":[], "files_error":[]}
+    
+    def update_files_report(self, files_report: dict, file: dict, error: bool = False, exception = None) -> dict:
+        if not error:
+            files_report["files_pushed"].append(file["file_name"])
+        elif error:
+            if exception:
+                files_report["files_error"].append({"file_name": file["file_name"],
+                                        "error": str(exception)})
+            else:
+                raise Exception("Exception not provided.")
+            
+
 
 class MyFTP_TLS(ftplib.FTP_TLS):
     """Explicit FTPS, with shared TLS session"""
