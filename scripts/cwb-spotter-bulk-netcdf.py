@@ -140,7 +140,7 @@ def main():
                                             end_date=window_end_date,
                                             processing_sources="embedded")
 
-            generalTesting().generate_pickle_file(data=new_raw_data, file_name="new_data_raw", site_name=site.name)
+            # generalTesting().generate_pickle_file(data=new_raw_data, file_name="new_data_raw", site_name=site.name)
             # new_raw_data = generalTesting().open_pickle_file(file_name=f"{site.name}_new_data_raw")
             # SITE_LOGGER.info(f"raw spotter data extracted from Sofar API\n {pd.DataFrame(new_raw_data["waves"])}")
             # print(new_raw_data)
@@ -163,7 +163,7 @@ def main():
             if new_raw_data["surfaceTemp"]:
                 temp = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
                 temp = wb.convert_to_datetime(data=temp)
-                generalTesting().generate_pickle_file(data=temp, file_name="surfaceTemp_new_data", site_name=site.name)
+                # generalTesting().generate_pickle_file(data=temp, file_name="surfaceTemp_new_data", site_name=site.name)
                 SITE_LOGGER.info(f"temp data converted to DataFrame and pre-processed if exists")
 
                 all_new_data_df = wb.merge_parameter_types(waves=waves,
@@ -192,9 +192,9 @@ def main():
                 all_data_df = all_new_data_df
             
             # TEMPORARY SETUP (REMOVE WHEN DONE)
-            csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_output.csv")
-            all_data_df.reset_index().to_csv(csv_file_path, index=False)
-            SITE_LOGGER.info(f"processed data saved as '{csv_file_path}'")
+            # csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_output.csv")
+            # all_data_df.reset_index().to_csv(csv_file_path, index=False)
+            # SITE_LOGGER.info(f"processed data saved as '{csv_file_path}'")
             
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
             
@@ -231,9 +231,9 @@ def main():
             # qualified_data_summarized = qc.summarize_flags(data=qualified_data, parameter_type="waves")
 
             # TEMPORARY SETUP (REMOVE WHEN DONE)
-            csv_file_path_embedded = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_qualified_embedded.csv")
-            qualified_data_embedded.to_csv(csv_file_path_embedded, index=False)
-            SITE_LOGGER.info(f"qualified data saved as '{csv_file_path_embedded}'")
+            # csv_file_path_embedded = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_qualified_embedded.csv")
+            # qualified_data_embedded.to_csv(csv_file_path_embedded, index=False)
+            # SITE_LOGGER.info(f"qualified data saved as '{csv_file_path_embedded}'")
 
             # if not all_data_hdr.empty:
             #     csv_file_path_hdr = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_qualified_hdr.csv")

@@ -168,9 +168,9 @@ if __name__ == "__main__":
                     SITE_LOGGER.info("concatenate new data with previous since available")
             
             # TEMPORARY SETUP (REMOVE WHEN DONE)
-            csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_output.csv")
-            spectra.reset_index().to_csv(csv_file_path, index=False)
-            SITE_LOGGER.info(f"processed data saved as '{csv_file_path}'")
+            # csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_output.csv")
+            # spectra.reset_index().to_csv(csv_file_path, index=False)
+            # SITE_LOGGER.info(f"processed data saved as '{csv_file_path}'")
 
             
 
