@@ -276,9 +276,7 @@ class SofarAPI:
             return
 
     def get_latest_available_time(self, spot_id: str, token: str, dataset_type: str = "bulk") -> datetime:
-        """
-        CONSIDER SMART MOORING
-        """
+      
         latest_data = self.get_latest_data(spot_id=spot_id, token=token)
         SITE_LOGGER.warning(latest_data)
         # return latest_data[dataset_type]
@@ -287,7 +285,18 @@ class SofarAPI:
         elif dataset_type == "spectral":
             parameters_type = "frequencyData"
 
-        latest_available_time = latest_data[parameters_type][-1]["timestamp"]
+        SITE_LOGGER.warning("LATEST DATA:")
+        SITE_LOGGER.warning(latest_data)
+
+
+        if latest_data[parameters_type]:
+            latest_available_time = latest_data[parameters_type][-1]["timestamp"]
+        elif latest_data["track"]:
+            latest_available_time = latest_data["track"][-1]["timestamp"]
+        else:
+            message = f"Latest data empty for {parameters_type} and track. Probably spotter is under a gap"
+            SITE_LOGGER.warning(message)
+            raise Exception(message)
 
         # try:
         #     latest_available_time = latest_data["waves"][-1]["timestamp"]
