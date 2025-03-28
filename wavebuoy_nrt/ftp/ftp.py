@@ -112,20 +112,16 @@ class ncPusher:
         
         file_times = []
         for file_path in file_paths:
-            creation_date_time = datetime.fromtimestamp(os.path.getctime(file_path))
-            modification_date_time = datetime.fromtimestamp(os.path.getmtime(file_path))
-
             file_times.append({"file_name": os.path.basename(file_path),
-                                "creation_time": creation_date_time, 
-                               "modification_time": modification_date_time,
-                               "file_path": file_path})
+                                "creation_time": datetime.fromtimestamp(os.path.getctime(file_path)), 
+                                "modification_time": datetime.fromtimestamp(os.path.getmtime(file_path)),
+                                "file_path": file_path})
 
-        current_time = datetime.now()
-        last_hour_time = current_time - timedelta(hours=lookback_hours)
+        lookback_time = datetime.now() - timedelta(hours=lookback_hours)
 
         files_to_push = []
         for file_time in file_times:
-            if file_time["creation_time"] > last_hour_time or file_time["modification_time"] > last_hour_time:
+            if file_time["creation_time"] > lookback_time or file_time["modification_time"] > lookback_time:
                 files_to_push.append(file_time)
 
         return tuple(files_to_push)
