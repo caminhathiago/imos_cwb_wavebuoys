@@ -61,6 +61,7 @@ class NetCDFFileHandler():
                             site_id: str, 
                             latest_available_datetime: datetime,
                             #minimum_datetime_recursion:datetime=datetime(2020,1,1), # This should be less than the minimum Datetime of the first spotter we ever deployed
+                            incoming_path: str,
                             window: int=24,
                             window_unit: str="hours",
                             data_type: str = "bulk") -> str:
@@ -86,9 +87,9 @@ class NetCDFFileHandler():
         for month in monthly_daterange:
             nc_file_name = file_name_template.format(operating_institution=operating_institution,# Temporary data
                                                 monthly_datetime=month.strftime("%Y%m%d"),
-                                                site_id=site_id.upper())
+                                                site_id=site_id.replace("_","").upper())
             print(nc_file_name)
-            nc_file_path = os.path.join(FILES_OUTPUT_PATH, nc_file_name)
+            nc_file_path = os.path.join(incoming_path, nc_file_name)
             nc_file_paths_needed.append(nc_file_path)
 
         return nc_file_paths_needed
@@ -134,9 +135,9 @@ class NetCDFFileHandler():
         #                                             site_id=site_id.upper())
         
         if parameters_type == "bulk":
-            nc_file_filter = f"*{site_id.upper()}_RT_WAVE-PARAMETERS*.nc"
+            nc_file_filter = f"*{site_id.replace("_","").upper()}_RT_WAVE-PARAMETERS*.nc"
         elif parameters_type == "spectral":
-            nc_file_filter = f"*{site_id.upper()}_RT_SPECTRAL*.nc"
+            nc_file_filter = f"*{site_id.replace("_","").upper()}_RT_SPECTRAL*.nc"
         else:
             error = "Please select a valid data type: 'bulk' or 'spectral'"
             SITE_LOGGER.error(error)
