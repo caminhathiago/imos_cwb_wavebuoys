@@ -12,6 +12,7 @@ from wavebuoy_nrt.sofar.api import SofarAPI
 from wavebuoy_nrt.qc.qcTests import WaveBuoyQC
 from wavebuoy_nrt.netcdf.writer import ncWriter, ncAttrsComposer, ncAttrsExtractor, ncProcessor, ncMetaDataLoader
 from wavebuoy_nrt.utils import args_processing, IMOSLogging, generalTesting
+from wavebuoy_nrt.alerts.email import Email
 
 
 load_dotenv()
@@ -23,8 +24,7 @@ def main():
     vargs = args_processing()
 
     # Start general logging
-    
-    general_log_file = os.path.join(vargs.output_path, "logs", f"general_process.log") # f"{runtime}_general_process.log"
+    general_log_file = os.path.join(vargs.output_path, "logs", f"general_{os.path.basename(__file__).removesuffix(".py")}.log") # f"{runtime}_general_process.log"
     GENERAL_LOGGER = IMOSLogging().logging_start(logger_name="general_logger",
                                                 logging_filepath=general_log_file)
 
@@ -34,14 +34,18 @@ def main():
     
     # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
     # "MtEliza", "Hillarys", "Central"
-    wb.buoys_metadata = wb.buoys_metadata.loc[["Hillarys"]].copy()
+    # wb.buoys_metadata = wb.buoys_metadata.loc[["Central"]].copy()#,"Hillarys", "Central", "Hillarys_HSM", "JurienBayInshore", "NorthKangarooIsland", "TorbayWest", "MtEliza"]].copy()
+    # wb.buoys_metadata = wb.buoys_metadata.loc[["CapeBridgewater", "Hillarys_HSM", "TorbayWest_HSM", "CapeBridgewater_HSM"]].copy()
+    
     # END OF TEMPORARY SETUP
+    
+    sites_error_logs = []
 
     for idx, site in wb.buoys_metadata.iterrows():
         
         GENERAL_LOGGER.info(f"=========== {site.name.upper()} processing ===========")
 
-        site_log_file = os.path.join(vargs.output_path, "logs", f"{site.name.upper()}_run.log") # f"{runtime}_[CURRENT_SITE]_process.log
+        site_log_file = os.path.join(vargs.incoming_path, "logs", f"{site.name.upper()}_{os.path.basename(__file__).removesuffix(".py")}.log") # f"{runtime}_[CURRENT_SITE]_process.log
         SITE_LOGGER = IMOSLogging().logging_start(logger_name="site_logger", logging_filepath=site_log_file)
         
         GENERAL_LOGGER.info(f"{site.name.upper()} log file created as {site_log_file}")
@@ -53,13 +57,15 @@ def main():
             
             meta_data_loader = ncMetaDataLoader(buoys_metadata=wb.buoys_metadata)
             deployment_metadata = meta_data_loader.load_latest_deployment_metadata(site_name=site.name)
+            regional_metadata = meta_data_loader.load_regional_metadata()
+
 
             latest_available_time = sofar_api.get_latest_available_time(spot_id=site.serial, token=site.sofar_token)
             SITE_LOGGER.info(f"grabed latest_available_time: {latest_available_time}")
 
             window_start_time = wb.generate_window_start_time(latest_available_datetime=latest_available_time,
-                                                                window=int(vargs.window),
-                                                                window_unit=vargs.window_unit)
+                                                            window=int(vargs.window),
+                                                            window_unit=vargs.window_unit)
             SITE_LOGGER.info(f"window start generated as {latest_available_time} minus {vargs.window} {vargs.window_unit}: {window_start_time}")
 
             nc_files_available = wb.get_available_nc_files(site_id=site.name,
@@ -74,6 +80,7 @@ def main():
                                                             latest_available_datetime=latest_available_time,
                                                             window=int(vargs.window),
                                                             window_unit=vargs.window_unit,
+                                                            incoming_path=vargs.incoming_path,
                                                             data_type="bulk")
                 SITE_LOGGER.info(f"nc files needed based on defined window: {nc_files_needed}")
 
@@ -102,7 +109,7 @@ def main():
                     earliest_nc_file_available = wb.get_earliest_nc_file_available(deployment_metadata=deployment_metadata,
                                                                                 site_id=site.name,
                                                                                 files_path=vargs.incoming_path)
-                    earliest_available_time = wb.get_earliest_processed_time(nc_file_path=latest_nc_file_available)
+                    earliest_available_time = wb.get_earliest_processed_time(nc_file_path=earliest_nc_file_available)
                     
                     if window_start_time < earliest_available_time:
                         SITE_LOGGER.info("desired window start time is older than earliest available time, extract new data and overwrite all available nc files.")
@@ -140,10 +147,10 @@ def main():
                                             end_date=window_end_date,
                                             processing_sources="embedded")
 
-            # generalTesting().generate_pickle_file(data=new_raw_data, file_name="new_data_raw", site_name=site.name)
+            generalTesting().generate_pickle_file(data=new_raw_data, file_name="new_data_raw", site_name=site.name)
             # new_raw_data = generalTesting().open_pickle_file(file_name=f"{site.name}_new_data_raw")
             # SITE_LOGGER.info(f"raw spotter data extracted from Sofar API\n {pd.DataFrame(new_raw_data["waves"])}")
-            # print(new_raw_data)
+            print(new_raw_data)
             # print("======================")
             # if not new_raw_data:
             #     SITE_LOGGER.info("No data for the desired period. Aborting processing for this site")
@@ -160,18 +167,20 @@ def main():
             waves = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="waves")
             waves = wb.convert_to_datetime(data=waves)          
 
-            if new_raw_data["surfaceTemp"]:
-                temp = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
-                temp = wb.convert_to_datetime(data=temp)
-                # generalTesting().generate_pickle_file(data=temp, file_name="surfaceTemp_new_data", site_name=site.name)
-                SITE_LOGGER.info(f"temp data converted to DataFrame and pre-processed if exists")
+            # if new_raw_data["surfaceTemp"]:
+            #     temp = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
+            #     temp = wb.convert_to_datetime(data=temp)
+            #     # generalTesting().generate_pickle_file(data=temp, file_name="surfaceTemp_new_data", site_name=site.name)
+            #     SITE_LOGGER.info(f"temp data converted to DataFrame and pre-processed if exists")
 
-                all_new_data_df = wb.merge_parameter_types(waves=waves,
-                                                       temp=temp,
-                                                       consider_processing_source=True)
-            else:
-                all_new_data_df = waves.copy()
+            #     all_new_data_df = wb.merge_parameter_types(waves=waves,
+            #                                            temp=temp,
+            #                                            consider_processing_source=True,
+            #                                            how='outer')
+            # else:
+            #     all_new_data_df = waves.copy()
             
+            all_new_data_df = waves.copy()
             all_new_data_df = wb.create_timeseries_aodn_column(data=all_new_data_df)
             all_new_data_df = wb.conform_columns_names_aodn(data=all_new_data_df)
             all_new_data_df = wb.sort_datetimes(data=all_new_data_df)
@@ -182,7 +191,7 @@ def main():
             if nc_files_available:
                 if not previous_data_df.empty:
                     if vargs.flag_previous_new:
-                        previous_data_df["processing_source"] = "embedded"
+                        previous_data_df["processing_source"] = "prev"
                     all_data_df = wb.concat_previous_new(previous_data=previous_data_df,
                                                     new_data=all_new_data_df)
                     SITE_LOGGER.info("concatenate new data with previous since available")
@@ -192,9 +201,9 @@ def main():
                 all_data_df = all_new_data_df
             
             # TEMPORARY SETUP (REMOVE WHEN DONE)
-            # csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_output.csv")
-            # all_data_df.reset_index().to_csv(csv_file_path, index=False)
-            # SITE_LOGGER.info(f"processed data saved as '{csv_file_path}'")
+            csv_file_path = os.path.join(vargs.incoming_path, "test_files", f"{site.name.lower()}_all_data_df_output.csv")
+            all_data_df.reset_index().to_csv(csv_file_path, index=False)
+            SITE_LOGGER.info(f"processed data saved as '{csv_file_path}'")
             
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
             
@@ -206,34 +215,34 @@ def main():
 
             all_data_df = qc.create_global_qc_columns(data=all_data_df)
             
-            all_data_hdr = wb.select_processing_source(data=all_data_df, processing_source="hdr")
-            all_data_embedded = wb.select_processing_source(data=all_data_df, processing_source="embedded")
+            # all_data_hdr = wb.select_processing_source(data=all_data_df, processing_source="hdr")
+            # all_data_embedded = wb.select_processing_source(data=all_data_df, processing_source="embedded")
 
-            qc.load_data(data=all_data_embedded)
-            parameters_to_qc = qc.get_parameters_to_qc(data=all_data_embedded, qc_config=qc.qc_config)      
-            qualified_data_embedded = qc.qualify(data=all_data_embedded,
+            qc.load_data(data=all_data_df)
+            parameters_to_qc = qc.get_parameters_to_qc(data=all_data_df, qc_config=qc.qc_config)      
+            qualified_data_embedded = qc.qualify(data=all_data_df,
                                         parameters=parameters_to_qc,
                                         gross_range_test=True,
                                         rate_of_change_test=True)
             
 
-            if not all_data_hdr.empty:
-                qc = WaveBuoyQC(config_id=1)
-                qc.load_data(data=all_data_hdr)
-                parameters_to_qc = qc.get_parameters_to_qc(data=all_data_hdr, qc_config=qc.qc_config)      
-                qualified_data_hdr = qc.qualify(data=all_data_hdr,
-                                            parameters=parameters_to_qc,
-                                            gross_range_test=True,
-                                            rate_of_change_test=True)
+            # if not all_data_hdr.empty:
+            #     qc = WaveBuoyQC(config_id=1)
+            #     qc.load_data(data=all_data_hdr)
+            #     parameters_to_qc = qc.get_parameters_to_qc(data=all_data_hdr, qc_config=qc.qc_config)      
+            #     qualified_data_hdr = qc.qualify(data=all_data_hdr,
+            #                                 parameters=parameters_to_qc,
+            #                                 gross_range_test=True,
+            #                                 rate_of_change_test=True)
 
             SITE_LOGGER.info("Qualification successfull")
 
             # qualified_data_summarized = qc.summarize_flags(data=qualified_data, parameter_type="waves")
 
             # TEMPORARY SETUP (REMOVE WHEN DONE)
-            # csv_file_path_embedded = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_qualified_embedded.csv")
-            # qualified_data_embedded.to_csv(csv_file_path_embedded, index=False)
-            # SITE_LOGGER.info(f"qualified data saved as '{csv_file_path_embedded}'")
+            csv_file_path_embedded = os.path.join(vargs.incoming_path, "test_files", f"{site.name.lower()}_qualified_embedded.csv")
+            qualified_data_embedded.to_csv(csv_file_path_embedded, index=False)
+            SITE_LOGGER.info(f"qualified data saved as '{csv_file_path_embedded}'")
 
             # if not all_data_hdr.empty:
             #     csv_file_path_hdr = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_qualified_hdr.csv")
@@ -245,7 +254,9 @@ def main():
             SITE_LOGGER.info("NC FILE PROCESSING STEP ====================================")
 
             nc_writer = ncWriter(buoy_type="sofar")
-            nc_attrs_composer = ncAttrsComposer(buoys_metadata=wb.buoys_metadata, deployment_metadata=deployment_metadata)
+            nc_attrs_composer = ncAttrsComposer(buoys_metadata=wb.buoys_metadata,
+                                                deployment_metadata=deployment_metadata,
+                                                regional_metadata=regional_metadata)
 
             # embedded dataset
             ds_embedded = ncProcessor.compose_dataset(data=qualified_data_embedded)
@@ -283,39 +294,39 @@ def main():
             SITE_LOGGER.info(f"embedded nc files saved to the output path as {nc_file_names_embedded}")
             
             
-            if not all_data_hdr.empty:
-                ds_hdr = ncProcessor.compose_dataset(data=qualified_data_hdr)
-                SITE_LOGGER.info("hdr dataset composed")
+            # if not all_data_hdr.empty:
+            #     ds_hdr = ncProcessor.compose_dataset(data=qualified_data_hdr)
+            #     SITE_LOGGER.info("hdr dataset composed")
 
-                ds_hdr = nc_attrs_composer.assign_general_attributes(dataset=ds_hdr, site_name=site.name)
-                SITE_LOGGER.info("general attributes assigned to embedded dataset")
+            #     ds_hdr = nc_attrs_composer.assign_general_attributes(dataset=ds_hdr, site_name=site.name)
+            #     SITE_LOGGER.info("general attributes assigned to embedded dataset")
                 
-                ds_embedded = ncProcessor.create_timeseries_variable(dataset=ds_embedded)
-                SITE_LOGGER.info("time series variable created in embedded dataset")
+            #     ds_embedded = ncProcessor.create_timeseries_variable(dataset=ds_embedded)
+            #     SITE_LOGGER.info("time series variable created in embedded dataset")
 
-                periods_hdr = ncProcessor.extract_monthly_periods_dataset(dataset=ds_hdr)
-                ds_objects_hdr = ncProcessor.split_dataset_monthly(dataset=ds_hdr, periods=periods_hdr)
-                SITE_LOGGER.info(f"combined dataset split monthly for periods {periods_hdr}")
+            #     periods_hdr = ncProcessor.extract_monthly_periods_dataset(dataset=ds_hdr)
+            #     ds_objects_hdr = ncProcessor.split_dataset_monthly(dataset=ds_hdr, periods=periods_hdr)
+            #     SITE_LOGGER.info(f"combined dataset split monthly for periods {periods_hdr}")
                 
-                ds_objects_hdr = ncProcessor.process_time_to_CF_convention(dataset_objects=ds_objects_hdr)
-                SITE_LOGGER.info("dataset objects time dimension processed to conform to CF conventions")
+            #     ds_objects_hdr = ncProcessor.process_time_to_CF_convention(dataset_objects=ds_objects_hdr)
+            #     SITE_LOGGER.info("dataset objects time dimension processed to conform to CF conventions")
                 
-                ds_objects_hdr = nc_attrs_composer.assign_variables_attributes_dataset_objects(dataset_objects=ds_objects_hdr)
-                SITE_LOGGER.info("variables attributes assigned to datasets")
+            #     ds_objects_hdr = nc_attrs_composer.assign_variables_attributes_dataset_objects(dataset_objects=ds_objects_hdr)
+            #     SITE_LOGGER.info("variables attributes assigned to datasets")
                 
-                ds_objects_hdr = ncProcessor.convert_dtypes(dataset_objects=ds_objects_hdr)
-                SITE_LOGGER.info("variables dtypes converted and now conforming to template")
+            #     ds_objects_hdr = ncProcessor.convert_dtypes(dataset_objects=ds_objects_hdr)
+            #     SITE_LOGGER.info("variables dtypes converted and now conforming to template")
 
-                nc_file_names_hdr = nc_writer.compose_file_names(
-                                            site_id=site.name.upper(),
-                                            periods=periods_hdr,
-                                            deployment_metadata=deployment_metadata)
-                nc_file_names_hdr = nc_writer.compose_file_names_processing_source(file_names=nc_file_names_hdr,
-                                                                                    processing_source="hdr")           
-                nc_writer.save_nc_file(output_path=vargs.incoming_path,
-                                    file_names=nc_file_names_hdr,
-                                    dataset_objects=ds_objects_hdr)
-                SITE_LOGGER.info(f"hdr nc files saved to the output path as {nc_file_names_hdr}")
+            #     nc_file_names_hdr = nc_writer.compose_file_names(
+            #                                 site_id=site.name.upper(),
+            #                                 periods=periods_hdr,
+            #                                 deployment_metadata=deployment_metadata)
+            #     nc_file_names_hdr = nc_writer.compose_file_names_processing_source(file_names=nc_file_names_hdr,
+            #                                                                         processing_source="hdr")           
+            #     nc_writer.save_nc_file(output_path=vargs.incoming_path,
+            #                         file_names=nc_file_names_hdr,
+            #                         dataset_objects=ds_objects_hdr)
+            #     SITE_LOGGER.info(f"hdr nc files saved to the output path as {nc_file_names_hdr}")
 
 
             GENERAL_LOGGER.info(f"Processing successful")
@@ -329,11 +340,19 @@ def main():
             # Closing current site logging
             site_logger_file_path = imos_logging.get_log_file_path(SITE_LOGGER)
             imos_logging.logging_stop(logger=SITE_LOGGER)
-            if e:
-                imos_logging.rename_log_file_if_error(site_name=site.name, file_path=site_logger_file_path,
-                                                      add_runtime=False)
+            error_logger_file_path = imos_logging.rename_log_file_if_error(site_name=site.name,
+                                                                           file_path=site_logger_file_path,
+                                                                            script_name=os.path.basename(__file__).removesuffix(".py"),
+                                                                            add_runtime=False)
+            sites_error_logs.append(error_logger_file_path)
             
             continue
+
+    if sites_error_logs:
+        e = Email(script_name=os.path.basename(__file__),
+                  email=os.getenv("EMAIL_TO"),
+                  log_file_path=sites_error_logs)
+        # e.send()
 
         GENERAL_LOGGER.info(f"=========== {site.name.upper()} successfully processed. ===========")
 
