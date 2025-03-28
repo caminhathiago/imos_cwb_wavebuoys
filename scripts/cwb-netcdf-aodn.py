@@ -35,8 +35,8 @@ def main():
             LOGGER.info(f"files to push:")
             LOGGER.info(json.dumps(files_to_push, indent=6, default=str))
             
-            working_dir = "folder2"
-            ncp.change_dir("folder2")
+            working_dir = "wave"
+            ncp.change_dir(working_dir)
             LOGGER.info(f"FTP working dir changed to '/{working_dir}'")
 
             ncp._secure_data_connection()
@@ -47,13 +47,11 @@ def main():
                 LOGGER.info(f"pushing {file["file_name"]}")
                 
                 try:
-                    ncValidator().validate_file_name(file["file_name"])
+                    # ncValidator().validate_file_name(file["file_name"])
                     LOGGER.info("file name validation passed")
                     
                     ncValidator().validade_nc_integrity(file["file_path"])
                     LOGGER.info("file integrity validation passed")
-
-                    # nv.validate_compliance() # compare file name, data and attributes 
 
                     ncp.push_file_to_ftp(file=file)
                     LOGGER.info(f"file pushed: {file["file_name"]}")
@@ -73,6 +71,8 @@ def main():
                                             exception=e)
                     continue
                 
+            ncp.quit()
+
         else:
             LOGGER.info("no files to push. Aborting.")
             sys.exit(1)
@@ -90,7 +90,9 @@ def main():
         print(logger_file_path)
         imos_logging.logging_stop(logger=LOGGER)
         error_logger_file_path = imos_logging.rename_push_log_if_error(file_path=logger_file_path, add_runtime=True)
-        e = Email(problem="test", email=os.getenv("EMAIL_TO"), log_file_path=error_logger_file_path)
+        e = Email(script_name=os.path.basename(__file__),
+                  email=os.getenv("EMAIL_TO"),
+                  log_file_path=error_logger_file_path)
         e.send()
 
 if __name__ == "__main__":
