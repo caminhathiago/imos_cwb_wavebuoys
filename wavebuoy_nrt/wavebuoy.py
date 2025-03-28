@@ -33,7 +33,7 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
             buoys_metadata = self._select_buoy_type(buoy_type=buoy_type, buoys_metadata=buoys_metadata)
             buoys_metadata["region"] = self._get_regions(buoys_metadata=buoys_metadata)
             buoys_metadata = buoys_metadata.set_index('name')
-            # buoys_metadata = self._exclude_drifters(buoys_metadata=buoys_metadata)
+            buoys_metadata = self._exclude_drifters(buoys_metadata=buoys_metadata)
             GENERAL_LOGGER.info("Buoys metadata grabbed successfully")
             return buoys_metadata
 
