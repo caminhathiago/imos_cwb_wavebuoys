@@ -227,9 +227,6 @@ class WaveBuoyQC():
 
 
         parameter_type_qc_columns = data.filter(regex=qc_col_prefix).columns
-
-        SITE_LOGGER.warning(f"SUMMARIZE: {data.columns}")
-        SITE_LOGGER.warning(f"SUMMARIZE: {parameter_type_qc_columns}")
         
         if parameter_type_qc_columns.empty:
             return data
@@ -245,7 +242,6 @@ class WaveBuoyQC():
     def drop_parameters_qc_columns(self, data: pd.DataFrame, qc_col_prefix: str) -> pd.DataFrame:
         qc_columns = data.filter(regex=qc_col_prefix).columns
         parameters_qc_columns = [col for col in qc_columns if not col.endswith("_quality_control")]
-        SITE_LOGGER.warning(f"DROP PARAMETERS: {parameters_qc_columns}")
         return data.drop(columns=parameters_qc_columns)
 
     def create_global_qc_columns(self, data: pd.DataFrame) -> pd.DataFrame:
