@@ -9,19 +9,17 @@ from wavebuoy_nrt.sofar.api import SofarAPI
 from wavebuoy_nrt.qc.qcTests import WaveBuoyQC
 from wavebuoy_nrt.netcdf.writer import ncWriter, ncAttrsComposer, ncAttrsExtractor, ncProcessor, ncMetaDataLoader
 from wavebuoy_nrt.utils import args_processing, IMOSLogging, generalTesting
-
+from wavebuoy_nrt.alerts.email import Email
 
 load_dotenv()
 
-
-if __name__ == "__main__":
+def main():
 
     # Args handling
     vargs = args_processing()
 
     # Start general logging
-    
-    general_log_file = os.path.join(vargs.output_path, "logs", f"general_process.log") # f"{runtime}_general_process.log"
+    general_log_file = os.path.join(vargs.output_path, "logs", f"general_{os.path.basename(__file__).removesuffix(".py")}.log") # f"{runtime}_general_process.log"
     GENERAL_LOGGER = IMOSLogging().logging_start(logger_name="general_logger",
                                                 logging_filepath=general_log_file)
 
@@ -31,14 +29,17 @@ if __name__ == "__main__":
 
     # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
     # "MtEliza", "Hillarys", "Central"
-    wb.buoys_metadata = wb.buoys_metadata.loc[["Central"]].copy()
+    # wb.buoys_metadata = wb.buoys_metadata.loc[["Hillarys", "Central", "Hillarys_HSM", "JurienBayInshore", "NorthKangarooIsland", "TorbayWest", "MtEliza"]].copy()
+    # wb.buoys_metadata = wb.buoys_metadata.loc[["Abbey"]].copy()
+    
     # END OF TEMPORARY SETUP
 
+    sites_error_logs = []
     for idx, site in wb.buoys_metadata.iterrows():
         
         GENERAL_LOGGER.info(f"=========== {site.name.upper()} processing ===========")
 
-        site_log_file = os.path.join(vargs.output_path, "logs", f"{site.name.upper()}_run.log") # f"{runtime}_[CURRENT_SITE]_process.log
+        site_log_file = os.path.join(vargs.incoming_path, "logs", f"{site.name.upper()}_{os.path.basename(__file__).removesuffix(".py")}.log") # f"{runtime}_[CURRENT_SITE]_process.log
         SITE_LOGGER = IMOSLogging().logging_start(logger_name="site_logger", logging_filepath=site_log_file)
         
         GENERAL_LOGGER.info(f"{site.name.upper()} log file created as {site_log_file}")
@@ -50,6 +51,7 @@ if __name__ == "__main__":
             
             meta_data_loader = ncMetaDataLoader(buoys_metadata=wb.buoys_metadata)
             deployment_metadata = meta_data_loader.load_latest_deployment_metadata(site_name=site.name)
+            regional_metadata = meta_data_loader.load_regional_metadata()
 
             latest_available_time = sofar_api.get_latest_available_time(spot_id=site.serial, token=site.sofar_token)
             SITE_LOGGER.info(f"grabed latest_available_time: {latest_available_time}")
@@ -185,6 +187,7 @@ if __name__ == "__main__":
             nc_writer = ncWriter(buoy_type="sofar")
             nc_attrs_composer = ncAttrsComposer(buoys_metadata=wb.buoys_metadata,
                                                 deployment_metadata=deployment_metadata,
+                                                regional_metadata=regional_metadata,
                                                 parameters_type="spectral")
     
             ds_embedded = ncProcessor.compose_dataset(data=spectra, parameters_type="spectral")
@@ -232,8 +235,19 @@ if __name__ == "__main__":
             # Closing current site logging
             site_logger_file_path = imos_logging.get_log_file_path(SITE_LOGGER)
             imos_logging.logging_stop(logger=SITE_LOGGER)
-            if e:
-                imos_logging.rename_log_file_if_error(site_name=site.name, file_path=site_logger_file_path,
-                                                      add_runtime=False)
-                
+            error_logger_file_path = imos_logging.rename_log_file_if_error(site_name=site.name,
+                                                                           file_path=site_logger_file_path,
+                                                                            script_name=os.path.basename(__file__).removesuffix(".py"),
+                                                                            add_runtime=True)
+            sites_error_logs.append(error_logger_file_path)
+
             continue
+    
+    if sites_error_logs:
+        e = Email(script_name=os.path.basename(__file__),
+                  email=os.getenv("EMAIL_TO"),
+                  log_file_path=sites_error_logs)
+        e.send()
+
+if __name__ == "__main__":
+    main()
