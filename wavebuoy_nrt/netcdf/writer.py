@@ -11,13 +11,14 @@ import pandas as pd
 from pandas.core.indexes.period import PeriodIndex
 import numpy as np
 import glob
+from dotenv import load_dotenv
 
 import wavebuoy_nrt.config as config
 from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
 from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, NC_SPECTRAL_FILE_NAME_TEMPLATE, IRDS_PATH, OPERATING_INSTITUTIONS
 
-
+load_dotenv()
 
 SITE_LOGGER = logging.getLogger("site_logger")
 
@@ -51,6 +52,11 @@ class ncMetaDataLoader:
         except:
             error_message = "Loading and processing buoys_metadata.csv unsuccessful. Check if the file is corrupted or if its structure has been changed"
 
+    def load_regional_metadata(self) -> pd.DataFrame:
+        metadata_path = os.path.normpath(os.getenv("METADATA_PATH"))
+        regional_metadata_path = os.path.join(metadata_path, "regional_metadata.csv")
+        SITE_LOGGER.warning(regional_metadata_path)
+        return pd.read_csv(regional_metadata_path)
 
     def _get_deployment_metadata_region_folders(self, site_name: str) -> list:
         region_folder = self.buoys_metadata.loc[site_name, "region"].lower()
@@ -106,13 +112,27 @@ class ncMetaDataLoader:
     def _validate_deployment_metadata_file_name(self, file_paths: list):
         template = re.compile(r"metadata_[A-Za-z0-9]+_deploy(\d+).xlsx")
 
-        matches = [file for file in file_paths if template.search(file)]
+        matches, not_matches, temp_files = [], [], []
+        for file in file_paths:
+            if template.search(file):
+                matches.append(file)
+            else:
+                if os.path.basename(file).startswith("~$"):
+                    temp_files.append(file)
+                else:
+                    not_matches.append(file)
+
         if not matches:
             error_message = "No deployment metadata files found."
             SITE_LOGGER.error(error_message)
             raise FileNotFoundError(error_message)
 
-        elif matches and len(matches) < len(file_paths):
+        elif temp_files and not not_matches:
+            SITE_LOGGER.warning(f"the following deployment metadata sheets weren't closed properly: {temp_files}")
+
+        elif not_matches:
+            SITE_LOGGER.warning(file_paths)
+            SITE_LOGGER.warning(matches)
             error_message = "At least one of the deployment metadata files name is not conforming with the expected template (metadata_{site_name}_deploy{YYYYmmdd}.xlsx). Make sure all of them are conforming."
             SITE_LOGGER.error(error_message)
             raise NameError(error_message)
@@ -147,14 +167,6 @@ class ncMetaDataLoader:
         with open(file_path) as j:
             return json.load(j)
 
-class ncGeneralAttrs:
-    def __init__():
-        return
-
-class ncBulkAttrs:
-    def __init__():
-        return
-    
 class ncSpectralAttrsExtractor:
     def _extract_general_spectral_analysis_technique() -> str:
         return "Fast Fourier Transform"
@@ -203,7 +215,8 @@ class ncAttrsExtractor:
 
     # from deployment metadata -------------
     def _extract_deployment_metadata_site_name(deployment_metadata: pd.DataFrame) -> str:
-        return deployment_metadata.loc["Site Name", "metadata_wave_buoy"]
+        site_name = deployment_metadata.loc["Site Name", "metadata_wave_buoy"]
+        return re.sub(r'\d+', '', site_name).strip()
     
     def  _extract_deployment_metadata_instrument(deployment_metadata: pd.DataFrame):
         return deployment_metadata.loc["Instrument", "metadata_wave_buoy"]
@@ -215,24 +228,24 @@ class ncAttrsExtractor:
         return deployment_metadata.loc["Hull serial number", "metadata_wave_buoy"]
     
     def _extract_deployment_metadata_institution(deployment_metadata: pd.DataFrame) -> str:
-        return NetCDFFileHandler()._get_operating_institution(deployment_metadata=deployment_metadata)
+        op_inst_code = {"UWA":"The University of Western Australia",
+                          "Deakin":"Deakin University",
+                          "NSW-DCCEEW" : "New South Wales Department of Climate Change, Energy, the Environment and Water",
+                          "IMOS":"IMOS Coastal Wave Buoys",
+                          "SARDI": "South Australian Research and Development Institute"
+                          }
+        operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
+        if "IMOS" in operating_institution:
+            return op_inst_code["IMOS"]
+        else:
+            return op_inst_code[operating_institution]
+        # return NetCDFFileHandler()._get_operating_institution(deployment_metadata=deployment_metadata)
     
     def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Water depth", "metadata_wave_buoy"]
     
     def _extract_deployment_metadata_water_depth_units(deployment_metadata: pd.DataFrame) -> str:
         return "m"
-
-    def _extract_deployment_metadata_principal_investigator(deployment_metadata: pd.DataFrame) -> str:
-        return "PRINCIPAL_INVESTIGATOR_TEST"
-
-    def _extract_deployment_metadata_principal_investigator_email(deployment_metadata: pd.DataFrame) -> str:
-        return "PRINCIPAL_INVESTIGATOR_EMAIL_TEST"
-
-    def _extract_deployment_metadata_project(deployment_metadata: pd.DataFrame) -> str:
-        project = "IMOS"
-        
-        return project
     
     def _extract_deployment_metadata_instrument_burst_duration(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Instrument burst duration", "metadata_wave_buoy"]
@@ -264,6 +277,35 @@ class ncAttrsExtractor:
     def _extract_deployment_metadata_abstract(deployment_metadata: pd.DataFrame) -> str:
         return ncAttrsExtractor._extract_deployment_metadata_title(deployment_metadata=deployment_metadata)
 
+    # from regional metadata -------------
+    def _process_operating_institution(deployment_metadata: pd.DataFrame) -> str:
+        operating_institution_code = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
+        if "IMOS" in operating_institution_code:
+            return "IMOS"
+        else:
+            return operating_institution_code
+
+    def _extract_regional_metadata_principal_investigator(regional_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame) -> str:
+        operating_institution_code = ncAttrsExtractor._process_operating_institution(deployment_metadata=deployment_metadata)
+        return regional_metadata.loc[regional_metadata["operating_institution"]==operating_institution_code, "principal_investigator"].values[0]
+
+    def _extract_regional_metadata_principal_investigator_email(regional_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame) -> str:
+        operating_institution_code = ncAttrsExtractor._process_operating_institution(deployment_metadata=deployment_metadata)
+        return regional_metadata.loc[regional_metadata["operating_institution"]==operating_institution_code, "principal_investigator_email"].values[0]
+    
+    def _extract_regional_metadata_citation(regional_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame) -> str:
+        operating_institution_code = ncAttrsExtractor._process_operating_institution(deployment_metadata=deployment_metadata)
+        return regional_metadata.loc[regional_metadata["operating_institution"]==operating_institution_code, "citation"].values[0]
+    
+    def _extract_regional_metadata_acknowledgement(regional_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame) -> str:
+        operating_institution_code = ncAttrsExtractor._process_operating_institution(deployment_metadata=deployment_metadata)
+        # SITE_LOGGER.warning(f"OPERATING INSTITUTION: {operating_institution}")
+        return regional_metadata.loc[regional_metadata["operating_institution"]==operating_institution_code, "acknowledgement"].values[0]
+
+    def _extract_regional_metadata_project(regional_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame) -> str:
+        operating_institution_code = ncAttrsExtractor._process_operating_institution(deployment_metadata=deployment_metadata)
+        return regional_metadata.loc[regional_metadata["operating_institution"]==operating_institution_code, "project"].values[0]
+
     # generally pre-defined --------------------
     def _extract_data_history(dataset: xr.Dataset) -> str:
         # return f"this file was file created on: {datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M%SZ")}"
@@ -292,15 +334,6 @@ class ncAttrsExtractor:
         
         return naming_authority
     
-    def _extract_general_citation() -> str:
-        return "_general_citation".upper()
-    
-    def _extract_general_acknowledgement() -> str:
-        return "_general_acknowledgement".upper()
-    
-    def _extract_general_disclaimer() -> str:
-        return "_general_disclaimer".upper()
-    
     def _extract_general_license() -> str:
         return 'http://creativecommons.org/licenses/by/4.0/'
     
@@ -319,15 +352,24 @@ class ncAttrsExtractor:
     def _extract_general_wave_motion_sensor_type() -> str:
         return "GPS"
     
+    def _extract_general_disclaimer() -> str:
+        return 'Data, products and services from UWA are provided \\"as is\\" without any warranty as to fitness for a particular purpose.'
+
+    
+
+
+
 class ncAttrsComposer:
     def __init__(self, 
                  buoys_metadata: pd.DataFrame,
                  deployment_metadata: pd.DataFrame,
+                 regional_metadata: pd.DataFrame,
                  parameters_type: str = "bulk"):
         
         self.parameters_type = parameters_type
         self.buoys_metadata = buoys_metadata
         self.deployment_metadata = deployment_metadata
+        self.regional_metadata = regional_metadata
         self.attrs_templates_files = {"bulk": "bulk_attrs.json",
                                 "spectral":"spectral_attrs.json"}
         self.attrs_template = (ncMetaDataLoader(buoys_metadata=buoys_metadata)
@@ -338,15 +380,12 @@ class ncAttrsComposer:
         variables = list(self.attrs_template['variables'].keys())
         # variables.remove("timeSeries")
         for variable in variables:
-            
             if variable in list(dataset.variables):
                 variables_attributes = self.attrs_template['variables'][variable]
                 
-                # for var_attr in variables_attributes:
-                #     if var_attr.startswith("_"):
-                #         del variables_attributes[var_attr] 
-                # print(variables_attributes)
-                # print("===================")
+                if "quality_control" in variable:
+                    variables_attributes["flag_values"] = np.int8(variables_attributes["flag_values"])
+                
                 dataset[variable] = (dataset[variable].assign_attrs(variables_attributes))
         
         return dataset
@@ -393,6 +432,11 @@ class ncAttrsComposer:
                     elif name.startswith("_extract_general_"):
                         key = name.removeprefix("_extract_general_") 
                         kwargs = {}
+
+                    elif name.startswith("_extract_regional_metadata_"):
+                        key = name.removeprefix("_extract_regional_metadata_") 
+                        kwargs = kwargs = {"regional_metadata": self.regional_metadata,
+                                        "deployment_metadata":self.deployment_metadata}
 
                     try:                        
                         extracted = method(**kwargs)
@@ -626,6 +670,7 @@ class ncWriter(WaveBuoy):
         file_names = []
 
         operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata)
+        site_id = re.sub(r'_+', '', site_id).strip()
 
         for period in periods_formated:
             file_name = file_name_template.format(operating_institution=operating_institution,
@@ -648,22 +693,30 @@ class ncWriter(WaveBuoy):
             dataset[qc_var].encoding["coordinates"] = None
         return dataset
 
+    def _process_encoding(self, dataset: xr.Dataset, parameters_type: str) -> dict:
+                
+        if parameters_type == "bulk":
+            encoding = self.ENCODING_ENFORCEMENT_BULK.copy()
+            if "TEMP" not in list(dataset.variables):
+                del encoding["TEMP"]
+                del encoding["TEMP_quality_control"]
+
+        elif parameters_type == "spectral":
+            encoding = self.ENCODING_ENFORCEMENT_SPECTRAL.copy()
+        SITE_LOGGER.warning(encoding)
+        return encoding
+
     def save_nc_file(self, 
                      output_path: str,
                      file_names: str,
                      dataset_objects: xr.Dataset,
                      parameters_type: str = "bulk"):
         file_paths = self._compose_file_paths(output_path=output_path,
-                                                 file_names=file_names)
-        
-        if parameters_type == "bulk":
-            encoding = self.ENCODING_ENFORCEMENT_BULK
-        elif parameters_type == "spectral":
-            encoding = self.ENCODING_ENFORCEMENT_SPECTRAL
-
+                                                 file_names=file_names)       
         
         for file_path, dataset in zip(file_paths, dataset_objects):
             dataset = self._remove_coordinates_qc_variables(dataset=dataset)
+            encoding = self._process_encoding(dataset=dataset, parameters_type=parameters_type)
             dataset.to_netcdf(file_path, engine="netcdf4",
                                 encoding=encoding)
 
