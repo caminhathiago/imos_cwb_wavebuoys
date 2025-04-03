@@ -36,6 +36,7 @@ def main():
     # "MtEliza", "Hillarys", "Central"
     # wb.buoys_metadata = wb.buoys_metadata.loc[["Central"]].copy()#,"Hillarys", "Central", "Hillarys_HSM", "JurienBayInshore", "NorthKangarooIsland", "TorbayWest", "MtEliza"]].copy()
     # wb.buoys_metadata = wb.buoys_metadata.loc[["CapeBridgewater", "Hillarys_HSM", "TorbayWest_HSM", "CapeBridgewater_HSM"]].copy()
+    wb.buoys_metadata = wb.buoys_metadata.loc[["Hillarys"]].copy()
     
     # END OF TEMPORARY SETUP
     
@@ -130,9 +131,12 @@ def main():
                         nc_to_load = None
 
                 
-                previous_data_df = wb.load_datasets(nc_file_paths=nc_to_load, flag_previous_new=vargs.flag_previous_new)
-                window_start_time = latest_processed_time
-                SITE_LOGGER.info(f"considering window start time as lastest processed time ({window_start_time}) as previous nc files are being loaded.")
+                previous_data_df = wb.load_datasets(nc_file_paths=nc_to_load,
+                                                    flag_previous_new=vargs.flag_previous_new,
+                                                    parameters_type="bulk")
+                if not previous_data_df.empty:
+                    window_start_time = latest_processed_time
+                    SITE_LOGGER.info(f"considering window start time as lastest processed time ({window_start_time}) as previous nc files are being loaded.")
             
             else:
                 SITE_LOGGER.info("no previous nc files available. Extract new data and create new nc files.")
@@ -147,14 +151,7 @@ def main():
                                             end_date=window_end_date,
                                             processing_sources="embedded")
 
-            generalTesting().generate_pickle_file(data=new_raw_data, file_name="new_data_raw", site_name=site.name)
-            # new_raw_data = generalTesting().open_pickle_file(file_name=f"{site.name}_new_data_raw")
-            # SITE_LOGGER.info(f"raw spotter data extracted from Sofar API\n {pd.DataFrame(new_raw_data["waves"])}")
-            print(new_raw_data)
             # print("======================")
-            # if not new_raw_data:
-            #     SITE_LOGGER.info("No data for the desired period. Aborting processing for this site")
-            #     break
             if not sofar_api.check_new_data(raw_data=new_raw_data, dataset_type="waves"):
                 SITE_LOGGER.info("No data for the desired period. Aborting processing for this site")
                 GENERAL_LOGGER.info(f"Processing successful")
@@ -224,6 +221,7 @@ def main():
                                         parameters=parameters_to_qc,
                                         gross_range_test=True,
                                         rate_of_change_test=True)
+            SITE_LOGGER.info("Qualification successfull")
             
 
             # if not all_data_hdr.empty:
@@ -235,7 +233,6 @@ def main():
             #                                 gross_range_test=True,
             #                                 rate_of_change_test=True)
 
-            SITE_LOGGER.info("Qualification successfull")
 
             # qualified_data_summarized = qc.summarize_flags(data=qualified_data, parameter_type="waves")
 
@@ -353,9 +350,9 @@ def main():
                   email=os.getenv("EMAIL_TO"),
                   log_file_path=sites_error_logs)
         # e.send()
+        print("SEND EMAIL")
 
         GENERAL_LOGGER.info(f"=========== {site.name.upper()} successfully processed. ===========")
-
 
 if __name__ == "__main__":
     main()

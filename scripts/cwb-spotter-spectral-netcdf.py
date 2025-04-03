@@ -30,7 +30,7 @@ def main():
     # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
     # "MtEliza", "Hillarys", "Central"
     # wb.buoys_metadata = wb.buoys_metadata.loc[["Hillarys", "Central", "Hillarys_HSM", "JurienBayInshore", "NorthKangarooIsland", "TorbayWest", "MtEliza"]].copy()
-    # wb.buoys_metadata = wb.buoys_metadata.loc[["Abbey"]].copy()
+    wb.buoys_metadata = wb.buoys_metadata.loc[["Hillarys"]].copy()
     
     # END OF TEMPORARY SETUP
 
@@ -70,6 +70,7 @@ def main():
             if nc_files_available:
                 nc_files_needed = wb.lookup_netcdf_files_needed(deployment_metadata=deployment_metadata,
                                                             site_id=site.name,
+                                                            incoming_path=vargs.incoming_path,
                                                             latest_available_datetime=latest_available_time,
                                                             window=int(vargs.window),
                                                             window_unit=vargs.window_unit,
@@ -99,7 +100,7 @@ def main():
                     earliest_nc_file_available = wb.get_earliest_nc_file_available(deployment_metadata=deployment_metadata,
                                                                                 site_id=site.name,
                                                                                 files_path=vargs.incoming_path)
-                    earliest_available_time = wb.get_earliest_processed_time(nc_file_path=latest_nc_file_available)
+                    earliest_available_time = wb.get_earliest_processed_time(nc_file_path=earliest_nc_file_available)
                     
                     if window_start_time < earliest_available_time:
                         SITE_LOGGER.info("desired window start time is older than earliest available time, extract new data and overwrite all available nc files.")
@@ -119,7 +120,9 @@ def main():
                         
                         nc_to_load = None
 
-                previous_data_df = wb.load_datasets(nc_file_paths=nc_to_load, flag_previous_new=vargs.flag_previous_new)
+                previous_data_df = wb.load_datasets(nc_file_paths=nc_to_load, 
+                                                    flag_previous_new=vargs.flag_previous_new,
+                                                    parameters_type="spectral")
                 window_start_time = latest_processed_time
                 SITE_LOGGER.info(f"considering window start time as lastest processed time ({window_start_time}) as previous nc files are being loaded.")
             
@@ -145,6 +148,7 @@ def main():
                 imos_logging.logging_stop(logger=SITE_LOGGER)
                 continue
 
+    
 
             # Processing ---------------------------------------
             SITE_LOGGER.info("PRE-PROCESSING STEP ====================================")
@@ -223,6 +227,8 @@ def main():
                                    file_names=nc_file_names_embedded,
                                    dataset_objects=ds_objects_embedded,
                                    parameters_type="spectral")
+            SITE_LOGGER.info(f"embedded nc files saved to the output path as {nc_file_names_embedded}")
+
 
             GENERAL_LOGGER.info(f"Processing successful")
             imos_logging.logging_stop(logger=SITE_LOGGER)
@@ -247,7 +253,8 @@ def main():
         e = Email(script_name=os.path.basename(__file__),
                   email=os.getenv("EMAIL_TO"),
                   log_file_path=sites_error_logs)
-        e.send()
+        # e.send()
+        print("SEND EMAIL")
 
 if __name__ == "__main__":
     main()
