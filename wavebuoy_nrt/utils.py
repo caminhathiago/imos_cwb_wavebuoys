@@ -1,20 +1,20 @@
 import os
 import sys
 from datetime import datetime
-
-import argparse
 import logging
 import re
+import argparse
+
 import pickle
 from netCDF4 import Dataset
 import numpy as np
-import json
+from dotenv import load_dotenv
 
-from wavebuoy_nrt.config.config import FILES_PATH
 
 GENERAL_LOGGER = logging.getLogger("general_logger")
 SITE_LOGGER = logging.getLogger("site_logger")
 
+load_dotenv()
 
 def args_processing():
     """
@@ -244,7 +244,7 @@ class FilesHandler():
     def __init__(self):
         pass
 
-    def _get_file_path(self, file_name: str, file_path: str = FILES_PATH):
+    def _get_file_path(self, file_name: str, file_path: str = os.getenv('FILES_PATH')):
         if os.path.exists(os.path.join(file_path, file_name)):
             # print(os.path.join(file_path, file_name))
             return os.path.join(file_path, file_name)

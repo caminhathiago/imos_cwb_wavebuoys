@@ -5,11 +5,13 @@ import logging
 
 import pandas as pd
 import numpy as np
+from dotenv import load_dotenv
 
 from wavebuoy_nrt.processor.spotter import SpotterWaveBuoy
 from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
-from wavebuoy_nrt.config.config import FILES_PATH, AODN_COLUMNS_TEMPLATE, IRDS_PATH
 from wavebuoy_nrt.utils import FilesHandler
+
+load_dotenv()
 
 GENERAL_LOGGER = logging.getLogger("general_logger")
 SITE_LOGGER = logging.getLogger("site_logger")
@@ -24,7 +26,7 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
 
     def _get_buoys_metadata(self, buoy_type:str, buoys_metadata_file_name:str):
         try:
-            file_path = os.path.join(IRDS_PATH, "Data", "website", "auswaves")
+            file_path = os.path.join(os.getenv('IRDS_PATH'), "Data", "website", "auswaves")
             if not os.path.exists(file_path):
                 raise FileNotFoundError("No such directory for buoys metadata: {}")
             buoys_metadata_path = self._get_file_path(file_name=buoys_metadata_file_name, file_path=file_path)

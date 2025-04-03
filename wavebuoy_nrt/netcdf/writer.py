@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 import wavebuoy_nrt.config as config
 from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
-from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, NC_SPECTRAL_FILE_NAME_TEMPLATE, IRDS_PATH, OPERATING_INSTITUTIONS
+from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, NC_SPECTRAL_FILE_NAME_TEMPLATE, OPERATING_INSTITUTIONS
 
 load_dotenv()
 
@@ -29,7 +29,7 @@ class ncMetaDataLoader:
 
     def load_buoys_metadata(self, buoy_type:str):
         try:
-            file_path = os.path.join(IRDS_PATH, "Data", "website", "auswaves", "buoys_metadata.csv")
+            file_path = os.path.join(os.getenv('IRDS_PATH'), "Data", "website", "auswaves", "buoys_metadata.csv")
             if not os.path.exists(file_path):
                 raise FileNotFoundError("No such directory for buoys metadata: {}")
            
@@ -67,7 +67,7 @@ class ncMetaDataLoader:
         
         deployment_metadata_files_extension = file_extension
         site_name_corrected = site_name.replace("_","")
-        files_path = os.path.join(IRDS_PATH, "Data", region_folder, site_name_corrected)
+        files_path = os.path.join(os.getenv('IRDS_PATH'), "Data", region_folder, site_name_corrected)
 
         if os.path.exists(files_path):
             if os.path.exists(os.path.join(files_path, "metadata")):
@@ -498,7 +498,7 @@ class ncProcessor:
         dimensions = ["TIME"]
 
         if parameters_type == "spectral":
-            cols_to_drop.extend(["FREQUENCY", "DIFFREQUENCY"])
+            cols_to_drop.extend(["FREQUENCY", "DIFFREQUENCY", "DIRECTION", "DIRSPREAD"])
             dimensions.append("FREQUENCY")
 
         vars_to_include = data.drop(columns=cols_to_drop).columns
@@ -539,7 +539,7 @@ class ncProcessor:
 
     @staticmethod
     def create_timeseries_variable(dataset: xr.Dataset) -> xr.Dataset:
-        dataset["timeSeries"] = [np.int64(1)]
+        dataset["timeSeries"] = [np.int16(1)]
         return dataset
 
     @staticmethod
@@ -621,8 +621,18 @@ class ncWriter(WaveBuoy):
                             'timeSeries':{"dtype":np.int16}
                     }
 
-    ENCODING_ENFORCEMENT_SPECTRAL = {"TIME":{"_FillValue":None},
-                                }
+    ENCODING_ENFORCEMENT_SPECTRAL = {
+                "TIME": {"dtype": np.float64, "_FillValue":None},
+                "FREQUENCY": {"dtype": np.float32},
+                "LATITUDE": {"dtype": np.float64},
+                "LONGITUDE": {"dtype": np.float64},
+                "A1": {"dtype": np.float32},
+                "B1": {"dtype": np.float32},
+                "A2": {"dtype": np.float32},
+                "B2": {"dtype": np.float32},
+                "ENERGY": {"dtype": np.float32},
+                'timeSeries':{"dtype":np.int16}
+            }
 
 
     def __init__(self, buoy_type):

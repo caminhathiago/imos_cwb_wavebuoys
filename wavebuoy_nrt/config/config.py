@@ -1,7 +1,3 @@
-FILES_OUTPUT_PATH = r"C:\Users\00116827\cwb\wavebuoy_aodn\output_path\final_testing"
-FILES_PATH = r"C:\Users\00116827\cwb\wavebuoy_aodn\wavebuoy_nrt"
-IRDS_PATH = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves"
-
 OPERATING_INSTITUTIONS = {"UWA":"UWA",
                           "Deakin":"VIC-DEAKIN-UNI",
                           "NSW-DCCEEW" : "NSW-DPE",

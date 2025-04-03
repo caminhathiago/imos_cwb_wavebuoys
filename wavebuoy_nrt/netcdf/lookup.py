@@ -1,24 +1,24 @@
 import os
 import logging
-
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
+from typing import Union, List
+
 import pandas as pd
 import numpy as np
 import xarray as xr
 import glob
 import re
-from typing import Union, List
+from dotenv import load_dotenv
 
-
-from wavebuoy_nrt.config.config import (FILES_OUTPUT_PATH,
-                                        NC_FILE_NAME_TEMPLATE,
+from wavebuoy_nrt.config.config import (NC_FILE_NAME_TEMPLATE,
                                         OPERATING_INSTITUTIONS,
                                         NC_SPECTRAL_FILE_NAME_TEMPLATE)
 
 GENERAL_LOGGER = logging.getLogger("general_logger")
 SITE_LOGGER = logging.getLogger("site_logger")
 
+load_dotenv()
 
 class NetCDFFileHandler():
     """
@@ -196,7 +196,7 @@ class NetCDFFileHandler():
             
         return availability_check, nc_file_paths 
         
-    def load_datasets(self, nc_file_paths: Union[List[str], str], flag_previous_new: str = False) -> pd.DataFrame:
+    def load_datasets(self, nc_file_paths: Union[List[str], str], flag_previous_new: str = False, parameters_type: str = "bulk") -> pd.DataFrame:
 
         if not nc_file_paths:
             return pd.DataFrame()
@@ -216,7 +216,23 @@ class NetCDFFileHandler():
         if flag_previous_new:
             global_dataframe["flag_previous_new"] = "prev"
 
+        if parameters_type == "spectral":
+            global_dataframe = self._pivot_previous_spectral(global_dataframe)
+
         return global_dataframe
+
+    def _pivot_previous_spectral(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        return dataframe.groupby("TIME").agg({
+                                        "FREQUENCY": list,
+                                        "A1": list,
+                                        "B1": list,
+                                        "A2": list,
+                                        "B2": list,
+                                        "ENERGY": list,
+                                        "timeSeries": "first",
+                                        "LATITUDE": "first",
+                                        "LONGITUDE": "first",
+                                    }).reset_index()
 
     def get_site_ids(self, buoys_metadata: pd.DataFrame) -> list:
         return buoys_metadata.name.list()

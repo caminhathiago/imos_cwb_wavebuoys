@@ -2,15 +2,14 @@ from datetime import datetime, timedelta
 import os
 import logging
 
+from dotenv import load_dotenv
 import pandas as pd
 import numpy as np
-
 from ioos_qc import qartod
-
-from wavebuoy_nrt.config.config import FILES_PATH
 
 SITE_LOGGER = logging.getLogger("site_logger")
 
+load_dotenv()
 
 class WaveBuoyQC():
     waves_parameters = ['SSWMD', 'WMDS', 'WPDI', 'WPDS', 'WPFM', 'WPPE', 'WSSH']
@@ -21,7 +20,7 @@ class WaveBuoyQC():
         self.qc_config_dict = self.convert_qc_config_to_dict(qc_config=self.qc_config )
 
     def get_qc_configs(self, file_name: str = "qc_config.csv"):
-        file_path = os.path.join(FILES_PATH, file_name)
+        file_path = os.path.join(os.getenv('FILES_PATH'), file_name)
         if os.path.exists(file_path):
             return pd.read_csv(file_path)
         else:
