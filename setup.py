@@ -6,6 +6,10 @@ from setuptools import setup, find_packages
 with open('README.md') as f:
     readme = f.read()
 
+def read_requirements(filename):
+    with open(filename, encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip() and not line.startswith("#")]
+
 PACKAGE_NAME = 'wavebuoys'
 
 PACKAGE_EXCLUDES = [
@@ -35,7 +39,7 @@ setup(
     author='Thiago Caminha, Michael Cuttler',
     author_email='thiago.caminha@uwa.edu.au, michael.cuttler@uwa.edu.au',
     url='',
-    # install_requires=INSTALL_REQUIRES,
+    install_requires=read_requirements("requirements.txt"),
     packages=find_packages(exclude=PACKAGE_EXCLUDES),
     scripts=SCRIPTS,
     # entry_points={
