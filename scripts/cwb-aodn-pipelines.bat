@@ -26,7 +26,7 @@ if "%arg1%"=="cwb-netcdf-aodn" (
     %PYTHON_EXEC% C:\Users\00116827\cwb\wavebuoy_aodn\scripts\cwb-spotter-spectral-netcdf.py ^
     -o %INCOMING_PATH% ^
     -i %INCOMING_PATH% ^
-    -w 72 ^
+    -w 24 ^
     -wu hours
     echo [FINISHED] %DATE% %TIME%
 
