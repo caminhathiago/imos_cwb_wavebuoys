@@ -21,7 +21,7 @@ class ncValidator():
             raise ValueError("Either 'file_name' or 'file_path' must be provided.")
         
         pattern_bulk = "^[A-Za-z-_]+_\d{8}_[A-Z_]+_RT_WAVE-PARAMETERS_monthly\.nc"
-        pattern_spectral = "^[A-Za-z-_]+_\d{8}_[A-Z_]+_RT_SPECTRAL_monthly\.nc"
+        pattern_spectral = "^[A-Za-z-_]+_\d{8}_[A-Z_]+_RT_WAVE-SPECTRA_monthly\.nc"
 
         if not re.fullmatch(pattern_bulk, file_name) and not re.fullmatch(pattern_spectral, file_name):
             error = f"File name not matching templates {NC_FILE_NAME_TEMPLATE} or {NC_SPECTRAL_FILE_NAME_TEMPLATE}"

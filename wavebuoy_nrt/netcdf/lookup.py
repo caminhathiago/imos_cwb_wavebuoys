@@ -137,7 +137,7 @@ class NetCDFFileHandler():
         if parameters_type == "bulk":
             nc_file_filter = f"*{site_id.replace("_","").upper()}_RT_WAVE-PARAMETERS*.nc"
         elif parameters_type == "spectral":
-            nc_file_filter = f"*{site_id.replace("_","").upper()}_RT_SPECTRAL*.nc"
+            nc_file_filter = f"*{site_id.replace("_","").upper()}_RT_WAVE-SPECTRA*.nc"
         else:
             error = "Please select a valid data type: 'bulk' or 'spectral'"
             SITE_LOGGER.error(error)
