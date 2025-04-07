@@ -8,7 +8,7 @@ from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
 from wavebuoy_nrt.qc.qcTests import WaveBuoyQC
 from wavebuoy_nrt.netcdf.writer import ncWriter, ncAttrsComposer, ncAttrsExtractor, ncProcessor, ncMetaDataLoader
-from wavebuoy_nrt.utils import args_processing, IMOSLogging, generalTesting
+from wavebuoy_nrt.utils import args_processing, IMOSLogging, generalTesting, csvOutput
 from wavebuoy_nrt.alerts.email import Email
 
 load_dotenv()
@@ -177,6 +177,8 @@ def main():
             # csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_output.csv")
             # spectra.reset_index().to_csv(csv_file_path, index=False)
             # SITE_LOGGER.info(f"processed data saved as '{csv_file_path}'")
+            csvOutput.save_csv(data=spectra, file_path=vargs.incoming_path, file_name=f"{site.name.upper()}_spectra_all_data.csv")
+
 
             
 

@@ -11,7 +11,7 @@ from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
 from wavebuoy_nrt.qc.qcTests import WaveBuoyQC
 from wavebuoy_nrt.netcdf.writer import ncWriter, ncAttrsComposer, ncAttrsExtractor, ncProcessor, ncMetaDataLoader
-from wavebuoy_nrt.utils import args_processing, IMOSLogging, generalTesting
+from wavebuoy_nrt.utils import args_processing, IMOSLogging, generalTesting, csvOutput
 from wavebuoy_nrt.alerts.email import Email
 
 
@@ -198,9 +198,7 @@ def main():
                 all_data_df = all_new_data_df
             
             # TEMPORARY SETUP (REMOVE WHEN DONE)
-            csv_file_path = os.path.join(vargs.incoming_path, "test_files", f"{site.name.lower()}_all_data_df_output.csv")
-            all_data_df.reset_index().to_csv(csv_file_path, index=False)
-            SITE_LOGGER.info(f"processed data saved as '{csv_file_path}'")
+            csvOutput.save_csv(data=all_data_df, file_path=vargs.incoming_path, file_name=f"{site.name.upper()}_all_data.csv")
             
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
             
@@ -237,9 +235,7 @@ def main():
             # qualified_data_summarized = qc.summarize_flags(data=qualified_data, parameter_type="waves")
 
             # TEMPORARY SETUP (REMOVE WHEN DONE)
-            csv_file_path_embedded = os.path.join(vargs.incoming_path, "test_files", f"{site.name.lower()}_qualified_embedded.csv")
-            qualified_data_embedded.to_csv(csv_file_path_embedded, index=False)
-            SITE_LOGGER.info(f"qualified data saved as '{csv_file_path_embedded}'")
+            csvOutput.save_csv(data=qualified_data_embedded, file_path=vargs.incoming_path, file_name=f"{site.name.upper()}_all_data_qualified.csv")
 
             # if not all_data_hdr.empty:
             #     csv_file_path_hdr = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_qualified_hdr.csv")

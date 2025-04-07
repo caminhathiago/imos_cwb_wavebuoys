@@ -7,6 +7,7 @@ import argparse
 
 import pickle
 from netCDF4 import Dataset
+import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
 
@@ -239,7 +240,6 @@ class generalTesting:
         return data
     
 
-    
 class FilesHandler():
     def __init__(self):
         pass
@@ -254,6 +254,18 @@ class FilesHandler():
             GENERAL_LOGGER.error(error_message)
             raise FileNotFoundError(error_message)
         
+
+class csvOutput:
+    @staticmethod
+    def save_csv(file_path: str, file_name: str, data: pd.DataFrame) -> None:
+        output_path = os.path.join(file_path, "csv")
+        if not os.path.isdir(output_path):
+            os.makedirs(output_path)
+
+        data.reset_index().to_csv(os.path.join(output_path, file_name), index=False)
+        SITE_LOGGER.info(f"file saved as {os.path.join(output_path, file_name)}")
+        
+
 
 class ncAttributesValidator:
     def __init__(self):
