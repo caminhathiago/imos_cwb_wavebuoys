@@ -112,7 +112,7 @@ def main():
                                                                                 files_path=vargs.incoming_path)
                     earliest_available_time = wb.get_earliest_processed_time(nc_file_path=earliest_nc_file_available)
                     
-                    if window_start_time < earliest_available_time:
+                    if (window_start_time < earliest_available_time) and len(nc_file_paths) > 1:
                         SITE_LOGGER.info("desired window start time is older than earliest available time, extract new data and overwrite all available nc files.")
                         nc_to_load = None
                     else:
