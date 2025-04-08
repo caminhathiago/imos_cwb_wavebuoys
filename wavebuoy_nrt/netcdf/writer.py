@@ -167,6 +167,7 @@ class ncMetaDataLoader:
         with open(file_path) as j:
             return json.load(j)
 
+
 class ncSpectralAttrsExtractor:
     def _extract_general_spectral_analysis_technique() -> str:
         return "Fast Fourier Transform"
@@ -355,9 +356,6 @@ class ncAttrsExtractor:
     def _extract_general_disclaimer() -> str:
         return 'Data, products and services from UWA are provided \\"as is\\" without any warranty as to fitness for a particular purpose.'
 
-    
-
-
 
 class ncAttrsComposer:
     def __init__(self, 
@@ -469,6 +467,7 @@ class ncAttrsComposer:
         return base_abstact.format(institution=institution,
                                 instrument=instrument,
                                 site_name=site_name)
+
 
 class ncProcessor:
 
@@ -601,7 +600,6 @@ class ncProcessor:
         return dataset_objects
 
 
-
 class ncWriter(WaveBuoy):
 
     ENCODING_ENFORCEMENT_BULK = {"TIME":{"_FillValue":None},
@@ -664,7 +662,6 @@ class ncWriter(WaveBuoy):
         day = "01"
         return periods.strftime("%Y%m") + day
         
-
     def compose_file_names(self,
                             site_id: str,
                             deployment_metadata: pd.DataFrame,
