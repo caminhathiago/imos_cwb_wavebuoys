@@ -45,6 +45,10 @@ def args_processing():
                         help="desired window unit (hours:Default, months).",
                         required=False)
 
+    parser.add_argument('-sp', '--site-to-process', dest='site_to_process', type=str, default=None,
+                        help="desired individual site to be processed.",
+                        required=False)
+
     parser.add_argument('-pp', '--period-to-process', dest='period_to_process', type=str, default=None, nargs=2,
                         help="desired period to be extracted, processed and qualified. Please pass start and end dates as YYYY-mm-ddTHH:MM separated by a blank space.",
                         required=False)

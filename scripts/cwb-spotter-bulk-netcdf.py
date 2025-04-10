@@ -32,13 +32,8 @@ def main():
     sofar_api = SofarAPI(buoys_metadata=wb.buoys_metadata)    
     imos_logging = IMOSLogging() 
     
-    # ### TEMPORARY SETUP TO AVOID UNECESSARY SOFAR API CALLS (REMOVE WHEN DONE)
-    # "MtEliza", "Hillarys", "Central"
-    # wb.buoys_metadata = wb.buoys_metadata.loc[["Central"]].copy()#,"Hillarys", "Central", "Hillarys_HSM", "JurienBayInshore", "NorthKangarooIsland", "TorbayWest", "MtEliza"]].copy()
-    # wb.buoys_metadata = wb.buoys_metadata.loc[["CapeBridgewater", "Hillarys_HSM", "TorbayWest_HSM", "CapeBridgewater_HSM"]].copy()
-    wb.buoys_metadata = wb.buoys_metadata.loc[["Hillarys"]].copy()
-    
-    # END OF TEMPORARY SETUP
+    if vargs.site_to_process:
+        wb.buoys_metadata = wb.buoys_metadata.loc[[vargs.site_to_process]].copy()
     
     sites_error_logs = []
 
