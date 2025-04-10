@@ -19,6 +19,7 @@ if "%arg1%"=="cwb-netcdf-aodn" (
     -o %INCOMING_PATH% ^
     -i %INCOMING_PATH% ^
     -lh 1
+    -e
     echo [FINISHED] %DATE% %TIME%
 
 ) else if "%arg1%"=="cwb-spotter-spectral-netcdf" (
@@ -28,6 +29,7 @@ if "%arg1%"=="cwb-netcdf-aodn" (
     -i %INCOMING_PATH% ^
     -w 24 ^
     -wu hours
+    -e
     echo [FINISHED] %DATE% %TIME%
 
 ) else if "%arg1%"=="cwb-spotter-bulk-netcdf" (
@@ -37,6 +39,7 @@ if "%arg1%"=="cwb-netcdf-aodn" (
     -i %INCOMING_PATH% ^
     -w 24 ^
     -wu hours
+    -e
     echo [FINISHED] %DATE% %TIME%
 
 ) else (

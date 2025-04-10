@@ -248,11 +248,12 @@ def main():
             continue
     
     if sites_error_logs:
-        e = Email(script_name=os.path.basename(__file__),
-                  email=os.getenv("EMAIL_TO"),
-                  log_file_path=sites_error_logs)
-        # e.send()
-        print("SEND EMAIL")
+        if vargs.email_alert:
+            e = Email(script_name=os.path.basename(__file__),
+                    email=os.getenv("EMAIL_TO"),
+                    log_file_path=sites_error_logs)
+            # e.send()
+            print("SEND EMAIL")
 
 if __name__ == "__main__":
     main()

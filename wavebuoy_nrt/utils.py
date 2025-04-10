@@ -65,6 +65,10 @@ def args_processing():
                         help="wether the user wants to flag previous/new data in the data products generated",
                         required=False)
     
+    parser.add_argument('-e', '--email-alert', dest='email_alert', action="store_true",
+                        help="toggle email alert.",
+                        required=False)
+
     # parser.add_argument('-p', '--push-to-incoming', dest='incoming_path', type=str, default=None,
     #                     help="incoming directory for files to be ingested by AODN pipeline (Optional)",
     #                     required=False)
@@ -110,6 +114,12 @@ def args_processing():
     else:
         flag_previous_new = False
 
+    if vargs.email_alert:
+        vargs.email_alert = True
+    else:
+        vargs.email_alert = False
+
+
     return vargs
 
 def args_pushing():
@@ -127,6 +137,10 @@ def args_pushing():
                         help="desired window from present backwards to be processed and qualified. Default to 24, please check argument --window-unit for the right desired unit.",
                         required=False)
 
+    parser.add_argument('-e', '--email-alert', dest='email_alert', action="store_true",
+                        help="toggle email alert.",
+                        required=False)
+
     vargs = parser.parse_args()
 
     if not os.path.exists(vargs.output_path):
@@ -142,6 +156,11 @@ def args_pushing():
         except Exception:
             raise ValueError('{path} not a valid path'.format(path=vargs.incoming_path))
             sys.exit(1)
+
+    if vargs.email_alert:
+        vargs.email_alert = True
+    else:
+        vargs.email_alert = False
 
     vargs.lookback_hours = int(vargs.lookback_hours)
 
