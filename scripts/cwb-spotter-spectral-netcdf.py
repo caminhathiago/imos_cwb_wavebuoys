@@ -244,7 +244,7 @@ def main():
             e = Email(script_name=os.path.basename(__file__),
                     email=os.getenv("EMAIL_TO"),
                     log_file_path=sites_error_logs)
-            print("SEND EMAIL")
+            e.send()
 
 if __name__ == "__main__":
     main()
