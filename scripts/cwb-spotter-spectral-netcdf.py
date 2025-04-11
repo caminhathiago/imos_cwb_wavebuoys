@@ -168,18 +168,10 @@ def main():
                     spectra = wb.concat_previous_new(previous_data=previous_data_df,
                                                     new_data=spectra)
                     SITE_LOGGER.info("concatenate new data with previous since available")
-            
-            # TEMPORARY SETUP (REMOVE WHEN DONE)
-            # csv_file_path = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_all_data_df_output.csv")
-            # spectra.reset_index().to_csv(csv_file_path, index=False)
-            # SITE_LOGGER.info(f"processed data saved as '{csv_file_path}'")
+           
             csvOutput.save_csv(data=spectra, file_path=vargs.incoming_path, file_name=f"{site.name.upper()}_spectra_all_data.csv")
 
-
-            
-
             # Qualification ---------------------------------------
-            # GENERAL_LOGGER.info("Starting qualification step")
             SITE_LOGGER.info("QUALIFICATION STEP ====================================")
 
 
@@ -252,7 +244,6 @@ def main():
             e = Email(script_name=os.path.basename(__file__),
                     email=os.getenv("EMAIL_TO"),
                     log_file_path=sites_error_logs)
-            # e.send()
             print("SEND EMAIL")
 
 if __name__ == "__main__":
