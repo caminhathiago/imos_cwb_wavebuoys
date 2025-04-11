@@ -279,14 +279,41 @@ class FilesHandler():
         
 
 class csvOutput:
+    
     @staticmethod
-    def save_csv(file_path: str, file_name: str, data: pd.DataFrame) -> None:
+    def extract_monthly_date(data:pd.DataFrame) -> list[pd.DataFrame]:
+        periods = (pd.to_datetime(data["TIME"])
+                   .dt.to_period("M")
+                   .unique()
+                )
+
+        dataframes = []
+        for period in periods:
+            mask = data["TIME"].dt.to_period("M") == period
+            monthly_df = data.loc[mask]
+            dataframes.append((period, monthly_df))
+
+        return dataframes
+
+    @staticmethod
+    def format_period(period: pd.PeriodIndex) -> str:
+        return str(period).replace("-","") + "01"
+
+    @staticmethod
+    def save_csv(file_path: str, site_name:str, file_name_preffix: str, data: pd.DataFrame) -> None:
+        
+        dataframes = csvOutput.extract_monthly_date(data)        
+        
         output_path = os.path.join(file_path, "csv")
         if not os.path.isdir(output_path):
             os.makedirs(output_path)
 
-        data.reset_index().to_csv(os.path.join(output_path, file_name), index=False)
-        SITE_LOGGER.info(f"file saved as {os.path.join(output_path, file_name)}")
+        for dataframe in dataframes:
+            period_str = csvOutput.format_period(dataframe[0])
+            file_name = period_str + "_" + site_name + file_name_preffix
+            file_output_path = os.path.join(output_path, file_name)
+            data.reset_index().to_csv(file_output_path, index=False)
+            SITE_LOGGER.info(f"file saved as {output_path}")
         
 
 
