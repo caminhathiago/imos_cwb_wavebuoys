@@ -249,6 +249,9 @@ def main():
             ds_embedded = ncProcessor.compose_dataset(data=qualified_data_embedded)
             SITE_LOGGER.info("embedded dataset composed")
             
+            ds_embedded = ncProcessor.convert_dtypes(dataset=ds_embedded, parameters_type="bulk")
+            SITE_LOGGER.info("variables dtypes converted and now conforming to template")
+
             ds_embedded = nc_attrs_composer.assign_general_attributes(dataset=ds_embedded, site_name=site.name)
             SITE_LOGGER.info("general attributes assigned to embedded dataset")
             
@@ -265,8 +268,8 @@ def main():
             ds_objects_embedded = nc_attrs_composer.assign_variables_attributes_dataset_objects(dataset_objects=ds_objects_embedded)
             SITE_LOGGER.info("variables attributes assigned to datasets")
             
-            ds_objects_embedded = ncProcessor.convert_dtypes(dataset_objects=ds_objects_embedded)
-            SITE_LOGGER.info("variables dtypes converted and now conforming to template")
+            # ds_objects_embedded = ncProcessor.convert_dtypes_dataset_objects(dataset_objects=ds_objects_embedded)
+            # SITE_LOGGER.info("variables dtypes converted and now conforming to template")
 
             nc_file_names_embedded = nc_writer.compose_file_names(
                                         site_id=site.name.upper(),
