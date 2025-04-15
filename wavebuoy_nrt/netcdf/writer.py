@@ -313,7 +313,7 @@ class ncAttrsExtractor:
         return f"this file was file created on: {ncAttrsExtractor._extract_data_date_created(dataset=dataset)}"
     
     def _extract_general_author():
-        return "AODN"
+        return "IMOS"
     
     def _extract_general_author_email() -> str:
         return "info@aodn.org.au"
@@ -325,7 +325,7 @@ class ncAttrsExtractor:
         return "info@aodn.org.au"
 
     def _extract_general_Conventions() -> str:
-        return 'CF-1.6'
+        return 'CF-1.8'
 
     def _extract_general_standard_name_vocabulary() -> str:
         return "NetCDF Climate and Forecast CF Standard Name Table Version 78"
@@ -354,7 +354,7 @@ class ncAttrsExtractor:
         return "GPS"
     
     def _extract_general_disclaimer() -> str:
-        return 'Data, products and services from UWA are provided \\"as is\\" without any warranty as to fitness for a particular purpose.'
+        return 'Data, products and services from IMOS are provided \\"as is\\" without any warranty as to fitness for a particular purpose.'
 
 
 class ncAttrsComposer:
@@ -374,6 +374,12 @@ class ncAttrsComposer:
                               ._get_template_imos(file_name=self.attrs_templates_files[self.parameters_type])
                         )
     
+    def _match_valid_min_max_dtype(self, variable:str, variables_attributes:dict , dataset: xr.Dataset):
+        return (np.dtype(dataset[variable]).type(variables_attributes["valid_min"]),
+                np.dtype(dataset[variable]).type(variables_attributes["valid_max"]))
+    
+
+
     def assign_variables_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
         variables = list(self.attrs_template['variables'].keys())
         # variables.remove("timeSeries")
@@ -384,6 +390,13 @@ class ncAttrsComposer:
                 if "quality_control" in variable:
                     variables_attributes["flag_values"] = np.int8(variables_attributes["flag_values"])
                 
+                if "valid_min" in variables_attributes or variable not in ("TIME","timeSeries"):
+                    variables_attributes["valid_min"], variables_attributes["valid_max"] = self._match_valid_min_max_dtype(
+                                                                                variable=variable,
+                                                                                dataset=dataset,
+                                                                                variables_attributes=variables_attributes
+                                                                            )
+                    
                 dataset[variable] = (dataset[variable].assign_attrs(variables_attributes))
         
         return dataset
@@ -470,6 +483,34 @@ class ncAttrsComposer:
 
 
 class ncProcessor:
+
+    DTYPES_BULK = {'WSSH':{"dtype":np.float64},
+                        'WPPE':{"dtype":np.float64},
+                        'WPFM':{"dtype":np.float64},
+                        'WPDI':{"dtype":np.float64},
+                        'WPDS':{"dtype":np.float64},
+                        'SSWMD':{"dtype":np.float64},
+                        'WMDS':{"dtype":np.float64},
+                        'TEMP':{"dtype":np.float64},
+                        'WAVE_quality_control':{"dtype":np.int8},
+                        'TEMP_quality_control':{"dtype":np.int8},
+                        # 'TIME':{"dtype":np.float64},
+                        'LATITUDE':{"dtype":np.float64},
+                        'LONGITUDE':{"dtype":np.float64},
+                        'timeSeries':{"dtype":np.int16}}\
+                        
+    
+    DTYPES_SPECTRAL = {
+                "FREQUENCY": {"dtype": np.float32},
+                "LATITUDE": {"dtype": np.float64},
+                "LONGITUDE": {"dtype": np.float64},
+                "A1": {"dtype": np.float32},
+                "B1": {"dtype": np.float32},
+                "A2": {"dtype": np.float32},
+                "B2": {"dtype": np.float32},
+                "ENERGY": {"dtype": np.float32},
+                'timeSeries':{"dtype":np.int16}
+            }
 
     @staticmethod
     def select_processing_source(data: pd.DataFrame, processing_source : str) -> pd.DataFrame:
@@ -577,23 +618,33 @@ class ncProcessor:
         return dataset_objects
 
     @staticmethod
-    def convert_dtypes(dataset_objects: tuple) -> List[xr.Dataset]:
+    def convert_dtypes(dataset:tuple, parameters_type:str = "bulk") -> xr.Dataset:
         
-        dtypes_dict = {'WSSH':{"dtype":np.float64},
-                        'WPPE':{"dtype":np.float64},
-                        'WPFM':{"dtype":np.float64},
-                        'WPDI':{"dtype":np.float64},
-                        'WPDS':{"dtype":np.float64},
-                        'SSWMD':{"dtype":np.float64},
-                        'WMDS':{"dtype":np.float64},
-                        'TEMP':{"dtype":np.float64},
-                        'WAVE_quality_control':{"dtype":np.int8},
-                        'TEMP_quality_control':{"dtype":np.int8},
-                        'TIME':{"dtype":np.float64},
-                        'LATITUDE':{"dtype":np.float64},
-                        'LONGITUDE':{"dtype":np.float64},
-                        'timeSeries':{"dtype":np.int16}}
+        if parameters_type == 'bulk':
+            dtypes_dict = ncProcessor.DTYPES_BULK
+        elif parameters_type == 'spectral':
+            dtypes_dict = ncProcessor.DTYPES_SPECTRAL
+        else:
+            raise ValueError("Invalid parameters_type. Choose 'bulk' or 'spectral'.")
+
+        dataset = dataset.copy()
+
+        for var_name, target_dtype in dtypes_dict.items():
+            if var_name in dataset:
+                dataset[var_name] = dataset[var_name].astype(target_dtype["dtype"])
+
+        SITE_LOGGER.warning(dataset.dtypes)
+
+        return dataset
+    
+    @staticmethod
+    def convert_dtypes_dataset_objects(dataset_objects: tuple, parameters_type:str = "bulk") -> List[xr.Dataset]:
         
+        if parameters_type == 'bulk':
+            dtypes_dict = ncProcessor.DTYPES_BULK
+        elif parameters_type == 'spectral':
+            dtypes_dict = ncProcessor.DTYPES_SPECTRAL
+
         for dataset in dataset_objects:
             dataset = dataset.map(lambda x: x.astype(dtypes_dict[x.name]["dtype"]) if x.name in dtypes_dict else x )
             SITE_LOGGER.warning(dataset.dtypes)
@@ -621,7 +672,7 @@ class ncWriter(WaveBuoy):
 
     ENCODING_ENFORCEMENT_SPECTRAL = {
                 "TIME": {"dtype": np.float64, "_FillValue":None},
-                "FREQUENCY": {"dtype": np.float32},
+                "FREQUENCY": {"dtype": np.float32, "_FillValue":None},
                 "LATITUDE": {"dtype": np.float64},
                 "LONGITUDE": {"dtype": np.float64},
                 "A1": {"dtype": np.float32},
