@@ -313,10 +313,10 @@ class ncAttrsExtractor:
         return f"this file was file created on: {ncAttrsExtractor._extract_data_date_created(dataset=dataset)}"
     
     def _extract_general_author():
-        return "IMOS"
+        return "Thiago Caminha"
     
     def _extract_general_author_email() -> str:
-        return "info@aodn.org.au"
+        return "thiago.caminha@uwa.edu.au"
     
     def _extract_general_data_centre() -> str:
         return "Australian Ocean Data Network (AODN)"
