@@ -742,8 +742,17 @@ class ncWriter(WaveBuoy):
         return [file_name.replace(".nc", f"_{processing_source}.nc") 
                     for file_name in file_names]
 
-    def _compose_file_paths(self, file_names: list, output_path: str) -> list:
-        return [os.path.join(output_path, file_name) for file_name in file_names]
+    def _compose_file_paths(self, file_names: list, output_path: str, stage: str = "production") -> list:
+        
+        if stage == "production":
+            return [os.path.join(output_path, file_name) for file_name in file_names]
+        
+        elif stage == "backup":
+            backup_path = os.path.join(output_path, "backup_files")
+            if not os.path.isdir(backup_path):
+                os.makedirs(backup_path)
+            return [os.path.join(backup_path, file_name) for file_name in file_names]
+            
     
     def _remove_coordinates_qc_variables(self, dataset: xr.Dataset) -> xr.Dataset:
         qc_variables = [var for var in list(dataset.variables.keys()) if var.endswith("quality_control")]
@@ -764,6 +773,36 @@ class ncWriter(WaveBuoy):
         SITE_LOGGER.warning(encoding)
         return encoding
 
+    
+    def _is_file_locked(self, file_path: str) -> bool:
+        if not os.path.exists(file_path):
+            return False
+        
+        import platform
+        system = platform.system()
+
+        if system == "Windows":
+            try:
+                import msvcrt
+                with open(file_path, 'a') as f:
+                    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                    msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+                return False
+            except OSError:
+                return True
+
+        elif system in ("Linux", "Darwin"):  # Darwin = macOS
+            try:
+                import fcntl
+                with open(file_path, 'a') as f:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                return False
+            except (OSError, IOError):
+                return True
+
+        return False
+    
     def save_nc_file(self, 
                      output_path: str,
                      file_names: str,
@@ -771,12 +810,22 @@ class ncWriter(WaveBuoy):
                      parameters_type: str = "bulk"):
         file_paths = self._compose_file_paths(output_path=output_path,
                                                  file_names=file_names)       
-        
-        for file_path, dataset in zip(file_paths, dataset_objects):
+        backup_file_paths = self._compose_file_paths(output_path=output_path,
+                                                 file_names=file_names,
+                                                 stage="backup") 
+        for file_path, backup_file_path, dataset in zip(file_paths, backup_file_paths, dataset_objects):
             dataset = self._remove_coordinates_qc_variables(dataset=dataset)
             encoding = self._process_encoding(dataset=dataset, parameters_type=parameters_type)
-            dataset.to_netcdf(file_path, engine="netcdf4",
-                                encoding=encoding)
+            
+            if not self._is_file_locked(file_path):
+                dataset.to_netcdf(file_path, engine="netcdf4",
+                                    encoding=encoding)
+                
+            else:
+                dataset.to_netcdf(backup_file_path, engine="netcdf4",
+                                    encoding=encoding)
+                raise RuntimeError(f"File was locked, saving to {backup_file_path}")
+                
 
 
         
