@@ -33,7 +33,7 @@ def main():
     imos_logging = IMOSLogging() 
     
     if vargs.site_to_process:
-        wb.buoys_metadata = wb.buoys_metadata.loc[[vargs.site_to_process]].copy()
+        wb.buoys_metadata = wb.buoys_metadata.loc[wb.buoys_metadata.index.isin(vargs.site_to_process)].copy()
     
     sites_error_logs = []
 
