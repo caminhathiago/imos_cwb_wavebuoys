@@ -1,0 +1,5 @@
+incoming_path/
+output_path/
+build/
+
+.env
