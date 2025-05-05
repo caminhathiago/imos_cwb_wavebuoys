@@ -45,9 +45,17 @@ def args_processing():
                         help="desired window unit (hours:Default, months).",
                         required=False)
 
-    parser.add_argument('-sp', '--site-to-process', dest='site_to_process', type=str, default=None,
-                        help="desired individual site to be processed.",
-                        required=False)
+    def parse_site_list(value):
+        return [site.strip() for site in value.split(',') if site.strip()]
+
+    parser.add_argument(
+        '-sp', '--site-to-process',
+        dest='site_to_process',
+        type=parse_site_list,
+        default=None,
+        help="Comma-separated list of sites to be processed (e.g., site1,site2,site3). A single site is also valid.",
+        required=False
+    )
 
     parser.add_argument('-pp', '--period-to-process', dest='period_to_process', type=str, default=None, nargs=2,
                         help="desired period to be extracted, processed and qualified. Please pass start and end dates as YYYY-mm-ddTHH:MM separated by a blank space.",
