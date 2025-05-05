@@ -24,7 +24,7 @@ def main():
     vargs = args_processing()
 
     # Start general logging
-    general_log_file = os.path.join(vargs.output_path, "logs", f"general_{os.path.basename(__file__).removesuffix(".py")}.log") # f"{runtime}_general_process.log"
+    general_log_file = os.path.join(vargs.incoming_path, "logs", f"general_{os.path.basename(__file__).removesuffix(".py")}.log") # f"{runtime}_general_process.log"
     GENERAL_LOGGER = IMOSLogging().logging_start(logger_name="general_logger",
                                                 logging_filepath=general_log_file)
 
@@ -41,7 +41,12 @@ def main():
         
         GENERAL_LOGGER.info(f"=========== {site.name.upper()} processing ===========")
 
-        site_log_file = os.path.join(vargs.incoming_path, "logs", f"{site.name.upper()}_{os.path.basename(__file__).removesuffix(".py")}.log") # f"{runtime}_[CURRENT_SITE]_process.log
+        site_log_file = os.path.join(vargs.incoming_path,
+                                     "sites",
+                                     site.name.replace("_",""), 
+                                     "logs", 
+                                     f"{site.name.upper()}_{os.path.basename(__file__).removesuffix(".py")}.log") # f"{runtime}_[CURRENT_SITE]_process.log
+        
         SITE_LOGGER = IMOSLogging().logging_start(logger_name="site_logger", logging_filepath=site_log_file)
         
         GENERAL_LOGGER.info(f"{site.name.upper()} log file created as {site_log_file}")
@@ -278,7 +283,8 @@ def main():
                                         parameters_type="bulk")
             # nc_file_names_embedded = nc_writer.compose_file_names_processing_source(file_names=nc_file_names_embedded,
             #                                                                         processing_source="embedded")           
-            nc_writer.save_nc_file(output_path=vargs.incoming_path,
+            nc_writer.save_nc_file(site_id=site.name,
+                                    output_path=vargs.incoming_path,
                                    file_names=nc_file_names_embedded,
                                    dataset_objects=ds_objects_embedded)
             SITE_LOGGER.info(f"embedded nc files saved to the output path as {nc_file_names_embedded}")

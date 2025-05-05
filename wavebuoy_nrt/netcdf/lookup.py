@@ -89,7 +89,8 @@ class NetCDFFileHandler():
                                                 monthly_datetime=month.strftime("%Y%m%d"),
                                                 site_id=site_id.replace("_","").upper())
             print(nc_file_name)
-            nc_file_path = os.path.join(incoming_path, nc_file_name)
+            site_id_processed = site_id.replace("_","")
+            nc_file_path = os.path.join(incoming_path, "sites", site_id_processed, nc_file_name)
             nc_file_paths_needed.append(nc_file_path)
 
         return nc_file_paths_needed
@@ -128,24 +129,36 @@ class NetCDFFileHandler():
 
         return operating_institution
 
-    def get_available_nc_files(self, files_path: str, deployment_metadata: pd.DataFrame, site_id: str, parameters_type: str = "bulk") -> list:
+    def get_available_nc_files(self, 
+                               files_path: str, 
+                               deployment_metadata: pd.DataFrame, 
+                               site_id: str, 
+                               parameters_type: str = "bulk") -> list:
         # operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata)
         # nc_file_filter = NC_FILE_NAME_TEMPLATE.format(operating_institution=operating_institution,# Temporary data
         #                                             monthly_datetime="*",
         #                                             site_id=site_id.upper())
         
+        site_name_processed = site_id.replace("_","")
+
         if parameters_type == "bulk":
-            nc_file_filter = f"*{site_id.replace("_","").upper()}_RT_WAVE-PARAMETERS*.nc"
+            nc_file_filter = f"*{site_name_processed.upper()}_RT_WAVE-PARAMETERS*.nc"
         elif parameters_type == "spectral":
-            nc_file_filter = f"*{site_id.replace("_","").upper()}_RT_WAVE-SPECTRA*.nc"
+            nc_file_filter = f"*{site_name_processed.upper()}_RT_WAVE-SPECTRA*.nc"
         else:
             error = "Please select a valid data type: 'bulk' or 'spectral'"
             SITE_LOGGER.error(error)
             raise TypeError(error)
 
-        nc_file_path = os.path.join(files_path, nc_file_filter)
+        sites_path = os.path.join(files_path, "sites")
+        if not os.path.exists(sites_path):
+            os.mkdir(sites_path)
 
-        return glob.glob(nc_file_path)
+        nc_file_path = os.path.join(sites_path, site_name_processed)
+        if not os.path.exists(nc_file_path):
+            os.mkdir(nc_file_path)
+
+        return glob.glob(os.path.join(nc_file_path, nc_file_filter))
     
     def get_latest_nc_file_available(self, files_path: str,deployment_metadata: pd.DataFrame, site_id:str, parameters_type: str = "bulk") -> str:
         

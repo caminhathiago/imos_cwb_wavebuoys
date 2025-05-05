@@ -742,13 +742,20 @@ class ncWriter(WaveBuoy):
         return [file_name.replace(".nc", f"_{processing_source}.nc") 
                     for file_name in file_names]
 
-    def _compose_file_paths(self, file_names: list, output_path: str, stage: str = "production") -> list:
-        
+    def _compose_file_paths(self,
+                            site_id: str,
+                            file_names: list,
+                            output_path: str,
+                            stage: str = "production") -> list:
+
+        output_path = os.path.join(output_path, "sites")        
+        site_id_processed = site_id.replace("_","")
+
         if stage == "production":
-            return [os.path.join(output_path, file_name) for file_name in file_names]
+            return [os.path.join(output_path, site_id_processed, file_name) for file_name in file_names]
         
         elif stage == "backup":
-            backup_path = os.path.join(output_path, "backup_files")
+            backup_path = os.path.join(output_path, site_id_processed, "backup_files")
             if not os.path.isdir(backup_path):
                 os.makedirs(backup_path)
             return [os.path.join(backup_path, file_name) for file_name in file_names]
@@ -804,15 +811,19 @@ class ncWriter(WaveBuoy):
         return False
     
     def save_nc_file(self, 
+                     site_id: str,
                      output_path: str,
                      file_names: str,
                      dataset_objects: xr.Dataset,
                      parameters_type: str = "bulk"):
-        file_paths = self._compose_file_paths(output_path=output_path,
-                                                 file_names=file_names)       
-        backup_file_paths = self._compose_file_paths(output_path=output_path,
-                                                 file_names=file_names,
-                                                 stage="backup") 
+        file_paths = self._compose_file_paths(site_id=site_id,
+                                                output_path=output_path,
+                                                file_names=file_names)       
+        backup_file_paths = self._compose_file_paths(site_id=site_id,
+                                                        output_path=output_path,
+                                                        file_names=file_names,
+                                                        stage="backup") 
+        
         for file_path, backup_file_path, dataset in zip(file_paths, backup_file_paths, dataset_objects):
             dataset = self._remove_coordinates_qc_variables(dataset=dataset)
             encoding = self._process_encoding(dataset=dataset, parameters_type=parameters_type)
