@@ -3,5 +3,7 @@ incoming_path_dep/
 pipeline_design/
 output_path/
 build/
+wavebuoy_dm/
+tests/
 
 .env
