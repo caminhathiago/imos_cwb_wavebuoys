@@ -107,8 +107,10 @@ class ncPusher:
 
     def grab_nc_files_to_push(self, incoming_path: str, lookback_hours: timedelta = 1) -> list:
         
-        condition = os.path.join(incoming_path, "*.nc")
-        file_paths = glob.glob(condition)
+        sites = glob.glob(os.path.join(incoming_path,"sites", "*"))
+        file_paths = []
+        for site in sites:
+            file_paths.extend(glob.glob(os.path.join(site, "*.nc")))
         
         file_times = []
         for file_path in file_paths:
