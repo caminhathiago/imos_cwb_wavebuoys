@@ -147,8 +147,12 @@ class ncPusher:
             files_report["files_pushed"].append(file["file_name"])
         elif error:
             if exception:
-                files_report["files_error"].append({"file_name": file["file_name"],
-                                        "error": str(exception)})
+                files_report["files_error"].append({
+                                        "file_name": file["file_name"],
+                                        "error": str(exception),
+                                        "validation_results": validation_results
+                                        })
+                
             else:
                 raise Exception("Exception not provided.")
             

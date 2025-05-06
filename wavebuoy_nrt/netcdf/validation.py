@@ -26,7 +26,7 @@ class ncValidator():
         if not re.fullmatch(pattern_bulk, file_name) and not re.fullmatch(pattern_spectral, file_name):
             error = f"File name not matching templates {NC_FILE_NAME_TEMPLATE} or {NC_SPECTRAL_FILE_NAME_TEMPLATE}"
             LOGGER.error(error)
-            raise ValueError(error)
+            return f"validate_file_name - failed: {error}"
         
         # Specific matching
         file_name_parts = file_name.split("_")
@@ -37,16 +37,21 @@ class ncValidator():
         if file_name_parts[0] not in OPERATING_INSTITUTIONS.values():
             error = f"Operating institution '{file_name_parts[0]}' not in {list(OPERATING_INSTITUTIONS.values())}"
             LOGGER.error(error)
-            raise ValueError(error)
+            return f"validate_file_name - failed: {error}"
         
+        return "validate_file_name - passed"
         # if file_name_parts[2] not in 
 
     @staticmethod        
     def validade_nc_integrity(file_path: str):
         try:
             ds = Dataset(file_path)
-        except Exception as e:
-            LOGGER.error(str(e), exc_info=True)
+            return f"validade_nc_integrity - failed: {str(e)}"
+            return f"validade_nc_integrity - failed: {str(e)}"
+        
+        return "validade_nc_integrity - passed"
+        
+        
 
     @staticmethod
     def validade_variables_attributes(Dataset: Dataset):
