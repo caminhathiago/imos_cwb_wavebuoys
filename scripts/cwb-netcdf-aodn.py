@@ -46,6 +46,7 @@ def main():
                 LOGGER.info(f"="*60)
                 LOGGER.info(f"pushing {file['file_name']}")
                 
+                validation_results = []
                 try:
                     validation_results.append(ncValidator().validate_file_name(file["file_name"]))
                     LOGGER.info("file name validation passed")
@@ -68,9 +69,11 @@ def main():
                     error_message = f"Error pushing file: {file['file_name']}"
                     LOGGER.error(error_message)
                     LOGGER.error(str(e), exc_info=True)
+                    
                     ncp.update_files_report(files_report=files_report,
                                             file=file,
                                             error=True,
+                                            validation_results=validation_results,
                                             exception=e)
                     
                     continue
@@ -94,10 +97,11 @@ def main():
         print(logger_file_path)
         imos_logging.logging_stop(logger=LOGGER)
         error_logger_file_path = imos_logging.rename_push_log_if_error(file_path=logger_file_path, add_runtime=True)
-        e = Email(script_name=os.path.basename(__file__),
-                  email=os.getenv("EMAIL_TO"),
-                  log_file_path=error_logger_file_path)
-        e.send()
+        if vargs.email_alert:
+            e = Email(script_name=os.path.basename(__file__),
+                    email=os.getenv("EMAIL_TO"),
+                    log_file_path=error_logger_file_path)
+            e.send()
 
 if __name__ == "__main__":
     main()

@@ -144,7 +144,7 @@ class ncPusher:
     def create_files_report(self) -> dict:
         return {"files_pushed":[], "files_error":[]}
     
-    def update_files_report(self, files_report: dict, file: dict, error: bool = False, exception = None) -> dict:
+    def update_files_report(self, files_report: dict, file: dict, error: bool = False, validation_results: list = None, exception = None) -> dict:
         if not error:
             files_report["files_pushed"].append(file["file_name"])
         elif error:

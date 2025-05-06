@@ -18,10 +18,10 @@ class ncValidator():
         if file_path:
             file_name = os.path.basename(file_path)
         if not file_name:
-            raise ValueError("Either 'file_name' or 'file_path' must be provided.")
+            return ValueError("Either 'file_name' or 'file_path' must be provided.")
         
-        pattern_bulk = "^[A-Za-z-_]+_\d{8}_[A-Z_]+_RT_WAVE-PARAMETERS_monthly\.nc"
-        pattern_spectral = "^[A-Za-z-_]+_\d{8}_[A-Z_]+_RT_WAVE-SPECTRA_monthly\.nc"
+        pattern_bulk = r"^[A-Za-z_-]+_\d{8}_[A-Za-z0-9]+_RT_WAVE-PARAMETERS_monthly\.nc$"
+        pattern_spectral = r"^[A-Za-z_-]+_\d{8}_[A-Za-z0-9]+_RT_WAVE-SPECTRA_monthly\.nc$"
 
         if not re.fullmatch(pattern_bulk, file_name) and not re.fullmatch(pattern_spectral, file_name):
             error = f"File name not matching templates {NC_FILE_NAME_TEMPLATE} or {NC_SPECTRAL_FILE_NAME_TEMPLATE}"
@@ -46,13 +46,11 @@ class ncValidator():
     def validade_nc_integrity(file_path: str):
         try:
             ds = Dataset(file_path)
-            return f"validade_nc_integrity - failed: {str(e)}"
+        except Exception as e:
             return f"validade_nc_integrity - failed: {str(e)}"
         
         return "validade_nc_integrity - passed"
         
-        
-
     @staticmethod
     def validade_variables_attributes(Dataset: Dataset):
         pass
