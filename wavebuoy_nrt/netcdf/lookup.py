@@ -11,9 +11,7 @@ import glob
 import re
 from dotenv import load_dotenv
 
-from wavebuoy_nrt.config.config import (NC_FILE_NAME_TEMPLATE,
-                                        OPERATING_INSTITUTIONS,
-                                        NC_SPECTRAL_FILE_NAME_TEMPLATE)
+from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, NC_SPECTRAL_FILE_NAME_TEMPLATE
 
 GENERAL_LOGGER = logging.getLogger("general_logger")
 SITE_LOGGER = logging.getLogger("site_logger")
@@ -58,6 +56,7 @@ class NetCDFFileHandler():
 
     def lookup_netcdf_files_needed(self, 
                             deployment_metadata: pd.DataFrame,
+                            regional_metadata: pd.DataFrame,
                             site_id: str, 
                             latest_available_datetime: datetime,
                             #minimum_datetime_recursion:datetime=datetime(2020,1,1), # This should be less than the minimum Datetime of the first spotter we ever deployed
@@ -72,7 +71,8 @@ class NetCDFFileHandler():
         monthly_daterange = self._generate_monthly_daterange(start_date=window_start_date,
                                                             end_date=latest_available_datetime)
         
-        operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata)
+        operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata,
+                                                                regional_metadata=regional_metadata)
         
         if data_type == "bulk":
             file_name_template = NC_FILE_NAME_TEMPLATE
@@ -116,18 +116,22 @@ class NetCDFFileHandler():
 
         return monthly_daterange    
 
-    def _get_operating_institution(self, deployment_metadata: pd.DataFrame) -> str:
+    def _get_operating_institution(self, deployment_metadata: pd.DataFrame, regional_metadata: pd.DataFrame) -> str:
         operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
         print(operating_institution)
         if "IMOS" in operating_institution:
-            operating_institution = "IMOS_COASTAL-WAVE-BUOYS"
+            return "IMOS_COASTAL-WAVE-BUOYS"
         elif "IMOS" not in operating_institution:
             try:
-                operating_institution = OPERATING_INSTITUTIONS[operating_institution]
+                # operating_institution = OPERATING_INSTITUTIONS[operating_institution]
+                return (regional_metadata
+                        .loc[regional_metadata["operating_institution"] == operating_institution,"operating_institution_nc_preffix"]
+                        .values[0]
+                    )
+
+
             except:
                 raise ValueError(f"{operating_institution} not valid. Please make sure the operating institution code is valid in the deployment metadata file")
-
-        return operating_institution
 
     def get_available_nc_files(self, 
                                files_path: str, 

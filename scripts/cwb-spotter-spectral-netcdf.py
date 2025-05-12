@@ -69,6 +69,7 @@ def main():
 
             if nc_files_available:
                 nc_files_needed = wb.lookup_netcdf_files_needed(deployment_metadata=deployment_metadata,
+                                                                regional_metadata=regional_metadata,
                                                             site_id=site.name,
                                                             incoming_path=vargs.incoming_path,
                                                             latest_available_datetime=latest_available_time,
@@ -217,6 +218,7 @@ def main():
                                         site_id=site.name.upper(),
                                         periods=periods_embedded,
                                         deployment_metadata=deployment_metadata,
+                                        regional_metadata=regional_metadata,
                                         parameters_type="spectral")
 
 
