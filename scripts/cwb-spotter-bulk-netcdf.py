@@ -24,7 +24,7 @@ def main():
     vargs = args_processing()
 
     # Start general logging
-    general_log_file = os.path.join(vargs.output_path, "logs", f"general_{os.path.basename(__file__).removesuffix(".py")}.log") # f"{runtime}_general_process.log"
+    general_log_file = os.path.join(vargs.incoming_path, "logs", f"general_{os.path.basename(__file__).removesuffix(".py")}.log") # f"{runtime}_general_process.log"
     GENERAL_LOGGER = IMOSLogging().logging_start(logger_name="general_logger",
                                                 logging_filepath=general_log_file)
 
@@ -41,7 +41,12 @@ def main():
         
         GENERAL_LOGGER.info(f"=========== {site.name.upper()} processing ===========")
 
-        site_log_file = os.path.join(vargs.incoming_path, "logs", f"{site.name.upper()}_{os.path.basename(__file__).removesuffix(".py")}.log") # f"{runtime}_[CURRENT_SITE]_process.log
+        site_log_file = os.path.join(vargs.incoming_path,
+                                     "sites",
+                                     site.name.replace("_",""), 
+                                     "logs", 
+                                     f"{site.name.upper()}_{os.path.basename(__file__).removesuffix(".py")}.log") # f"{runtime}_[CURRENT_SITE]_process.log
+        
         SITE_LOGGER = IMOSLogging().logging_start(logger_name="site_logger", logging_filepath=site_log_file)
         
         GENERAL_LOGGER.info(f"{site.name.upper()} log file created as {site_log_file}")
@@ -72,6 +77,7 @@ def main():
 
             if nc_files_available:
                 nc_files_needed = wb.lookup_netcdf_files_needed(deployment_metadata=deployment_metadata,
+                                                                regional_metadata=regional_metadata,
                                                             site_id=site.name,
                                                             latest_available_datetime=latest_available_time,
                                                             window=int(vargs.window),
@@ -193,7 +199,7 @@ def main():
                 all_data_df = all_new_data_df
             
             # TEMPORARY SETUP (REMOVE WHEN DONE)
-            csvOutput.save_csv(data=all_data_df, site_name=site.name.upper(), file_path=vargs.incoming_path, file_name_preffix="_all_data.csv")
+            csvOutput.save_csv(data=all_data_df, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves.csv")
             
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
             
@@ -230,7 +236,8 @@ def main():
             # qualified_data_summarized = qc.summarize_flags(data=qualified_data, parameter_type="waves")
 
             # TEMPORARY SETUP (REMOVE WHEN DONE)
-            csvOutput.save_csv(data=qualified_data_embedded, site_name=site.name.upper(), file_path=vargs.incoming_path, file_name_preffix="_all_data_qualified.csv")
+            csvOutput.save_csv(data=all_data_df, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves_qc_subflags.csv")
+            csvOutput.save_csv(data=qualified_data_embedded, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves_qc.csv")
             # if not all_data_hdr.empty:
             #     csv_file_path_hdr = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_qualified_hdr.csv")
             #     qualified_data_hdr.to_csv(csv_file_path_hdr, index=False)
@@ -275,10 +282,12 @@ def main():
                                         site_id=site.name.upper(),
                                         periods=periods_embedded,
                                         deployment_metadata=deployment_metadata,
+                                        regional_metadata=regional_metadata,
                                         parameters_type="bulk")
             # nc_file_names_embedded = nc_writer.compose_file_names_processing_source(file_names=nc_file_names_embedded,
             #                                                                         processing_source="embedded")           
-            nc_writer.save_nc_file(output_path=vargs.incoming_path,
+            nc_writer.save_nc_file(site_id=site.name,
+                                    output_path=vargs.incoming_path,
                                    file_names=nc_file_names_embedded,
                                    dataset_objects=ds_objects_embedded)
             SITE_LOGGER.info(f"embedded nc files saved to the output path as {nc_file_names_embedded}")

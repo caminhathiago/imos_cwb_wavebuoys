@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 import wavebuoy_nrt.config as config
 from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
-from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, NC_SPECTRAL_FILE_NAME_TEMPLATE, OPERATING_INSTITUTIONS
+from wavebuoy_nrt.config.config import NC_FILE_NAME_TEMPLATE, NC_SPECTRAL_FILE_NAME_TEMPLATE
 
 load_dotenv()
 
@@ -91,7 +91,7 @@ class ncMetaDataLoader:
 
     def _get_latest_deployment_metadata(self, file_paths: list) -> list:
         
-        self._validate_deployment_metadata_file_name(file_paths=file_paths)
+        file_paths = self._validate_deployment_metadata_file_name(file_paths=file_paths)
         
         file_paths.sort(key=os.path.getctime)
         latest_created_file = file_paths[-1]
@@ -129,6 +129,7 @@ class ncMetaDataLoader:
 
         elif temp_files and not not_matches:
             SITE_LOGGER.warning(f"the following deployment metadata sheets weren't closed properly: {temp_files}")
+            return matches
 
         elif not_matches:
             SITE_LOGGER.warning(file_paths)
@@ -136,6 +137,8 @@ class ncMetaDataLoader:
             error_message = "At least one of the deployment metadata files name is not conforming with the expected template (metadata_{site_name}_deploy{YYYYmmdd}.xlsx). Make sure all of them are conforming."
             SITE_LOGGER.error(error_message)
             raise NameError(error_message)
+        
+        return matches
 
     def load_latest_deployment_metadata(self, site_name:str) -> pd.DataFrame:
         region_folder = self._get_deployment_metadata_region_folders(site_name=site_name)
@@ -227,19 +230,6 @@ class ncAttrsExtractor:
 
     def _extract_deployment_metadata_hull_serial_number(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Hull serial number", "metadata_wave_buoy"]
-    
-    def _extract_deployment_metadata_institution(deployment_metadata: pd.DataFrame) -> str:
-        op_inst_code = {"UWA":"The University of Western Australia",
-                          "Deakin":"Deakin University",
-                          "NSW-DCCEEW" : "New South Wales Department of Climate Change, Energy, the Environment and Water",
-                          "IMOS":"IMOS Coastal Wave Buoys",
-                          "SARDI": "South Australian Research and Development Institute"
-                          }
-        operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
-        if "IMOS" in operating_institution:
-            return op_inst_code["IMOS"]
-        else:
-            return op_inst_code[operating_institution]
         # return NetCDFFileHandler()._get_operating_institution(deployment_metadata=deployment_metadata)
     
     def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame) -> str:
@@ -266,17 +256,17 @@ class ncAttrsExtractor:
     def _extract_deployment_metadata_wave_sensor_serial_number(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Wave sensor serial number", "metadata_wave_buoy"]
 
-    def _extract_deployment_metadata_title(deployment_metadata: pd.DataFrame) -> str:
+    def _extract_deployment_metadata_title(deployment_metadata: pd.DataFrame, regional_metadata: pd.DataFrame) -> str:
         base_title = """Near real time integral wave parameters from wave buoys collected by {operating_institution} using a {instrument} at {site_name}"""
-        operating_institution = ncAttrsExtractor._extract_deployment_metadata_institution(deployment_metadata=deployment_metadata)
+        operating_institution = ncAttrsExtractor._extract_regional_metadata_institution(deployment_metadata=deployment_metadata, regional_metadata=regional_metadata)
         instrument = ncAttrsExtractor._extract_deployment_metadata_instrument(deployment_metadata=deployment_metadata)
         site_name = ncAttrsExtractor._extract_deployment_metadata_site_name(deployment_metadata=deployment_metadata)
         return base_title.format(operating_institution=operating_institution,
                                 instrument=instrument,
                                 site_name=site_name)
 
-    def _extract_deployment_metadata_abstract(deployment_metadata: pd.DataFrame) -> str:
-        return ncAttrsExtractor._extract_deployment_metadata_title(deployment_metadata=deployment_metadata)
+    def _extract_deployment_metadata_abstract(deployment_metadata: pd.DataFrame, regional_metadata:pd.DataFrame) -> str:
+        return ncAttrsExtractor._extract_deployment_metadata_title(deployment_metadata=deployment_metadata, regional_metadata=regional_metadata)
 
     # from regional metadata -------------
     def _process_operating_institution(deployment_metadata: pd.DataFrame) -> str:
@@ -306,6 +296,25 @@ class ncAttrsExtractor:
     def _extract_regional_metadata_project(regional_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame) -> str:
         operating_institution_code = ncAttrsExtractor._process_operating_institution(deployment_metadata=deployment_metadata)
         return regional_metadata.loc[regional_metadata["operating_institution"]==operating_institution_code, "project"].values[0]
+
+    def  _extract_regional_metadata_institution(regional_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame) -> str:
+        operating_institution_code = ncAttrsExtractor._process_operating_institution(deployment_metadata=deployment_metadata)
+        return regional_metadata.loc[regional_metadata["operating_institution"]==operating_institution_code, "operating_institution_long_name"].values[0]
+        # op_inst_code = {"UWA":"The University of Western Australia",
+        #                   "Deakin":"Deakin University",
+        #                   "NSW-DCCEEW" : "New South Wales Department of Climate Change, Energy, the Environment and Water",
+        #                   "IMOS":"IMOS Coastal Wave Buoys",
+        #                   "SARDI": "South Australian Research and Development Institute",
+        #                   "SARDI-DEW": "TEST",
+        #                   "SARDI-Flinders": "SARDI-Flinders University",
+        #                   "DEW": "DEW"
+        #                   }
+        # operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
+        # if "IMOS" in operating_institution:
+        #     return op_inst_code["IMOS"]
+        # else:
+        #     return op_inst_code[operating_institution]
+
 
     # generally pre-defined --------------------
     def _extract_data_history(dataset: xr.Dataset) -> str:
@@ -439,6 +448,8 @@ class ncAttrsComposer:
                     elif name.startswith("_extract_deployment_metadata_"):
                         key = name.removeprefix("_extract_deployment_metadata_") 
                         kwargs = {"deployment_metadata":self.deployment_metadata}
+                        if name.endswith("_title") or name.endswith("_abstract"):
+                            kwargs.update({"regional_metadata":self.regional_metadata})
                     
                     elif name.startswith("_extract_general_"):
                         key = name.removeprefix("_extract_general_") 
@@ -691,18 +702,24 @@ class ncWriter(WaveBuoy):
         nc_output_paths = []
         return nc_output_paths
 
-    def _get_operating_institution(self, deployment_metadata: pd.DataFrame) -> str:
+    def _get_operating_institution(self, deployment_metadata: pd.DataFrame, regional_metadata: pd.DataFrame) -> str:
         operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
         print(operating_institution)
         if "IMOS" in operating_institution:
-            operating_institution = "IMOS_COASTAL-WAVE-BUOYS"
+            return "IMOS_COASTAL-WAVE-BUOYS"
         elif "IMOS" not in operating_institution:
             try:
-                operating_institution = OPERATING_INSTITUTIONS[operating_institution]
+                # operating_institution = OPERATING_INSTITUTIONS[operating_institution]
+                return (regional_metadata
+                        .loc[regional_metadata["operating_institution"] == operating_institution,"operating_institution_nc_preffix"]
+                        .values[0]
+                    )
+
             except:
                 raise ValueError(f"{operating_institution} not valid. Please make sure the operating institution code is valid in the deployment metadata file")
 
-        return operating_institution
+        
+
 
     # def _validate_operating_institution(self, deployment_metadata: pd.DataFrame):
     #     operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
@@ -716,6 +733,7 @@ class ncWriter(WaveBuoy):
     def compose_file_names(self,
                             site_id: str,
                             deployment_metadata: pd.DataFrame,
+                            regional_metadata: pd.DataFrame,
                             periods: PeriodIndex,
                             parameters_type: str = "bulk") -> List[str]:
         
@@ -727,7 +745,8 @@ class ncWriter(WaveBuoy):
         periods_formated = self._format_periods(periods=periods)
         file_names = []
 
-        operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata)
+        operating_institution = self._get_operating_institution(deployment_metadata=deployment_metadata,
+                                                                regional_metadata=regional_metadata)
         site_id = re.sub(r'_+', '', site_id).strip()
 
         for period in periods_formated:
@@ -742,13 +761,20 @@ class ncWriter(WaveBuoy):
         return [file_name.replace(".nc", f"_{processing_source}.nc") 
                     for file_name in file_names]
 
-    def _compose_file_paths(self, file_names: list, output_path: str, stage: str = "production") -> list:
-        
+    def _compose_file_paths(self,
+                            site_id: str,
+                            file_names: list,
+                            output_path: str,
+                            stage: str = "production") -> list:
+
+        output_path = os.path.join(output_path, "sites")        
+        site_id_processed = site_id.replace("_","")
+
         if stage == "production":
-            return [os.path.join(output_path, file_name) for file_name in file_names]
+            return [os.path.join(output_path, site_id_processed, file_name) for file_name in file_names]
         
         elif stage == "backup":
-            backup_path = os.path.join(output_path, "backup_files")
+            backup_path = os.path.join(output_path, site_id_processed, "backup_files")
             if not os.path.isdir(backup_path):
                 os.makedirs(backup_path)
             return [os.path.join(backup_path, file_name) for file_name in file_names]
@@ -804,15 +830,19 @@ class ncWriter(WaveBuoy):
         return False
     
     def save_nc_file(self, 
+                     site_id: str,
                      output_path: str,
                      file_names: str,
                      dataset_objects: xr.Dataset,
                      parameters_type: str = "bulk"):
-        file_paths = self._compose_file_paths(output_path=output_path,
-                                                 file_names=file_names)       
-        backup_file_paths = self._compose_file_paths(output_path=output_path,
-                                                 file_names=file_names,
-                                                 stage="backup") 
+        file_paths = self._compose_file_paths(site_id=site_id,
+                                                output_path=output_path,
+                                                file_names=file_names)       
+        backup_file_paths = self._compose_file_paths(site_id=site_id,
+                                                        output_path=output_path,
+                                                        file_names=file_names,
+                                                        stage="backup") 
+        
         for file_path, backup_file_path, dataset in zip(file_paths, backup_file_paths, dataset_objects):
             dataset = self._remove_coordinates_qc_variables(dataset=dataset)
             encoding = self._process_encoding(dataset=dataset, parameters_type=parameters_type)

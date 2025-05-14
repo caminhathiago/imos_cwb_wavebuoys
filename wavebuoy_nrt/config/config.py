@@ -1,9 +1,3 @@
-OPERATING_INSTITUTIONS = {"UWA":"UWA",
-                          "Deakin":"VIC-DEAKIN-UNI",
-                          "NSW-DCCEEW" : "NSW-DPE",
-                          "IMOS":"IMOS_COASTAL-WAVE-BUOYS",
-                          "SARDI": "SARDI"
-                          }
 
 NC_FILE_NAME_TEMPLATE = "{operating_institution}_{monthly_datetime}_{site_id}_RT_WAVE-PARAMETERS_monthly.nc"
 NC_SPECTRAL_FILE_NAME_TEMPLATE = "{operating_institution}_{monthly_datetime}_{site_id}_RT_WAVE-SPECTRA_monthly.nc"

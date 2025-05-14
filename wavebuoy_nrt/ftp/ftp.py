@@ -107,8 +107,10 @@ class ncPusher:
 
     def grab_nc_files_to_push(self, incoming_path: str, lookback_hours: timedelta = 1) -> list:
         
-        condition = os.path.join(incoming_path, "*.nc")
-        file_paths = glob.glob(condition)
+        sites = glob.glob(os.path.join(incoming_path,"sites", "*"))
+        file_paths = []
+        for site in sites:
+            file_paths.extend(glob.glob(os.path.join(site, "*.nc")))
         
         file_times = []
         for file_path in file_paths:
@@ -142,13 +144,17 @@ class ncPusher:
     def create_files_report(self) -> dict:
         return {"files_pushed":[], "files_error":[]}
     
-    def update_files_report(self, files_report: dict, file: dict, error: bool = False, exception = None) -> dict:
+    def update_files_report(self, files_report: dict, file: dict, error: bool = False, validation_results: list = None, exception = None) -> dict:
         if not error:
             files_report["files_pushed"].append(file["file_name"])
         elif error:
             if exception:
-                files_report["files_error"].append({"file_name": file["file_name"],
-                                        "error": str(exception)})
+                files_report["files_error"].append({
+                                        "file_name": file["file_name"],
+                                        "error": str(exception),
+                                        "validation_results": validation_results
+                                        })
+                
             else:
                 raise Exception("Exception not provided.")
             
