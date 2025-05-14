@@ -181,11 +181,13 @@ class WaveBuoyQC():
                         parameter: str,
                         qc_config: dict) -> pd.DataFrame:
        
-              
+        
+        time_freq = data["TIME"].diff().mean().seconds
+
         results = qartod.rate_of_change_test(
             inp=data[parameter],
             tinp=data["TIME"],
-            threshold=[qc_config[parameter]["rate_of_change_threshold"]]
+            threshold=[qc_config[parameter]["rate_of_change_threshold"]/time_freq] 
         )
         
         
