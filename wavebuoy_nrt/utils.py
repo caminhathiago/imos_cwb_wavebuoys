@@ -312,13 +312,14 @@ class csvOutput:
         
         dataframes = csvOutput.extract_monthly_date(data)        
         
-        output_path = os.path.join(file_path, "csv")
+        site_name_processed = site_name.replace("_", "")
+        output_path = os.path.join(file_path, "sites", site_name_processed, "csv")
         if not os.path.isdir(output_path):
             os.makedirs(output_path)
 
         for dataframe in dataframes:
             period_str = csvOutput.format_period(dataframe[0])
-            file_name = period_str + "_" + site_name + file_name_preffix
+            file_name = period_str + "_" + site_name.upper() + file_name_preffix
             file_output_path = os.path.join(output_path, file_name)
             data.reset_index().to_csv(file_output_path, index=False)
             SITE_LOGGER.info(f"file saved as {output_path}")

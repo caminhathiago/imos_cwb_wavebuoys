@@ -199,7 +199,7 @@ def main():
                 all_data_df = all_new_data_df
             
             # TEMPORARY SETUP (REMOVE WHEN DONE)
-            csvOutput.save_csv(data=all_data_df, site_name=site.name.upper(), file_path=vargs.incoming_path, file_name_preffix="_all_data.csv")
+            csvOutput.save_csv(data=all_data_df, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_all_data.csv")
             
             # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
             
@@ -236,7 +236,7 @@ def main():
             # qualified_data_summarized = qc.summarize_flags(data=qualified_data, parameter_type="waves")
 
             # TEMPORARY SETUP (REMOVE WHEN DONE)
-            csvOutput.save_csv(data=qualified_data_embedded, site_name=site.name.upper(), file_path=vargs.incoming_path, file_name_preffix="_all_data_qualified.csv")
+            csvOutput.save_csv(data=qualified_data_embedded, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_all_data_qualified.csv")
             # if not all_data_hdr.empty:
             #     csv_file_path_hdr = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_qualified_hdr.csv")
             #     qualified_data_hdr.to_csv(csv_file_path_hdr, index=False)
