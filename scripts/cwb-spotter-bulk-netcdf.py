@@ -11,6 +11,7 @@ from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
 from wavebuoy_nrt.qc.qcTests import WaveBuoyQC
 from wavebuoy_nrt.netcdf.writer import ncWriter, ncAttrsComposer, ncAttrsExtractor, ncProcessor, ncMetaDataLoader
+from wavebuoy_nrt.netcdf.validation import ncValidator
 from wavebuoy_nrt.utils import args_processing, IMOSLogging, generalTesting, csvOutput
 from wavebuoy_nrt.alerts.email import Email
 
@@ -49,7 +50,6 @@ def main():
         
         SITE_LOGGER = IMOSLogging().logging_start(logger_name="site_logger", logging_filepath=site_log_file)
         
-        GENERAL_LOGGER.info(f"{site.name.upper()} log file created as {site_log_file}")
         SITE_LOGGER.info(f"{site.name.upper()} processing start")
 
         try:       
@@ -163,20 +163,7 @@ def main():
             SITE_LOGGER.info("PRE-PROCESSING STEP ====================================")
 
             waves = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="waves")
-            waves = wb.convert_to_datetime(data=waves)          
-
-            # if new_raw_data["surfaceTemp"]:
-            #     temp = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
-            #     temp = wb.convert_to_datetime(data=temp)
-            #     # generalTesting().generate_pickle_file(data=temp, file_name="surfaceTemp_new_data", site_name=site.name)
-            #     SITE_LOGGER.info(f"temp data converted to DataFrame and pre-processed if exists")
-
-            #     all_new_data_df = wb.merge_parameter_types(waves=waves,
-            #                                            temp=temp,
-            #                                            consider_processing_source=True,
-            #                                            how='outer')
-            # else:
-            #     all_new_data_df = waves.copy()
+            waves = wb.convert_to_datetime(data=waves)         
             
             all_new_data_df = waves.copy()
             all_new_data_df = wb.create_timeseries_aodn_column(data=all_new_data_df)
@@ -198,10 +185,7 @@ def main():
             else:
                 all_data_df = all_new_data_df
             
-            # TEMPORARY SETUP (REMOVE WHEN DONE)
             csvOutput.save_csv(data=all_data_df, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves.csv")
-            
-            # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
             
             # Qualification ---------------------------------------
             # GENERAL_LOGGER.info("Starting qualification step")
@@ -211,9 +195,6 @@ def main():
 
             all_data_df = qc.create_global_qc_columns(data=all_data_df)
             
-            # all_data_hdr = wb.select_processing_source(data=all_data_df, processing_source="hdr")
-            # all_data_embedded = wb.select_processing_source(data=all_data_df, processing_source="embedded")
-
             qc.load_data(data=all_data_df)
             parameters_to_qc = qc.get_parameters_to_qc(data=all_data_df, qc_config=qc.qc_config)      
             qualified_data_embedded = qc.qualify(data=all_data_df,
@@ -222,27 +203,8 @@ def main():
                                         rate_of_change_test=True)
             SITE_LOGGER.info("Qualification successfull")
             
-
-            # if not all_data_hdr.empty:
-            #     qc = WaveBuoyQC(config_id=1)
-            #     qc.load_data(data=all_data_hdr)
-            #     parameters_to_qc = qc.get_parameters_to_qc(data=all_data_hdr, qc_config=qc.qc_config)      
-            #     qualified_data_hdr = qc.qualify(data=all_data_hdr,
-            #                                 parameters=parameters_to_qc,
-            #                                 gross_range_test=True,
-            #                                 rate_of_change_test=True)
-
-
-            # qualified_data_summarized = qc.summarize_flags(data=qualified_data, parameter_type="waves")
-
-            # TEMPORARY SETUP (REMOVE WHEN DONE)
             csvOutput.save_csv(data=all_data_df, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves_qc_subflags.csv")
             csvOutput.save_csv(data=qualified_data_embedded, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves_qc.csv")
-            # if not all_data_hdr.empty:
-            #     csv_file_path_hdr = os.path.join(vargs.output_path, "test_files", f"{site.name.lower()}_qualified_hdr.csv")
-            #     qualified_data_hdr.to_csv(csv_file_path_hdr, index=False)
-            #     SITE_LOGGER.info(f"qualified data saved as '{csv_file_path_hdr}'")
-            # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
             
             # Processing Nc File --------------------------------------------
             SITE_LOGGER.info("NC FILE PROCESSING STEP ====================================")
@@ -275,57 +237,32 @@ def main():
             ds_objects_embedded = nc_attrs_composer.assign_variables_attributes_dataset_objects(dataset_objects=ds_objects_embedded)
             SITE_LOGGER.info("variables attributes assigned to datasets")
             
-            # ds_objects_embedded = ncProcessor.convert_dtypes_dataset_objects(dataset_objects=ds_objects_embedded)
-            # SITE_LOGGER.info("variables dtypes converted and now conforming to template")
-
             nc_file_names_embedded = nc_writer.compose_file_names(
                                         site_id=site.name.upper(),
                                         periods=periods_embedded,
                                         deployment_metadata=deployment_metadata,
                                         regional_metadata=regional_metadata,
                                         parameters_type="bulk")
-            # nc_file_names_embedded = nc_writer.compose_file_names_processing_source(file_names=nc_file_names_embedded,
-            #                                                                         processing_source="embedded")           
-            nc_writer.save_nc_file(site_id=site.name,
-                                    output_path=vargs.incoming_path,
-                                   file_names=nc_file_names_embedded,
-                                   dataset_objects=ds_objects_embedded)
-            SITE_LOGGER.info(f"embedded nc files saved to the output path as {nc_file_names_embedded}")
-            
-            
-            # if not all_data_hdr.empty:
-            #     ds_hdr = ncProcessor.compose_dataset(data=qualified_data_hdr)
-            #     SITE_LOGGER.info("hdr dataset composed")
+           
+           # Validation before saving
+           
+            reports_path = ncValidator().generate_reports_path(site.name, vargs.incoming_path)
+            for nc_file_name, ds_object in zip(nc_file_names_embedded, ds_objects_embedded):
+                validation_log = ncValidator().create_validation_log_contents(nc_file_name)
+                ncValidator().validate_regional_metadata(nc_file_name, ds_object, regional_metadata, validation_log)
+                ncValidator().validate_spot_id(site.name, ds_object, deployment_metadata, wb.buoys_metadata, validation_log)
+                # ncValidator().validate_site_name(site.name, ds_object, deployment_metadata, validation_log)
+                ncValidator().save_validation_log(reports_path, nc_file_name, validation_log)
 
-            #     ds_hdr = nc_attrs_composer.assign_general_attributes(dataset=ds_hdr, site_name=site.name)
-            #     SITE_LOGGER.info("general attributes assigned to embedded dataset")
-                
-            #     ds_embedded = ncProcessor.create_timeseries_variable(dataset=ds_embedded)
-            #     SITE_LOGGER.info("time series variable created in embedded dataset")
-
-            #     periods_hdr = ncProcessor.extract_monthly_periods_dataset(dataset=ds_hdr)
-            #     ds_objects_hdr = ncProcessor.split_dataset_monthly(dataset=ds_hdr, periods=periods_hdr)
-            #     SITE_LOGGER.info(f"combined dataset split monthly for periods {periods_hdr}")
-                
-            #     ds_objects_hdr = ncProcessor.process_time_to_CF_convention(dataset_objects=ds_objects_hdr)
-            #     SITE_LOGGER.info("dataset objects time dimension processed to conform to CF conventions")
-                
-            #     ds_objects_hdr = nc_attrs_composer.assign_variables_attributes_dataset_objects(dataset_objects=ds_objects_hdr)
-            #     SITE_LOGGER.info("variables attributes assigned to datasets")
-                
-            #     ds_objects_hdr = ncProcessor.convert_dtypes(dataset_objects=ds_objects_hdr)
-            #     SITE_LOGGER.info("variables dtypes converted and now conforming to template")
-
-            #     nc_file_names_hdr = nc_writer.compose_file_names(
-            #                                 site_id=site.name.upper(),
-            #                                 periods=periods_hdr,
-            #                                 deployment_metadata=deployment_metadata)
-            #     nc_file_names_hdr = nc_writer.compose_file_names_processing_source(file_names=nc_file_names_hdr,
-            #                                                                         processing_source="hdr")           
-            #     nc_writer.save_nc_file(output_path=vargs.incoming_path,
-            #                         file_names=nc_file_names_hdr,
-            #                         dataset_objects=ds_objects_hdr)
-            #     SITE_LOGGER.info(f"hdr nc files saved to the output path as {nc_file_names_hdr}")
+            if ncValidator.check_any_fail(validation_log):
+                # Saving netcdf file
+                nc_writer.save_nc_file(site_id=site.name,
+                                        output_path=vargs.incoming_path,
+                                    file_names=nc_file_names_embedded,
+                                    dataset_objects=ds_objects_embedded)
+                SITE_LOGGER.info(f"embedded nc files saved to the output path as {nc_file_names_embedded}")
+            else:
+                raise ValueError(f"{validation_log["contents"]}")    
 
 
             GENERAL_LOGGER.info(f"Processing successful")
@@ -333,7 +270,7 @@ def main():
 
         except Exception as e:
             error_message = IMOSLogging().unexpected_error_message.format(site_name=site.name.upper())
-            GENERAL_LOGGER.error(error_message)
+            GENERAL_LOGGER.error(str(e), exc_info=True)
             SITE_LOGGER.error(str(e), exc_info=True)
         
             # Closing current site logging
