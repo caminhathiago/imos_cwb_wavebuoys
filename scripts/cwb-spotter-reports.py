@@ -79,13 +79,12 @@ def regional_metadata_validation(reports_path, nc_path, ds, regional_metadata, d
             if not match:
                 expected = match_regional[reg]
                 got = ds.attrs.get(bulk)
-                log_lines.append(f" • {reg}: expected {expected!r}, got {got!r}")
+                log_lines.append(f" • {bulk}: expected {expected!r}, got {got!r}")
     else:
         log_lines.append(f"All fields match for file: {os.path.basename(nc_path[0])}")
 
-    # At the end of the process (outside your loop), write the log to file:
     reg_validation_txt_path = os.path.join(reports_path, f"{datetime_prefix}_{site_name.upper()}_regional_metadata_validation_log.txt") 
-    with open(reg_validation_txt_path, "a", encoding="utf-8") as f:
+    with open(reg_validation_txt_path, "w", encoding="utf-8") as f:
         f.write("\n".join(log_lines) + "\n\n")
 
 # def deployment_metadata_validation(reports_path, nc_path, ds, deployment_metadata, datetime_prefix):
@@ -174,7 +173,7 @@ def run_tests(site_path, nc_bulk, nc_spectra, csv_bulk, deployment_metadata, reg
         if nc_s:
             ds_spectra = xr.open_dataset(nc_s)
         
-        regional_metadata_validation(reports_path, nc_bulk, ds_bulk, regional_metadata, datetime_prefix)
+        # regional_metadata_validation(reports_path, nc_bulk, ds_bulk, regional_metadata, datetime_prefix)
         qc_flags_report(reports_path, ds_bulk, df, datetime_prefix)
         generate_plots(reports_path, ds_bulk, df, datetime_prefix)
 

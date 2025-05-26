@@ -718,14 +718,7 @@ class ncWriter(WaveBuoy):
             except:
                 raise ValueError(f"{operating_institution} not valid. Please make sure the operating institution code is valid in the deployment metadata file")
 
-        
 
-
-    # def _validate_operating_institution(self, deployment_metadata: pd.DataFrame):
-    #     operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
-    #     if not operating_institution in self.OPERATING_INSTITUTIONS.values():
-    #         error_message = f""
-        
     def _format_periods(self, periods: PeriodIndex) -> PeriodIndex:
         day = "01"
         return periods.strftime("%Y%m") + day
@@ -856,13 +849,6 @@ class ncWriter(WaveBuoy):
                                     encoding=encoding)
                 raise RuntimeError(f"File was locked, saving to {backup_file_path}")
                 
-
-
-        
-    
-
-
-    # Compose methods for each general attribute key ======================================================
 
 
 

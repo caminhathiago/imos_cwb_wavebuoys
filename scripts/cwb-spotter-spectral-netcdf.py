@@ -8,6 +8,7 @@ from wavebuoy_nrt.wavebuoy import WaveBuoy
 from wavebuoy_nrt.sofar.api import SofarAPI
 from wavebuoy_nrt.qc.qcTests import WaveBuoyQC
 from wavebuoy_nrt.netcdf.writer import ncWriter, ncAttrsComposer, ncAttrsExtractor, ncProcessor, ncMetaDataLoader
+from wavebuoy_nrt.netcdf.validation import ncValidator
 from wavebuoy_nrt.utils import args_processing, IMOSLogging, generalTesting, csvOutput
 from wavebuoy_nrt.alerts.email import Email
 
@@ -42,7 +43,6 @@ def main():
                                      f"{site.name.upper()}_{os.path.basename(__file__).removesuffix(".py")}.log") # f"{runtime}_[CURRENT_SITE]_process.log
         SITE_LOGGER = IMOSLogging().logging_start(logger_name="site_logger", logging_filepath=site_log_file)
         
-        GENERAL_LOGGER.info(f"{site.name.upper()} log file created as {site_log_file}")
         SITE_LOGGER.info(f"{site.name.upper()} processing start")
 
         try:       
@@ -221,13 +221,24 @@ def main():
                                         regional_metadata=regional_metadata,
                                         parameters_type="spectral")
 
+            reports_path = ncValidator().generate_reports_path(site.name, vargs.incoming_path)
+            for nc_file_name, ds_object in zip(nc_file_names_embedded, ds_objects_embedded):
+                validation_log = ncValidator().create_validation_log_contents(nc_file_name)
+                ncValidator().validate_regional_metadata(nc_file_name, ds_object, regional_metadata, validation_log)
+                ncValidator().validate_spot_id(site.name, ds_object, deployment_metadata, wb.buoys_metadata, validation_log)
+                # ncValidator().validate_site_name(site.name, ds_object, deployment_metadata, validation_log)
+                ncValidator().save_validation_log(reports_path, nc_file_name, validation_log)
 
-            nc_writer.save_nc_file(site_id=site.name,
-                                    output_path=vargs.incoming_path,
-                                   file_names=nc_file_names_embedded,
-                                   dataset_objects=ds_objects_embedded,
-                                   parameters_type="spectral")
-            SITE_LOGGER.info(f"embedded nc files saved to the output path as {nc_file_names_embedded}")
+            if ncValidator.check_any_fail(validation_log):
+                # Saving netcdf file
+                nc_writer.save_nc_file(site_id=site.name,
+                                        output_path=vargs.incoming_path,
+                                    file_names=nc_file_names_embedded,
+                                    dataset_objects=ds_objects_embedded,
+                                    parameters_type="spectral")
+                SITE_LOGGER.info(f"embedded nc files saved to the output path as {nc_file_names_embedded}")
+            else:
+                raise ValueError(f"{validation_log["contents"]}")
 
 
             GENERAL_LOGGER.info(f"Processing successful")
