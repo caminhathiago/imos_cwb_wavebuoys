@@ -48,8 +48,6 @@ def main():
                 
                 validation_results = []
                 try:
-                    validation_results.append(ncValidator().validate_file_name(file["file_name"]))
-                    LOGGER.info("file name validation passed")
                     
                     validation_results.append(ncValidator().validade_nc_integrity(file["file_path"]))
                     LOGGER.info("file integrity validation passed")
