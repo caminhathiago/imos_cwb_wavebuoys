@@ -61,10 +61,11 @@ class WaveBuoyQC():
         data = self.drop_unwanted_variables(data=data)
         data_variables = data.columns
         
-        qc_config_parameters = qc_config["parameter"].values
-        
-        check = [param in qc_config_parameters for param in data_variables]
-        params_to_qc = [param for param in data_variables if param in qc_config_parameters]
+        qc_config_parameters = qc_config.loc[qc_config["enable_checks"] == 1,"parameter"].values
+
+        # check = [param in qc_config_parameters for param in data_variables]
+        return [param for param in qc_config_parameters if param in data_variables]
+
 
         if all(check):
             return params_to_qc
