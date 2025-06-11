@@ -1,0 +1,258 @@
+import os
+from typing import List, Tuple
+
+from netCDF4 import date2num
+import xarray as xr
+import polars as pl
+import pandas as pd
+from pandas.core.indexes.period import PeriodIndex
+import numpy as np
+
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    message=".*DatetimeProperties.to_pydatetime.*",
+    category=FutureWarning
+)
+
+class Process:
+
+    def __init__(self):
+        pass
+
+    def convert_time_to_CF_convention(self, dataframe: pl.DataFrame) -> pl.DataFrame:
+        unix_epoch_19500101 = -631152000 # unix epoch equivalent of 1950-01-01T00:00:00
+        secs_in_day = 24*60*60
+
+        col_time = self.extract_time_column_name(dataframe=dataframe)
+
+        return dataframe.with_columns(
+                    ((pl.col(col_time).dt.epoch(time_unit="s") - unix_epoch_19500101) / secs_in_day)
+                    .alias("TIME_ds1950")
+                    )
+
+    def extract_time_column_name(self, dataframe: pl.DataFrame):
+        col_time = [col_time for col_time in dataframe.columns if "time" in col_time.lower()]
+        if col_time:
+            return col_time[0]
+        else:
+            raise Exception("time column not found.")
+        
+    def convert_time_to_CF_convention(self, dataset: tuple) -> xr.Dataset:
+        time = np.array(dataset["TIME"]
+                            .to_dataframe()["TIME"]
+                            .dt.to_pydatetime()
+            )
+        dataset["TIME"] = date2num(np.array(time),
+                                "days since 1950-01-01 00:00:00 UTC",
+                                "gregorian")
+        
+        time_second_dim = [col for col in list(dataset.variables) if col in ("TIME_TEMP","TIME_LOCATION")]
+        if time_second_dim:
+            time = np.array(dataset[time_second_dim[0]]
+                            .to_dataframe()[time_second_dim[0]]
+                            .dt.to_pydatetime()
+                    )
+            dataset[time_second_dim[0]] = date2num(np.array(time),
+                                "days since 1950-01-01 00:00:00 UTC",
+                                "gregorian")
+            
+        return dataset
+
+    def convert_time_to_CF_convention_ds_list(self, dataset_objects: tuple) -> List[xr.Dataset]:
+        for dataset in dataset_objects:
+            dataset = self.convert_time_to_CF_convention(dataset=dataset)
+        return dataset_objects
+    
+    @staticmethod
+    def create_timeseries_variable(dataset: xr.Dataset) -> xr.Dataset:
+        dataset["timeSeries"] = [np.int16(1)]
+        return dataset
+
+
+class ncSpectra(Process):
+    def __init__(self):
+        super().__init__()
+
+    def compose_dataset(self, global_result: pl.DataFrame) -> xr.Dataset:
+        return xr.Dataset(
+            {
+                "ENERGY": (["TIME", "FREQUENCY"], global_result['ENERGY'].to_numpy()),
+                "A1": (["TIME", "FREQUENCY"], global_result["A1"].to_numpy()),
+                "B1": (["TIME", "FREQUENCY"], global_result["B1"].to_numpy()),
+                "A2": (["TIME", "FREQUENCY"], global_result["A2"].to_numpy()),
+                "B2": (["TIME", "FREQUENCY"], global_result["B2"].to_numpy()),
+            },
+            coords={
+                "TIME": global_result["TIME"].to_numpy(),
+                "FREQUENCY": global_result["FREQUENCY"].to_numpy()[0],
+                "LATITUDE": ("TIME", global_result["LATITUDE"].to_numpy()),
+                "LONGITUDE": ("TIME", global_result["LONGITUDE"].to_numpy())
+            }
+        )
+    
+
+class ncDisp(Process):
+    def __init__(self):
+        super().__init__()
+
+
+    def compose_dataset(self, data: pl.DataFrame, data_gps: pl.DataFrame) -> xr.Dataset:
+        return xr.Dataset(
+            {
+                "LATITUDE": ("TIME_LOCATION", data_gps["latitude"].to_numpy()),
+                "LONGITUDE": ("TIME_LOCATION", data_gps["longitude"].to_numpy()),
+                "XDIS": ("TIME", data["x"].to_numpy()),
+                "YDIS": ("TIME", data["y"].to_numpy()),
+                "ZDIS": ("TIME", data["z"].to_numpy())
+            },
+            coords={
+                "TIME": data["datetime"].to_numpy(),
+                "TIME_LOCATION": data_gps["datetime"].to_numpy(),
+            }
+        )
+
+    def generate_time_ranges(self, dataframe: pl.DataFrame, chunk_period: str = "14d") -> pl.DataFrame:
+        col_time = self.extract_time_column_name(dataframe)
+        return (dataframe.group_by_dynamic(col_time, every=chunk_period, start_by="datapoint")
+                .agg([pl.col(col_time).first().alias("start_datetime"),
+                     pl.col(col_time).last().alias("end_datetime")])
+        )
+
+    def compose_datasets(self, data: pl.DataFrame, data_gps: pl.DataFrame, chunk_period: str = "14d"):
+        time_ranges = self.generate_time_ranges(dataframe=data, chunk_period=chunk_period)
+        col_time_gps = self.extract_time_column_name(data_gps)
+        
+        datasets = []
+        for row in time_ranges.iter_rows(named=True):
+            data_chunk = data.filter(
+                        (data[col_time_gps] >= row['start_datetime']) & 
+                        (data[col_time_gps] < row['end_datetime']))
+            
+            gps_chunk = data_gps.filter(
+                        (data_gps[col_time_gps] >= row['start_datetime']) & 
+                        (data_gps[col_time_gps] < row['end_datetime']))
+
+            dataset = self.compose_dataset(data=data_chunk, data_gps=gps_chunk)
+            
+            datasets.append(dataset)
+
+        return tuple(datasets)
+
+    # @staticmethod
+    # def split_dataset_fortnightly(dataset: xr.Dataset, time_ranges: pl.DataFrame) -> Tuple[xr.Dataset, ...]:
+    #     dataset_objects = []
+    #     for row in time_ranges.iter_rows(named=True):
+    #         dataset_fortnight = dataset.where((dataset["TIME"] >= np.datetime64(row['start_datetime'])) & 
+    #                                            (dataset["TIME"] < np.datetime64(row['end_datetime'])), drop=True)
+    #         dataset_objects.append(dataset_fortnight)
+    #     return tuple(dataset_objects)
+    
+    def extract_fortnightly_periods_dataset(self, dataset: xr.Dataset) -> pd.PeriodIndex:
+    # Convert the TIME variable to a DatetimeIndex (removing timezone if present)
+        times = pd.to_datetime(dataset["TIME"].data)  # Convert to pandas DatetimeIndex
+        naive_times = times.tz_localize(None)  # Remove timezone if present (make it naive)
+
+        # Create fortnightly periods manually by using the 14-day frequency from the first date
+        start_date = naive_times.min()  # Get the first date (earliest time)
+        periods = pd.date_range(start=start_date, end=naive_times.max(), freq='14D')
+
+        # Convert to periods and return unique periods
+        unique = periods.to_period('D').unique()
+
+        if str(unique[-1]) != str(naive_times.max().date()):
+            unique = unique.append(pd.PeriodIndex([str(naive_times.max().date())], freq="D"))
+
+        fortnight_periods = []
+        for i in range(len(unique) - 1):
+            start = unique[i] if i == 0 else fortnight_periods[-1][1] + 1
+            end = unique[i + 1]
+            fortnight_periods.append((start, end))
+
+        # Display the result
+        for pair in fortnight_periods:
+            print((str(pair[0]), str(pair[1])))
+        
+        return fortnight_periods
+
+    def split_dataset_fortnightly(self, dataset: xr.Dataset, periods: PeriodIndex) -> Tuple[xr.Dataset, ...]:
+        dataset_objects = []
+        for period in periods:
+            print(period)
+            fortnightly_dataset = dataset.sel(TIME=slice(str(period[0]), str(period[1])),
+                                              TIME_LOCATION=slice(str(period[0]), str(period[1])))
+            dataset_objects.append(fortnightly_dataset)
+        return tuple(dataset_objects)
+    
+
+class ncBulk(Process):
+    def __init__(self):
+        super().__init__()
+
+    def _compose_coords_dimensions(self, waves: pd.DataFrame, temp: pd.DataFrame = None, parameters_type: str = "bulk") -> dict:
+
+        if parameters_type == "bulk":
+            coords = {
+                    "TIME":("TIME", waves["TIME"]),
+                    "LATITUDE":("TIME", waves["LATITUDE"]),
+                    "LONGITUDE":("TIME", waves["LONGITUDE"])
+                }
+            if temp is not None:
+                coords.update({"TIME_TEMP": ("TIME_TEMP", temp["TIME_TEMP"])})
+
+        if parameters_type == "spectral":
+            coords.update({"FREQUENCY": ("FREQUENCY", waves["FREQUENCY"].iloc[0])})
+
+        return coords
+
+    def _compose_data_vars(self, waves: pd.DataFrame, temp: pd.DataFrame = None, parameters_type: str = "bulk") -> dict:
+      
+        data_vars = {}
+        cols_to_drop = ['TIME', 'LATITUDE', 'LONGITUDE']
+        dimensions = ["TIME"]
+
+        if parameters_type == "spectral":
+            cols_to_drop.extend(["FREQUENCY", "DIFFREQUENCY", "DIRECTION", "DIRSPREAD"])
+            dimensions.append("FREQUENCY")
+
+        vars_to_include = waves.drop(columns=cols_to_drop).columns.to_list()
+        if temp is not None:
+            vars_to_include.extend(["TEMP","TEMP_quality_control"])
+
+
+        for var in vars_to_include:
+            if parameters_type == "bulk":
+                if var in ("TEMP","TEMP_quality_control"):
+                    data_vars.update({var:(("TIME_TEMP"), temp[var])})
+                else:
+                    data_vars.update({var:(tuple(dimensions), waves[var])})
+
+            elif parameters_type == "spectral":
+                data_vars.update({var:(tuple(dimensions), np.vstack(waves[var].values))})
+        
+        return data_vars
+
+    def compose_dataset(self, waves:pd.DataFrame, temp:pd.DataFrame, parameters_type:str = "bulk") -> xr.Dataset:
+        
+        coords = self._compose_coords_dimensions(waves=waves, temp=temp, parameters_type=parameters_type)
+        data_vars = self._compose_data_vars(waves=waves, temp=temp, parameters_type=parameters_type)
+        
+        return xr.Dataset(coords=coords, data_vars=data_vars)
+
+        # return xr.Dataset(
+        #     {
+        #         "WSSH": ("TIME", waves['WSSH'].to_numpy()),
+        #         "WPFM": ("TIME", waves["WPFM"].to_numpy()),
+        #         "WPPE": ("TIME", waves["WPPE"].to_numpy()),
+        #         "SSWMD": ("TIME", waves["SSWMD"].to_numpy()),
+        #         "WPDI": ("TIME", waves["WPDI"].to_numpy()),
+        #         "WMDS": ("TIME", waves["WMDS"].to_numpy()),
+        #         "WPDS": ("TIME", waves["WPDS"].to_numpy()),
+
+        #     },
+        #     coords={
+        #         "TIME": waves["TIME"].to_numpy(),
+        #         "LATITUDE": ("TIME", waves["LATITUDE"].to_numpy()),
+        #         "LONGITUDE": ("TIME", waves["LONGITUDE"].to_numpy())
+        #     }
+        # )

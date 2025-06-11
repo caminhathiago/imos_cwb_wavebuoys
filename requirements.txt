@@ -1,0 +1,15 @@
+python-dotenv
+xarray
+pandas
+pysofar
+netCDF4
+requests
+setuptools
+boto3
+awscli
+pytest
+openpyxl
+ioos_qc
+polars
+setuptools
+tqdm
