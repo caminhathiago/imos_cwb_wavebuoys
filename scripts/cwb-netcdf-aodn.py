@@ -24,9 +24,9 @@ def main():
     LOGGER.info(f"pushing NC files created/modified within the last {vargs.lookback_hours} hours")
     
     try:
-        ncp = ncPusher(host=os.getenv("FTP_HOST_TEST"),
-                    user=os.getenv("FTP_USER_TEST"),
-                    password=os.getenv("FTP_PASSWORD_TEST"))
+        ncp = ncPusher(host=os.getenv("FTP_HOST"),
+                    user=os.getenv("FTP_USER"),
+                    password=os.getenv("FTP_PASSWORD"))
         LOGGER.info("successfully connected with FTP server")
 
         files_to_push = ncp.grab_nc_files_to_push(incoming_path=vargs.incoming_path, lookback_hours=vargs.lookback_hours)
@@ -35,7 +35,7 @@ def main():
             LOGGER.info(f"files to push:")
             LOGGER.info(json.dumps(files_to_push, indent=6, default=str))
             
-            working_dir = "pushed"
+            working_dir = "wave"
             ncp.change_dir(working_dir)
             LOGGER.info(f"FTP working dir changed to '/{working_dir}'")
 
