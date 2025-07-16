@@ -136,7 +136,6 @@ def main():
             SITE_LOGGER.info("EXTRACTION STEP ====================================")
 
             window_end_date = latest_available_time
-            window_start_time = datetime(2025,6,9,0,0,0)
             new_raw_data = sofar_api.fetch_wave_data(spot_id=site.serial,
                                             token=site.sofar_token,
                                             start_date=window_start_time,
