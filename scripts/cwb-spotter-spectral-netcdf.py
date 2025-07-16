@@ -174,7 +174,7 @@ def main():
                                                     new_data=spectra)
                     SITE_LOGGER.info("concatenate new data with previous since available")
            
-            csvOutput.save_csv(data=spectra, site_name=site.name.upper(), file_path=vargs.incoming_path, file_name_preffix="_spectra_all_data.csv")
+            csvOutput.save_csv(data=spectra, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_spectra_all_data.csv")
 
             # Qualification ---------------------------------------
             SITE_LOGGER.info("QUALIFICATION STEP ====================================")
