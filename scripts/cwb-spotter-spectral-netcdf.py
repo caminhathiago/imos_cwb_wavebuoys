@@ -136,6 +136,7 @@ def main():
             SITE_LOGGER.info("EXTRACTION STEP ====================================")
 
             window_end_date = latest_available_time
+            window_start_time = datetime(2025,6,9,0,0,0)
             new_raw_data = sofar_api.fetch_wave_data(spot_id=site.serial,
                                             token=site.sofar_token,
                                             start_date=window_start_time,
@@ -174,7 +175,7 @@ def main():
                                                     new_data=spectra)
                     SITE_LOGGER.info("concatenate new data with previous since available")
            
-            csvOutput.save_csv(data=spectra, site_name=site.name.upper(), file_path=vargs.incoming_path, file_name_preffix="_spectra_all_data.csv")
+            csvOutput.save_csv(data=spectra, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_spectra_all_data.csv")
 
             # Qualification ---------------------------------------
             SITE_LOGGER.info("QUALIFICATION STEP ====================================")
