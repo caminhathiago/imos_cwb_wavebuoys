@@ -172,10 +172,10 @@ class SofarAPI:
                                                     "%Y-%m-%dT%H:%M:%S.%fZ")
             
             # Dealing with not owned spotters
-            test_not_owned = self._test_not_owned_spotter(raw_data, new_raw_data)
-            if test_not_owned:
-                SITE_LOGGER.info(f"Not owned Spotter, pagination not necessary")
-                break
+            # test_not_owned = self._test_not_owned_spotter(raw_data, new_raw_data)
+            # if test_not_owned:
+            #     SITE_LOGGER.info(f"Not owned Spotter, pagination not necessary")
+            #     break
 
 
 
@@ -218,7 +218,8 @@ class SofarAPI:
                                                 'wind',
                                                 'surfaceTemp',
                                                 'barometerData',
-                                                'waves']
+                                                'waves',
+                                                'frequencyData']
                     ) -> dict:
 
         for key in keys_to_extend:
