@@ -136,12 +136,15 @@ class SofarAPI:
                             token: str,
                             start_date: datetime = datetime.now() - timedelta(hours=24), 
                             end_date: datetime = datetime.now(),
+                            parameters_type:str = "waves",
                             **kwargs) -> dict:
         page = 1
         current_start_date = start_date
         needs_pagination = True
         raw_data = None
 
+        if parameters_type == "spectral":
+            parameters_type = "frequencyData"
         # if kwargs["include_waves"] and not kwargs["include_frequency_data"]:
         #     data_type = "waves"
         # elif not kwargs["include_waves"] and kwargs["include_frequency_data"]:
@@ -158,7 +161,7 @@ class SofarAPI:
                 **kwargs
             )
             
-            if not new_raw_data["waves"]:
+            if not new_raw_data[parameters_type]:
                     SITE_LOGGER.info(f"No more data available after Page: {page}")
                     break
             
@@ -168,7 +171,7 @@ class SofarAPI:
             else:
                 raw_data = self._extend_raw_data(global_output=raw_data, current_page=new_raw_data)
 
-            latest_extracted_time = datetime.strptime(new_raw_data["waves"][-1]["timestamp"],
+            latest_extracted_time = datetime.strptime(new_raw_data[parameters_type][-1]["timestamp"],
                                                     "%Y-%m-%dT%H:%M:%S.%fZ")
             
             # Dealing with not owned spotters
@@ -189,6 +192,9 @@ class SofarAPI:
 
         return raw_data
     
+
+
+
     def _test_not_owned_spotter(self, raw_data: dict, new_raw_data: dict) -> bool:
         if raw_data is None or new_raw_data is None:
             return False  
