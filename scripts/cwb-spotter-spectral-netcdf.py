@@ -140,6 +140,7 @@ def main():
                                             token=site.sofar_token,
                                             start_date=window_start_time,
                                             end_date=window_end_date,
+                                            parameters_type="spectral",
                                             include_frequency_data=True,
                                             processing_sources="embedded")
 
