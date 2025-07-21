@@ -334,7 +334,7 @@ class ncAttrsExtractor:
         return "info@aodn.org.au"
 
     def _extract_general_Conventions() -> str:
-        return 'CF-1.8'
+        return 'CF-1.6'
 
     def _extract_general_standard_name_vocabulary() -> str:
         return "NetCDF Climate and Forecast CF Standard Name Table Version 78"
