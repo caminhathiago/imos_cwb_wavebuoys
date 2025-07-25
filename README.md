@@ -45,6 +45,7 @@ The script can be found in the scripts folder as:
 
  | File name              | Description  |  Extension |
 | ---------------------- | -------------------| -----------------|
+| `"logs/DM_spotter_processing.log"`     | Processing log for debugging purposes | `.log` | 
 | `raw-displacements`     | Contains raw displacements as `Z` (heave), `Y` (east), `X` (north) and `TIME` (datetime) | `.nc` or `.csv` | 
 | `gps` | Contains gps data as `LATITUDE`, `LONGITUDE` and `TIME` (datetime) | `.csv` | 
 | `bulk` |  Contains calculated bulk wave parameters |  `.nc` or `.csv` | 
