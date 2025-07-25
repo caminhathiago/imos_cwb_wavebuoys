@@ -39,7 +39,7 @@ The script can be found in the scripts folder as:
 
  Processing results will be saved in:
 
- <pre> <log-path>/processed/ </pre>
+ <pre> /path/to/sdcard/files/processed/ </pre>
 
 Files created are listed below:
 
