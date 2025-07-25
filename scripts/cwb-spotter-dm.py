@@ -40,7 +40,7 @@ def filter_dates(disp, gps, utc_offset, deploy_start, deploy_end) -> list[pl.Dat
 
     return disp, gps
 
-def calculate_spectra_from_displacements_dask(disp: pl.DataFrame):
+def calculate_spectra_from_displacements(disp: pl.DataFrame, enable_dask:bool):
     
     s = Spectra()
     
@@ -59,46 +59,30 @@ def calculate_spectra_from_displacements_dask(disp: pl.DataFrame):
     merge = s.define_merging(nfft=nfft)
     nover = 0.5
 
-    LOGGER.info(f"Processing dask chunks for spectra calculation")
-    disp_chunks_30m = s.generate_time_chunks(disp, time_chunk='30m')
-    disp_chunks_30m = s.filter_insufficient_samples(disp_chunks_30m, min_samples)
+    if enable_dask:
+        LOGGER.info(f"Processing dask chunks for spectra calculation")
+        disp_chunks_30m = s.generate_time_chunks(disp, time_chunk='30m')
+        disp_chunks_30m = s.filter_insufficient_samples(disp_chunks_30m, min_samples)
+        
+        LOGGER.info(f"Splitting dask chunks by the number of workers (= {num_workers})")
+        disp_dask_chunks = s.generate_dask_chunks(disp_chunks_30m, num_workers)
+
+        LOGGER.info(f"Creating dask tasks")
+        disp_tasks = [dask.delayed(s.process_dask_chunk)
+                (dask_chunk, nfft, nover, fs, merge, 'xyz', info) 
+                for dask_chunk in disp_dask_chunks]
+
+        LOGGER.info(f"Computing dask tasks")
+        spectra_bulk_results = dask.compute(*disp_tasks)
+
+        LOGGER.info(f"Concatenating dask computed results")
+        spectra_bulk_df = pl.concat(spectra_bulk_results)
+
+        return spectra_bulk_df
     
-    disp_dask_chunks = s.generate_dask_chunks(disp_chunks_30m, num_workers)
-
-    LOGGER.info(f"Creating dask tasks")
-    disp_tasks = [dask.delayed(s.process_dask_chunk)
-             (dask_chunk, nfft, nover, fs, merge, 'xyz', info) 
-             for dask_chunk in disp_dask_chunks]
-
-    LOGGER.info(f"Computing dask tasks")
-    spectra_bulk_results = dask.compute(*disp_tasks)
-
-    LOGGER.info(f"Concatenating dask computed results")
-    spectra_bulk_df = pl.concat(spectra_bulk_results)
-
-    return spectra_bulk_df
-
-def calculate_spectra_from_displacements(disp: pl.DataFrame):
-    
-    s = Spectra()
-    
-    LOGGER.info(f"Setting spectra calculation parameters")
-    info = {
-        "hab": None,
-        "fmaxSS": 1/8,
-        "fmaxSea": 1/2,
-        "bad_data_thresh": 2/3,
-        "hs0_thresh": 3,
-        "t0_thresh": 5
-    }
-    fs = 2.5
-    min_samples = s.calculate_min_samples(fs=fs, spec_window=30)
-    nfft = s.calculate_nfft(fs=fs, spec_window=30)
-    merge = s.define_merging(nfft=nfft)
-    nover = 0.5
-
-    LOGGER.info(f"Calculating spectra with whole displacements data")
-    return s.spectra_from_dataframe(disp, nfft, nover, fs, merge, 'xyz', min_samples, info)
+    else:
+        LOGGER.info(f"Calculating spectra with whole displacements data")
+        return s.spectra_from_dataframe(disp, nfft, nover, fs, merge, 'xyz', min_samples, info)
 
 def align_gps(spectra_bulk_df, gps) -> pl.DataFrame:
 
@@ -190,10 +174,7 @@ if __name__ == "__main__":
                                         utc_offset=8)
         
         LOGGER.info(f"\nSpectra Calculation".upper())
-        if vargs.enable_dask == True:
-            spectra_bulk = calculate_spectra_from_displacements_dask(disp)
-        else:
-            spectra_bulk = calculate_spectra_from_displacements(disp)
+        spectra_bulk = calculate_spectra_from_displacements(disp, vargs.enable_dask)
 
         LOGGER.info(f"\nSpectra results processing".upper())
         spectra_bulk = align_gps(spectra_bulk, gps)
