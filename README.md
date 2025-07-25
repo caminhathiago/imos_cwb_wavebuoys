@@ -10,9 +10,13 @@ This repository provides tools to process data exported from SD cards used by **
 
 <pre> pip install -r requirements.txt </pre>
 
-### 2. Run the script
+### 2. Processing script
 
-#### Script arguments
+The script can be found in the scripts folder as:
+
+<pre> scripts/cwb-spotter-dm.py </pre>
+
+#### Arguments
 
 | Argument               | Description                                                                                                     |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
