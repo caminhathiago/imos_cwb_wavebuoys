@@ -37,15 +37,15 @@ The script can be found in the scripts folder as:
 
 #### Outputs
 
- Processed files will be saved in:
+ Processing results will be saved in:
 
  <pre> <log-path>/processed/ </pre>
 
- Those will consist of the following datasets:
+Files created are listed below:
 
  | File name              | Description  |  Extension |
 | ---------------------- | -------------------| -----------------|
-| `"logs/DM_spotter_processing.log"`     | Processing log for debugging purposes | `.log` | 
+| `"logs/DM_spotter_processing"`     | Processing log for debugging purposes | `.log` | 
 | `raw-displacements`     | Contains raw displacements as `Z` (heave), `Y` (east), `X` (north) and `TIME` (datetime) | `.nc` or `.csv` | 
 | `gps` | Contains gps data as `LATITUDE`, `LONGITUDE` and `TIME` (datetime) | `.csv` | 
 | `bulk` |  Contains calculated bulk wave parameters |  `.nc` or `.csv` | 
