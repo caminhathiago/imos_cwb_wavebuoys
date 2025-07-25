@@ -24,8 +24,16 @@ This repository provides tools to process data exported from SD cards used by **
 
 ### Execution example
 
-<pre> bash python scripts/cwb-spotter-dm.py \
+<pre> python scripts/cwb-spotter-dm.py \
   --log-path /path/to/sdcard/files \
   --deploy-dates 20240101T000000 20240131T235959 \
   --output-type netcdf \
   --enable-dask  </pre>
+
+
+#### Outputs
+
+ Processed files will be saved in:
+
+ <pre> <log-path>/processed/ </pre>
+
