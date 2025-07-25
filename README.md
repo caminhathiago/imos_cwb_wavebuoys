@@ -22,7 +22,7 @@ The script can be found in the scripts folder as:
 | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `-l`, `--log-path`     | **(Required)** Directory where the Spotter SD card files are stored.                                            |
 | `-d`, `--deploy-dates` | **(Required)** Start and end datetime of the deployment period in the format `YYYYmmddTHHMMSS YYYYmmddTHHMMSS`. |
-| `-ed`, `--enable-dask` | *(Optional)* Enables parallel spectra calculation using Dask.                                                   |
+| `-ed`, `--enable-dask` | *(Optional)* Enables parallel spectra calculation using Dask for faster results                                 |
 | `-ot`, `--output-type` | *(Optional)* Choose output format: `csv` or `netcdf` (default: `netcdf`).                                       |
 
 
