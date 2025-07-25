@@ -12,4 +12,3 @@ openpyxl
 ioos_qc
 polars
 setuptools
-tqdm

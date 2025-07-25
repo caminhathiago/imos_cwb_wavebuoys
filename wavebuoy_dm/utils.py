@@ -9,14 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def args_processing():
-    """
-    Returns the script arguments
-
-        Parameters:
-
-        Returns:
-            vargs (obj): input arguments
-    """
+ 
     parser = argparse.ArgumentParser(description='Creates NetCDF files.\n '
                                      'Prints out the path of the new locally generated NetCDF file.')
     
@@ -24,7 +17,7 @@ def args_processing():
                         help="output directory of netcdf file",
                         required=False)
     
-    parser.add_argument('-i', '--log-path', dest='log_path', type=str, default=None,
+    parser.add_argument('-l', '--log-path', dest='log_path', type=str, default=None,
                         help="directory where SD card files are stored",
                         required=False)
 
@@ -56,13 +49,48 @@ def args_processing():
     return vargs
 
 
+
+def args_processing_dm():
+
+    parser = argparse.ArgumentParser()
+ 
+    parser.add_argument('-l', '--log-path', dest='log_path', type=str, default=None,
+                        help="Directory where SD card files are stored",
+                        required=True)
+    
+    parser.add_argument('-d', '--deploy-dates', dest='deploy_dates', type=str, default=None, nargs=2,
+                        help="Deployment datetimes period to be processed. Please pass start and end dates as YYYYmmddTHHMMSS YYYYmmdd, separated by a blank space",
+                        required=True)
+
+    parser.add_argument('-ed', '--enable-dask', dest='enable_dask', action='store_true',
+                    help="Whether to enable spectra calculation with dask threading")
+
+    parser.add_argument('-ot', '--output-type', dest='output_type', type=str, default="netcdf",
+                    help="Whether to save outputs as csv or netcdf, when applicable.")
+
+    vargs = parser.parse_args()
+
+    if not os.path.exists(vargs.log_path):
+        raise ValueError('{path} not a valid path'.format(path=vargs.log_path))
+    else:
+        vargs.output_path = os.path.join(vargs.log_path, "processed")
+        if not os.path.exists(vargs.output_path):
+            os.makedirs(vargs.output_path)
+
+    if vargs.deploy_dates:
+        vargs.deploy_dates_start = datetime.strptime(vargs.deploy_dates[0],"%Y%m%dT%H%M%S")
+        vargs.deploy_dates_end = datetime.strptime(vargs.deploy_dates[1],"%Y%m%dT%H%M%S")
+
+    return vargs
+
+
 class IMOSLogging:
     unexpected_error_message = "An unexpected error occurred when processing {site_name}\n Please check the site log for details"
 
     def __init__(self):
         pass
 
-    def logging_start(self, site_name, logging_filepath, logger_name="general_logger", level=logging.INFO):
+    def logging_start(self, logging_filepath, logger_name="general_logger", level=logging.INFO):
         """
         Start logging using the Python logging library.
         Parameters:
@@ -71,7 +99,7 @@ class IMOSLogging:
         Returns:
             logger (logging.Logger): Configured logger instance.
         """
-        self.logging_filepath = os.path.join(logging_filepath, "logs", "site_logger.log")
+        self.logging_filepath = os.path.join(logging_filepath, "logs", logger_name)
 
         if not os.path.exists(os.path.dirname(self.logging_filepath)):
             os.makedirs(os.path.dirname(self.logging_filepath))
@@ -84,11 +112,15 @@ class IMOSLogging:
         self.logger.setLevel(level)
         handler = logging.FileHandler(self.logging_filepath, mode="w")
         handler.setLevel(level)
+        
+        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler.setLevel(level)
 
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
 
         self.logger.addHandler(handler)
+        self.logger.addHandler(stream_handler)
 
         return self.logger
 

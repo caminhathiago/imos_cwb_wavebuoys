@@ -8,6 +8,7 @@ import polars as pl
 import pandas as pd
 from dask.distributed import Client
 import dask
+import numpy as np
 
 from wavebuoy_dm.spectra import Spectra
 from wavebuoy_dm.processing.concat import csvConcat
@@ -34,7 +35,10 @@ class MetadataArgs:
 def process_paths(site_buoys_to_process):
 
     dm_deployment_path = site_buoys_to_process.loc["datapath"]
-    dm_deployment_path = dm_deployment_path.replace("Y:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
+    dm_deployment_path = os.path.dirname(dm_deployment_path
+                                        .replace("Y:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
+                                        .replace("X:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
+                                        )
     output_path = os.path.join(dm_deployment_path, "processed_py")
     if not os.path.exists(output_path):
         os.mkdir(output_path)
@@ -42,8 +46,10 @@ def process_paths(site_buoys_to_process):
     return dm_deployment_path, output_path
 
 def load_metadata(site_buoys_to_process:pd.DataFrame, dm_deployment_path) -> list[pd.DataFrame]:
-                                     
-    raw_data_path = os.path.join(dm_deployment_path, 'log')
+
+    if os.path.basename(dm_deployment_path) != "log":                         
+        raw_data_path = os.path.join(dm_deployment_path, 'log')
+    
     if not os.path.exists(raw_data_path):
         raise FileNotFoundError(f"path {raw_data_path} does not exist. Check if deployment path exists, and if SD card data is in the folder log.")
 
@@ -68,7 +74,7 @@ def load_metadata(site_buoys_to_process:pd.DataFrame, dm_deployment_path) -> lis
 
 def process_from_SD(raw_data_path) -> list[pl.DataFrame]:
 
-    cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=["FLT","LOC","SST","BARO"])#, suffixes_to_concat=["HDR","SST","LOC","BARO","SPC"])
+    cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=["FLT","LOC","SST","BARO"]) #,"SENS_IND","SENS_AGG"])#, suffixes_to_concat=["HDR","SST","LOC","BARO","SPC"])
     lazy_concat_results = cc.lazy_concat_files()
 
     cp = csvProcess()
@@ -87,20 +93,98 @@ def process_from_SD(raw_data_path) -> list[pl.DataFrame]:
 
     return collected_results["displacements"], collected_results["gps"], collected_results["surface_temp"]
 
-def filter_watch_circle(disp, gps, site_buoys_to_process, deploy_start, deploy_end) -> list[pl.DataFrame]:
+def filter_dates(disp, gps, temp, utc_offset, deploy_start, deploy_end, time_crop_start, time_crop_end) -> list[pl.DataFrame]:
+
+
+    cp = csvProcess()
+    disp = cp.filter_deployment_dates(dataframe=disp, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
+                                      time_crop_start=time_crop_start, time_crop_end=time_crop_end)
+    gps = cp.filter_deployment_dates(dataframe=gps, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
+                                      time_crop_start=time_crop_start, time_crop_end=time_crop_end)
+    temp = cp.filter_deployment_dates(dataframe=temp, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
+                                       time_crop_start=time_crop_start, time_crop_end=time_crop_end)
+
+    return disp, gps, temp
+
+def align_gps(spectra_bulk_df, gps) -> pl.DataFrame:
+
+    cp = csvProcess()
+    spectra_bulk_df = cp.interpolate_lat_lon(spectra_bulk_df, gps)
+
+    return spectra_bulk_df
+
+def qc_watch_circle(spectra_bulk_df, site_buoys_to_process:pd.DataFrame, output_path:str):
     
+    s = site_buoys_to_process
+    mainline = s.mainline_length + (s.mainline_length*s.mooring_stretch_factor)
+    catenary = s.catenary_length + (s.catenary_length*s.mooring_stretch_factor)
+    watch_circle = np.sqrt(mainline**2 - s.DeployDepth**2) + catenary + s.watch_circle_gps_error
+
+    cp = csvProcess()
+
+    spectra_bulk_df, out_of_radious_pct = cp.qc_watch_circle(
+        spectra_bulk_df,
+        deploy_lat=s.DeployLat,
+        deploy_lon=s.DeployLon,
+        watch_circle=watch_circle,
+        watch_circle_fail=s.watch_circle_fail
+    )
+
+    if out_of_radious_pct >= s.out_of_radius_tolerance:
+        mainline = mainline + s.mainline_length_error
+        catenary = catenary + s.catenary_length_error
+
+        mainline *= (1 + s.mooring_stretch_factor)
+        catenary *= (1 + s.mooring_stretch_factor)
+
+        watch_circle = np.sqrt(mainline**2 - s.DeployDepth**2) + catenary + s.watch_circle_gps_error
+        
+        spectra_bulk_df, out_of_radious_pct = cp.qc_watch_circle(
+                                                    spectra_bulk_df,
+                                                    deploy_lat=s.DeployLat,
+                                                    deploy_lon=s.DeployLon,
+                                                    watch_circle=watch_circle,
+                                                    watch_circle_fail=s.watch_circle_fail
+                                                )
+
+        spectra_bulk_df_file_name = os.path.join(output_path, "spectra_bulk_df_qc_watch.csv")
+        (spectra_bulk_df[['TIME', 'LATITUDE', 'LONGITUDE', 'distance', 'WATCH_quality_control_primary', 'WATCH_quality_control_secondary']]
+         .to_pandas()
+         .to_csv(spectra_bulk_df_file_name)
+            )
+        
+        if out_of_radious_pct >= s.out_of_radius_tolerance:
+            
+            raise ValueError(f"{out_of_radious_pct}% out of radius (watchcircle = {round(watch_circle,2)}), greater then tolerance ({s.out_of_radius_tolerance}%). CSV with qc_flag_watch saved as {spectra_bulk_df_file_name}")
+
+    return spectra_bulk_df
+
+def filter_watch_circle(disp, gps, site_buoys_to_process) -> list[pl.DataFrame]:
+    
+    """
+    1. calculate distance between metadata centroid and mean centroid, create one column for each
+    2. calculate watch circle from metadata: sqrt( buoy_info.mainline_length^2 - buoy_info.DeployDepth^2) + buoy_info.catenary_length;
+    3. create watch_circle_multiplier variable = 1.25
+    4. 
+    
+    """
+
+    
+
+
     cp = csvProcess()
     deploy_lat, deploy_lon = site_buoys_to_process.loc['DeployLat'], site_buoys_to_process.loc['DeployLon']
-    watch_circle = site_buoys_to_process.loc['watch_circle']
+    watch_circle = site_buoys_to_process.loc['watch_circle_manual']
 
     gps_renamed = gps.rename({'latitude':'LATITUDE', 'longitude':'LONGITUDE'})
-    gps_filtered = cp.filter_watch_circle_geodesic(dataframe=gps_renamed, deploy_lat=deploy_lat, deploy_lon=deploy_lon, max_distance=watch_circle)
+    gps_filtered, percentage_cropped = cp.filter_watch_circle_geodesic(dataframe=gps_renamed, deploy_lat=deploy_lat, deploy_lon=deploy_lon, max_distance=watch_circle,
+                                                   percentage_threshold=.97)
+    SITE_LOGGER.info(f"watch circle crop = {round(percentage_cropped*100,2)}% of data")
     gps = gps_filtered.rename({'LATITUDE':'latitude', 'LONGITUDE':'longitude'})
-    gps = cp.filter_deployment_dates(dataframe=gps, deploy_start=deploy_start, deploy_end=deploy_end)
     
-    disp = cp.filter_deployment_dates(dataframe=disp,
-                                      deploy_start=gps_filtered.select('datetime')[0].item(),
-                                      deploy_end=gps_filtered.select('datetime')[-1].item())
+    disp = cp.filter_deployment_dates(dataframe=disp, 
+                                      deploy_start=gps['datetime'][0], 
+                                      deploy_end=gps['datetime'][-1], hours_crop=3)
 
     return disp, gps
 
@@ -156,14 +240,14 @@ def generate_spectra_NC_file(spectra_bulk_df,
     # Process Spectra -------------------------------
     spectra = Spectra().select_parameters(spectra_bulk_df, dataset_type="spectra")    
     
-    cp = csvProcess()
-    deploy_lat, deploy_lon = site_buoys_to_process.loc['DeployLat'], site_buoys_to_process.loc['DeployLon']
-    watch_circle = site_buoys_to_process.loc['watch_circle']
+    # cp = csvProcess()
+    # deploy_lat, deploy_lon = site_buoys_to_process.loc['DeployLat'], site_buoys_to_process.loc['DeployLon']
+    # watch_circle = site_buoys_to_process.loc['watch_circle']
 
-    spectra = cp.interpolate_lat_lon(dataframe=spectra, locations_dataframe=gps)
-    spectra = cp.filter_watch_circle_geodesic(dataframe=spectra, deploy_lat=deploy_lat, deploy_lon=deploy_lon, max_distance=watch_circle)
+    # spectra = cp.interpolate_lat_lon(dataframe=spectra, locations_dataframe=gps)
+    # spectra = cp.filter_watch_circle_geodesic(dataframe=spectra, deploy_lat=deploy_lat, deploy_lon=deploy_lon, max_distance=watch_circle)
     
-    spectra = cp.filter_deployment_dates(dataframe=spectra, deploy_start=deploy_start, deploy_end=deploy_end)
+    # spectra = cp.filter_deployment_dates(dataframe=spectra, deploy_start=deploy_start, deploy_end=deploy_end)
 
 
     # Generate Spectra NC File ------------------------
@@ -220,17 +304,17 @@ def generate_bulk_NC_file(spectra_bulk_df,
 
 
     # Process Bulk ------------------------
-    cp = csvProcess()
-    deploy_lat, deploy_lon = site_buoys_to_process.loc['DeployLat'], site_buoys_to_process.loc['DeployLon']
-    watch_circle = site_buoys_to_process.loc['watch_circle']
+    # cp = csvProcess()
+    # deploy_lat, deploy_lon = site_buoys_to_process.loc['DeployLat'], site_buoys_to_process.loc['DeployLon']
+    # watch_circle = site_buoys_to_process.loc['watch_circle']
 
-    bulk = cp.interpolate_lat_lon(dataframe=bulk, locations_dataframe=gps)
-    bulk = cp.filter_watch_circle_geodesic(dataframe=bulk, deploy_lat=deploy_lat, deploy_lon=deploy_lon, max_distance=watch_circle)
-    bulk = cp.filter_deployment_dates(dataframe=bulk, deploy_start=deploy_start, deploy_end=deploy_end)
+    # bulk = cp.interpolate_lat_lon(dataframe=bulk, locations_dataframe=gps)
+    # bulk = cp.filter_watch_circle_geodesic(dataframe=bulk, deploy_lat=deploy_lat, deploy_lon=deploy_lon, max_distance=watch_circle)
+    # bulk = cp.filter_deployment_dates(dataframe=bulk, deploy_start=deploy_start, deploy_end=deploy_end)
 
     if temp is not None:
         temp = temp.rename({"temperature":"TEMP", "datetime":"TIME_TEMP"})
-        temp = cp.filter_deployment_dates(dataframe=temp, deploy_start=deploy_start, deploy_end=deploy_end)
+    #     temp = cp.filter_deployment_dates(dataframe=temp, deploy_start=deploy_start, deploy_end=deploy_end)
 
     # Qualify Bulk ------------------------------------------
     bulk_df = bulk.to_pandas()
@@ -256,6 +340,10 @@ def generate_bulk_NC_file(spectra_bulk_df,
     SITE_LOGGER.info("waves qualification successfull")
     
     # Temp ----
+    # # TEMPRARY SETUP
+    # temp = None
+    # # TEMPRARY SETUP
+    
     if temp is not None:
         temp_df = temp.to_pandas()
         
@@ -334,8 +422,8 @@ def generate_raw_displacements_NC_files(disp,
                                         output_path
                                         ) -> None:
 
-    cp = csvProcess()
-    disp = cp.filter_deployment_dates(dataframe=disp, deploy_start=deploy_start, deploy_end=deploy_end)
+    # cp = csvProcess()
+    # disp = cp.filter_deployment_dates(dataframe=disp, deploy_start=deploy_start, deploy_end=deploy_end)
 
     # filter watchcircle
 
@@ -374,7 +462,6 @@ def generate_raw_displacements_NC_files(disp,
 
 
 if __name__ == "__main__":
-
     
     vargs = args_processing()
 
@@ -392,8 +479,11 @@ if __name__ == "__main__":
                 
             dm_deployment_path, output_path = process_paths(site)
 
-            SITE_LOGGER = imos_logging.logging_start(logging_filepath=output_path, 
-                                                    site_name=site.loc['name'],
+            # # TEMPORARY SETUP
+            # output_path = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves\Data\vicwaves\CapeBridgewater\delayedmode\cape-bridgewater_deploy20240618_retrieve20241027_SPOT-31670C\processed_py_QCtests"
+            # # TEMPORARY SETUP
+
+            SITE_LOGGER = imos_logging.logging_start(logging_filepath=output_path,
                                                     logger_name="site_logger")
             
             metadata = load_metadata(site, dm_deployment_path)
@@ -411,44 +501,49 @@ if __name__ == "__main__":
                                 output_path=output_path
                             )
 
-            # PRE-PROCESSING AND CALCULATIONS -----------------
-            # import pickle
-            # with open("pickle_files/disp.pkl", "rb") as f:
-            #     disp = pickle.load(f)
-            # with open("pickle_files/gps.pkl", "rb") as f:
-            #     gps = pickle.load(f)
-            # with open("pickle_files/temp.pkl", "rb") as f:
-            #     temp = pickle.load(f)
-            
-            disp, gps, temp = process_from_SD(metadata['raw_data_path'])
+            # PRE-PROCESSING AND CALCULATIONS -----------------     
+            # disp, gps, temp = process_from_SD(metadata['raw_data_path'])
 
-            # with open("pickle_files/disp.pkl", "wb") as f:
-            #     pickle.dump(disp, f)
+            import pickle
             # with open("pickle_files/gps.pkl", "wb") as f:
             #     pickle.dump(gps, f)
             # with open("pickle_files/temp.pkl", "wb") as f:
             #     pickle.dump(temp, f)
-
-            disp, gps = filter_watch_circle(disp, gps, site, metadata_args.deploy_start, metadata_args.deploy_end)
             # with open("pickle_files/disp.pkl", "wb") as f:
             #     pickle.dump(disp, f)
-                
+            
+
+            with open("pickle_files/disp.pkl", "rb") as f:
+                disp = pickle.load(f)
+            with open("pickle_files/gps.pkl", "rb") as f:
+                gps = pickle.load(f)
+            with open("pickle_files/temp.pkl", "rb") as f:
+                temp = pickle.load(f)
+            
+
+            disp, gps, temp = filter_dates(disp, gps, temp, 
+                                           metadata_args.site_buoys_to_process.utc_offset, 
+                                           metadata_args.deploy_start,
+                                           metadata_args.deploy_end,
+                                           metadata_args.site_buoys_to_process.time_crop_start,
+                                           metadata_args.site_buoys_to_process.time_crop_end)
+            
             spectra_bulk_df = calculate_spectra_from_displacements(disp)
 
             
-            
-            # with open("pickle_files/spectra_bulk_df.pkl", "wb") as f:
-            #     pickle.dump(spectra_bulk_df, f)
 
-            # with open("pickle_files/disp.pkl", "rb") as f:
-            #     disp = pickle.load(f)
-            # with open("pickle_files/gps.pkl", "rb") as f:
-            #     gps = pickle.load(f)
-            # with open("pickle_files/temp.pkl", "rb") as f:
-            #     temp = pickle.load(f)
+            spectra_bulk_df = align_gps(spectra_bulk_df, gps)
+            
+            with open("pickle_files/spectra_bulk_df.pkl", "wb") as f:
+                pickle.dump(spectra_bulk_df, f)
             # with open("pickle_files/spectra_bulk_df.pkl", "rb") as f:
             #     spectra_bulk_df = pickle.load(f)
 
+            spectra_bulk_df = qc_watch_circle(spectra_bulk_df, site, output_path)
+
+            
+            
+            
             # from datetime import datetime, timedelta
             # start = datetime(2024,7,1,2,30)
             # end = start + timedelta(hours=72*4)
@@ -456,14 +551,14 @@ if __name__ == "__main__":
             #     (pl.col("datetime") >= start) & (pl.col("datetime") <= end)
             # )
             # NC FILES GENERATION ---------------------
-            generate_spectra_NC_file(spectra_bulk_df, gps, **vars(metadata_args))
-            SITE_LOGGER.info("spectra NC generated")
+            # generate_spectra_NC_file(spectra_bulk_df, gps, **vars(metadata_args))
+            # SITE_LOGGER.info("spectra NC generated")
 
             generate_bulk_NC_file(spectra_bulk_df, gps, temp, **vars(metadata_args))
             SITE_LOGGER.info("integral parameters NC generated")
 
-            generate_raw_displacements_NC_files(disp, gps, **vars(metadata_args))
-            SITE_LOGGER.info("raw displacements NCs generated")
+            # generate_raw_displacements_NC_files(disp, gps, **vars(metadata_args))
+            # SITE_LOGGER.info("raw displacements NCs generated")
 
             SITE_LOGGER.info(f"Processsing finished for {metadata['site_name']} in {(time.time() - start_exec_time)/60} min")
             imos_logging.logging_stop(logger=SITE_LOGGER)
@@ -473,7 +568,7 @@ if __name__ == "__main__":
             SITE_LOGGER.error(str(e), exc_info=True)
             
             # Closing current site logging
-            # site_logger_file_path = imos_logging.get_log_file_path(logger=SITE_LOGGER)
+            site_logger_file_path = imos_logging.get_log_file_path(logger=SITE_LOGGER)
             site_logger_file_path = SITE_LOGGER.handlers[0].baseFilename
             imos_logging.logging_stop(logger=SITE_LOGGER)
             error_logger_file_path = imos_logging.rename_log_file_if_error(site_name=site.loc['name'],

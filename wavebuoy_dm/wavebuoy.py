@@ -144,7 +144,9 @@ class WaveBuoy():
         pattern = f"{region}_delayed_mode_buoys_to_process.csv"
         file_path = glob.glob(os.path.join(region_path, pattern))[0]
         if os.path.exists(file_path):
-            return pd.read_csv(file_path)
+            buoys_to_process = pd.read_csv(file_path)
+            buoys_to_process = buoys_to_process.loc[buoys_to_process['process']==1]
+            return buoys_to_process
         else:
             raise NotADirectoryError(f"{file_path} does not exist")
 

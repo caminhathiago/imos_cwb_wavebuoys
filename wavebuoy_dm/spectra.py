@@ -479,10 +479,69 @@ class Spectra:
 
         return pl.DataFrame(results)
 
-    def select_parameters(self, dataframe:pl.DataFrame, dataset_type:str = "spectra") -> pl.DataFrame:
+    def spectra_from_dataframe(self, displacements, nfft, nover, fs, merge, data_type, min_samples, info) -> pl.DataFrame:
+
+        data_chunks = (displacements
+                .group_by_dynamic("datetime", every='30m', closed="left")
+                .agg([pl.all(), pl.col("datetime").first().alias("chunk_datetime")])
+            )
+        
+        data_chunks = Spectra().filter_insufficient_samples(data=data_chunks, min_samples=min_samples)
+
+        start_time = data_chunks.select(pl.col("datetime").min()).item()
+        end_time = data_chunks.select(pl.col("datetime").max()).item()
+
+        from datetime import timedelta
+        chunk_size = timedelta(minutes=30)
+        current_time = start_time
+
+        results = {"TIME": [], "FREQUENCY": [],
+                    "A1": [], "B1": [], "A2": [], "B2": [], "ENERGY": [],
+                    'WSSH':[], 'WPFM':[], 'WPPE':[], 'SSWMD':[], 'WPDI':[], 'WMDS':[], 'WPDS':[]}
+
+        while current_time <= end_time:
+            data_chunk = data_chunks.filter(
+                    (pl.col("datetime") == current_time)
+                )
+            
+            if data_chunk["z"].is_empty():
+                current_time += timedelta(minutes=30)
+                continue
+            
+            out, spectra = Spectra().spectra_from_displacements(data_chunk["z"].item().to_numpy(),
+                                            data_chunk["y"].item().to_numpy(), 
+                                            data_chunk["x"].item().to_numpy(),
+                                            nfft, nover, fs, merge, 'xyz', info)
+            
+            results["TIME"].append(current_time)
+            results["FREQUENCY"].append(spectra["f"])
+            results["A1"].append(spectra["a1"])
+            results["B1"].append(spectra["b1"])
+            results["A2"].append(spectra["a2"])
+            results["B2"].append(spectra["b2"])
+            results["ENERGY"].append(spectra["spec1D"])
+
+            results["WSSH"].append(out["Hm0"])
+            results["WPFM"].append(out["Tm1"])
+            results["WPPE"].append(out["Tp"])
+            results["SSWMD"].append(out["mdir1"])
+            results["WPDI"].append(out["Dp"])
+            results["WMDS"].append(out["spread"])
+            results["WPDS"].append(out["spread_Dp"])
+            
+            current_time += chunk_size
+
+        return pl.DataFrame(results)     
+
+
+    def select_parameters(self, dataframe:pl.DataFrame, dataset_type:str = "spectra", include_latlon:bool=True) -> pl.DataFrame:
         if dataset_type == "spectra":
             cols = self.spectra_params
         if dataset_type == "bulk":
             cols = self.bulk_params
         
+        if include_latlon:
+            cols.extend(["LATITUDE", "LONGITUDE"])
+
         return dataframe.select(cols)
+    
