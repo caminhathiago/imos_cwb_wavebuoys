@@ -45,8 +45,7 @@ The script can be found in the scripts folder as:
 
  | File name              | Description  |  Extension |
 | ---------------------- | -------------------| -----------------|
-| `raw-displacements`     | Contains raw displacements as `Z` (heave), `Y` (east), `X` (north) and `TIME` (datetime) | '.nc' or '.csv', 
-| `gps` | Contains gps data as `LATITUDE` and `LONGITUDE` displacements . |
-| `bulk` | *(Optional)* Enables parallel spectra calculation using Dask.                                                   |
-| `spectra` | *(Optional)* Choose output format: `csv` or `netcdf` (default: `netcdf`).                                       |
-
+| `raw-displacements`     | Contains raw displacements as `Z` (heave), `Y` (east), `X` (north) and `TIME` (datetime) | `.nc` or `.csv` | 
+| `gps` | Contains gps data as `LATITUDE`, `LONGITUDE` and `TIME` (datetime) | `.csv` | 
+| `bulk` |  Contains calculated bulk wave parameters |  `.nc` or `.csv` | 
+| `spectra` | Contains calculated spectra wave parameters | `.nc` or `.csv` | 
