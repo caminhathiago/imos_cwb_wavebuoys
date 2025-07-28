@@ -782,6 +782,12 @@ class ncWriter(WaveBuoy):
             dataset[qc_var].encoding["coordinates"] = None
         return dataset
 
+    def _remove_time_fillvalues(self, dataset: xr.Dataset) -> xr.Dataset:
+        time_variables = [var for var in list(dataset.variables.keys()) if var.startswith("TIME")]
+        for time_var in time_variables:
+            dataset[time_var].encoding["_FillValue"] = None
+        return dataset
+
     def _process_encoding(self, dataset: xr.Dataset, parameters_type: str) -> dict:
                 
         if parameters_type == "bulk":
@@ -841,6 +847,8 @@ class ncWriter(WaveBuoy):
         
         for file_path, backup_file_path, dataset in zip(file_paths, backup_file_paths, dataset_objects):
             dataset = self._remove_coordinates_qc_variables(dataset=dataset)
+            dataset = self._remove_time_fillvalues(dataset=dataset)
+
             encoding = self._process_encoding(dataset=dataset, parameters_type=parameters_type)
             
             if not self._is_file_locked(file_path):
