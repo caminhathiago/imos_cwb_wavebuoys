@@ -21,6 +21,7 @@ class WaveBuoyQC():
 
     def get_qc_configs(self, file_name: str = "qc_config.csv"):
         file_path = os.path.join(os.getenv('METADATA_PATH'), file_name)
+        file_path = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves\Data\aodn_nrt_python\qc_config_TC.csv"
         if os.path.exists(file_path):
             return pd.read_csv(file_path)
         else:
@@ -183,13 +184,13 @@ class WaveBuoyQC():
                 if test_enabled:
                     data_to_qualify = qc_test_func(data=data_to_qualify, parameter=param, qc_config=self.qc_config_dict)
 
-
+        qualified_subflags = data_to_qualify.copy()
         data_to_qualify = self.summarize_flags(data=data_to_qualify, parameter_type=parameter_type)
         # data_to_qualify = self.summarize_flags(data=data_to_qualify, parameter_type="temp")
 
         data_qualified_ignored = self._concatenate_qualified_ignored(data_to_qualify, data_to_ignore)
 
-        return data_qualified_ignored
+        return data_qualified_ignored, qualified_subflags
     
     def gross_range(self,
                     parameter:str,
