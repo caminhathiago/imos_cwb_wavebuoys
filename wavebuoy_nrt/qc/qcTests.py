@@ -21,6 +21,7 @@ class WaveBuoyQC():
 
     def get_qc_configs(self, file_name: str = "qc_config.csv"):
         file_path = os.path.join(os.getenv('METADATA_PATH'), file_name)
+        file_path = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves\Data\aodn_nrt_python\qc_config_TC.csv"
         if os.path.exists(file_path):
             return pd.read_csv(file_path)
         else:
@@ -120,54 +121,111 @@ class WaveBuoyQC():
         
         return data
 
+    def _extract_qualification_window(self, data: pd.DataFrame, window=int) -> pd.DataFrame:
+        
+        time_col = [col for col in data.columns if "TIME" in col][0]
+        
+        window_start = data[time_col].max() - timedelta(hours=window)
+
+        data_to_ignore = (data
+                    .set_index(time_col)
+                    .loc[:window_start-timedelta(hours=1)]
+                    .reset_index()
+                )
+        
+        data_to_qualify = (data
+                    .set_index(time_col)
+                    .loc[window_start:]
+                    .reset_index()
+                )
+        
+
+        return data_to_ignore, data_to_qualify
+
+    def _concatenate_qualified_ignored(self, data_to_qualify:pd.DataFrame, data_to_ignore:pd.DataFrame) -> pd.DataFrame:
+        return pd.concat([data_to_ignore,data_to_qualify])
+
     def qualify(self,
                 data: pd.DataFrame,
                 parameters: list,
-                start_date: datetime = None,
-                end_date: datetime = None,
+                parameter_type:str,
+                window: int,
                 gross_range_test: bool = True,
-                rate_of_change_test: bool = True) -> pd.DataFrame:
+                rate_of_change_test: bool = True,
+                # flat_line_test:bool = True,
+                mean_std_test:bool = True,
+                spike_test: bool = True) -> pd.DataFrame:
         
         self.check_qc_limits(qc_config=self.qc_config)
 
-        if start_date and end_date:
-            data = (data
-                    .set_index("TIME")
-                    .loc[start_date:end_date]
-                    .reset_index()
-                )
+        data_to_ignore, data_to_qualify = self._extract_qualification_window(data, window)
+
+        # for param in parameters:
+        #     # implement static method approach
+        #     if gross_range_test:
+        #         data_to_qualify = self.gross_range_test(data=data_to_qualify,
+        #                                     parameter=param,
+        #                                     qc_config=self.qc_config_dict)
+        #     if rate_of_change_test:
+        #         data_to_qualify = self.rate_of_change_test(data=data_to_qualify,
+        #                                         parameter=param,
+        #                                         qc_config=self.qc_config_dict)
+        
+        tests = [
+            (gross_range_test, self.gross_range_test),
+            (rate_of_change_test, self.rate_of_change_test),
+            # (flat_line_test, self.flat_line_test),
+            (mean_std_test, self.mean_std_test),
+            (spike_test, self.spike_test),
+        ]
 
         for param in parameters:
-            # implement static method approach
-            if gross_range_test:
-                data = self.gross_range_test(data=data,
-                                            parameter=param,
-                                            qc_config=self.qc_config_dict)
-            if rate_of_change_test:
-                data = self.rate_of_change_test(data=data,
-                                                parameter=param,
-                                                qc_config=self.qc_config_dict)
+            for test_enabled, qc_test_func in tests:
+                if test_enabled:
+                    data_to_qualify = qc_test_func(data=data_to_qualify, parameter=param, qc_config=self.qc_config_dict)
+
+        qualified_subflags = data_to_qualify.copy()
+        data_to_qualify = self.summarize_flags(data=data_to_qualify, parameter_type=parameter_type)
+        # data_to_qualify = self.summarize_flags(data=data_to_qualify, parameter_type="temp")
+
+        data_qualified_ignored = self._concatenate_qualified_ignored(data_to_qualify, data_to_ignore)
+
+        return data_qualified_ignored, qualified_subflags
+    
+    def gross_range(self,
+                    parameter:str,
+                    inp:pd.Series,
+                    max_threshold:float,
+                    min_threshold:float):
         
-        data = self.summarize_flags(data=data, parameter_type="waves")
-        data = self.summarize_flags(data=data, parameter_type="temp")
+        inp = np.asarray(inp)
+        QCFlag = np.ones(len(inp), dtype=int)
 
-
-        return data
+        for i in range(len(inp)):
+            if inp[i] > max_threshold or inp[i] < min_threshold:
+                if parameter == "WSSH":
+                    QCFlag[i] = 4
+                else:
+                    QCFlag[i] = 3
+                    
+        return QCFlag
     
     def gross_range_test(self,
-                        data: pd.DataFrame,
-                        parameter: str,
-                        qc_config: dict) -> pd.DataFrame:
-        
-        print(f"{parameter} - {qc_config[parameter]["gross_range_fail_min"]}")
+                        data:pd.DataFrame,
+                        parameter:str,
+                        qc_config:dict) -> pd.DataFrame:
 
-        results = qartod.gross_range_test(
+        results = self.gross_range(
+            parameter=parameter,
             inp=data[parameter],
-            suspect_span=[qc_config[parameter]["gross_range_suspect_min"],
-                          qc_config[parameter]["gross_range_suspect_max"]],
-            fail_span=[qc_config[parameter]["gross_range_fail_min"],
-                       qc_config[parameter]["gross_range_fail_max"]]
-        )
+            max_threshold=qc_config[parameter]["gross_range_fail_max"],
+            min_threshold=qc_config[parameter]["gross_range_fail_min"]
+            )
+        #     suspect_span=[qc_config[parameter]["gross_range_suspect_min"],
+        #                 qc_config[parameter]["gross_range_suspect_max"]],
+        #     fail_span=[qc_config[parameter]["gross_range_fail_min"],
+        #             qc_config[parameter]["gross_range_fail_max"]]
+        # )
 
         test_name = "gross_range_test"
         param_qc_column, data = self._create_parameters_qc_column(data=data, parameter=parameter, test=test_name)
@@ -177,20 +235,38 @@ class WaveBuoyQC():
         SITE_LOGGER.info(f"{parameter} | gross range test completed")
         return data
     
+    def rate_of_change(self, inp, tinp, threshold):
+        
+        inp = np.asarray(inp)
+        QCFlag = np.zeros(len(inp), dtype=int)
+
+        for i in range(len(inp)):
+            if i == 0:
+                QCFlag[i] = 2  # Not evaluated
+            else:
+                if abs(inp[i] - inp[i - 1]) >= threshold:
+                    QCFlag[i] = 4  # Fail
+                else:
+                    QCFlag[i] = 1  # Pass
+
+        return QCFlag
+
     def rate_of_change_test(self,
                         data: pd.DataFrame,
                         parameter: str,
                         qc_config: dict) -> pd.DataFrame:
        
-        
-        time_freq = data["TIME"].diff().mean().seconds
+        time_col = [col for col in data.columns if "TIME" in col][0]
 
-        results = qartod.rate_of_change_test(
+        time_freq = data[time_col].diff().mean().seconds
+
+        threshold = qc_config[parameter]["rate_of_change_threshold"]# / time_freq (timefreq needs to be used with qartod.rate_of_change_test)
+
+        results = self.rate_of_change(
             inp=data[parameter],
-            tinp=data["TIME"],
-            threshold=[qc_config[parameter]["rate_of_change_threshold"]/time_freq] 
+            tinp=data[time_col],
+            threshold=threshold
         )
-        
         
         test_name = "rate_of_change_test"
         param_qc_column, data = self._create_parameters_qc_column(data=data, parameter=parameter, test=test_name)
@@ -200,6 +276,93 @@ class WaveBuoyQC():
         qc_basic_report = self.flags_counter(results=results)
         
         SITE_LOGGER.info(f"{parameter} | rate of change test completed") #| {qc_basic_report}")
+        return data
+
+    def mean_std(self, data: pd.Series, time: pd.Series, time_window: int, std: float) -> list[int]:
+
+        qc_flags = []
+        for i in range(len(time)):
+            tnow = time.iloc[i]
+            tstart = tnow - timedelta(hours=time_window)
+            tend = tnow + timedelta(hours=time_window)
+
+            if tstart >= time.iloc[0] and tend <= time.iloc[-1]:
+
+                idx = (time >= tstart) & (time <= tend)
+                ddata = data[idx].to_numpy()
+                
+                # idx = np.where((time >= tstart) & (time <= tend))[0]
+                # ddata = data.iloc[idx].to_numpy()
+                # ddata = ddata[~np.isnan(ddata)]  # remove NaNs
+
+                # if len(ddata) == 0:
+                #     qc_flags.append(2)  # Not enough data to assess
+                #     continue
+
+                mean = np.nanmean(ddata)
+                Mhi = mean + (std * np.nanstd(ddata, ddof=1))
+                Mlow = mean - (std * np.nanstd(ddata, ddof=1))
+
+                if data.iloc[i] > Mhi or data.iloc[i] < Mlow:
+                    qc_flags.append(3) 
+                else:
+                    qc_flags.append(1) 
+            else:
+                qc_flags.append(2) 
+
+        return qc_flags
+
+    def mean_std_test(self, data: pd.DataFrame, parameter:str, qc_config: dict):
+        
+        time_col = [col for col in data.columns if "TIME" in col][0]
+
+        results = self.mean_std(data=data[parameter], 
+                                     time=data[time_col],
+                                     time_window=qc_config[parameter]["mean_std_time_window"],
+                                     std=qc_config[parameter]["mean_std_std"])
+        
+        test_name = "mean_std_test"
+        param_qc_column, data = self._create_parameters_qc_column(data=data, parameter=parameter, test=test_name)
+
+        data[param_qc_column] = results
+
+        SITE_LOGGER.info(f"{parameter} | mean std test completed")
+        return data
+
+    def spike(self, time: pd.DatetimeIndex, data: pd.Series, roc: float) -> pd.Series:
+        
+        QCFlags = []
+
+        for i in range(len(time)):
+            if i == 0 or i == len(time) - 1:
+                QCFlags.append(2)
+            else:
+                dum = np.diff(data[i-1:i+2])
+
+                # spike chec
+                if dum[0] > 0 and dum[1] < 0 and all(np.abs(dum) > roc):
+                    QCFlags.append(4)
+                elif dum[0] < 0 and dum[1] > 0 and all(np.abs(dum) > roc):
+                    QCFlags.append(4)
+                else:
+                    QCFlags.append(1)
+        
+        return QCFlags
+
+    def spike_test(self, data: pd.DataFrame, parameter:str, qc_config: dict):
+        
+        time_col = [col for col in data.columns if "TIME" in col][0]
+
+        results = self.spike(data=data[parameter], 
+                            time=data[time_col],
+                            roc=qc_config[parameter]["spike_test_roc"])
+        
+        test_name = "spike_test"
+        param_qc_column, data = self._create_parameters_qc_column(data=data, parameter=parameter, test=test_name)
+
+        data[param_qc_column] = results
+
+        SITE_LOGGER.info(f"{parameter} | spike test completed")
         return data
 
     def flags_counter(self, results: np.array):
@@ -233,8 +396,12 @@ class WaveBuoyQC():
         if parameter_type_qc_columns.empty:
             return data
 
-        for idx, row in data[parameter_type_qc_columns].iterrows():
-            data.loc[idx, global_qc_column] = row.max()
+        # data = data.reset_index(drop=True)
+        # for idx, row in data[parameter_type_qc_columns].iterrows():
+        #     data.loc[idx, global_qc_column] = row.max()
+        temp_flags = data[parameter_type_qc_columns].replace(2, 1)
+        max_flags = temp_flags.max(axis=1)
+        data[global_qc_column] = max_flags
 
         if drop_parameters_qc_columns:
             data = self.drop_parameters_qc_columns(data=data, qc_col_prefix=qc_col_prefix)
@@ -246,14 +413,17 @@ class WaveBuoyQC():
         parameters_qc_columns = [col for col in qc_columns if not col.endswith("_quality_control")]
         return data.drop(columns=parameters_qc_columns)
 
-    def create_global_qc_columns(self, data: pd.DataFrame) -> pd.DataFrame:
+    def create_global_qc_columns(self, data: pd.DataFrame, parameter_type:str) -> pd.DataFrame:
 
-        wave_qc_column = "WAVE_quality_control"
-        temp_qc_column = "TEMP_quality_control"
+        if parameter_type == "waves":
+            global_qc_column = "WAVE_quality_control"
+        elif parameter_type == "temp":
+            global_qc_column = "TEMP_quality_control"
 
-        data[wave_qc_column] = 2.0
-        if "TEMP" in data.columns:
-            data[temp_qc_column] = 2.0
+        global_qc_columns = [col for col in data.columns if col.endswith("quality_control")]
+
+        if not global_qc_columns:
+            data[global_qc_column] = 2.0
 
         return data
 

@@ -2,7 +2,7 @@
 "variables": 
     {
         "timeSeries": {
-        "long_name": "unique identifier for each feature instance",
+        "long_name": "Unique identifier for each feature instance",
         "cf_role": "timeseries_id"
         },
         "TIME": {
@@ -17,7 +17,7 @@
         "LATITUDE": {
         "_FillValue": -9999.0,
         "standard_name": "latitude",
-        "long_name": "latitude",
+        "long_name": "latitude of each observation",
         "units": "degrees_north",
         "axis": "Y",
         "valid_min": -90.0,
@@ -27,7 +27,7 @@
         "LONGITUDE": {
         "_FillValue": -9999.0,
         "standard_name": "longitude",
-        "long_name": "longitude",
+        "long_name": "longitude of each observation",
         "units": "degrees_east",
         "axis": "X",
         "valid_min": -180.0,
@@ -42,7 +42,7 @@
         "valid_min": 0.0,
         "valid_max": 50.0,
         "method": "Spectral analysis method",
-        "ancillary_variable": "WAVE_quality_control",
+        "ancillary_variables": "WAVE_quality_control",
         "coordinates": "TIME LATITUDE LONGITUDE"
         },
         "WPPE": {
@@ -54,64 +54,57 @@
         "valid_max": 50.0,
         "method": "Spectral analysis method",
         "coordinates": "TIME LATITUDE LONGITUDE",
-        "ancillary_variable": "WAVE_quality_control",
-        "comment": "Period of the peak of the energy spectrum"
+        "ancillary_variables": "WAVE_quality_control"
         },
         "SSWMD": {
         "standard_name": "sea_surface_wave_from_direction",
         "long_name": "spectral sea surface wave mean direction",
-        "units": "Degrees",
-        "magnetic_declination": 12.86,
-        "compass_correction_applied": 13,
+        "units": "Degree",
         "positive": "clockwise",
         "reference_datum": "true north",
         "method": "Spectral analysis method",
         "_FillValue": -9999.0,
         "valid_min": 0.0,
         "valid_max": 360.0,
-        "comment": "Direction (related to the magnetic north) from which the mean period waves are coming from",
-        "ancillary_variable": "WAVE_quality_control",
+        "ancillary_variables": "WAVE_quality_control",
         "coordinates": "TIME LATITUDE LONGITUDE"
         },
         "WPDI": {
         "standard_name": "sea_surface_wave_from_direction_at_variance_spectral_density_maximum",
         "long_name": "spectral peak wave direction",
-        "units": "Degrees",
-        "magnetic_declination": 12.86,
-        "compass_correction_applied": 13,
+        "units": "Degree",
         "reference_datum": "true north",
         "positive": "clockwise",
         "_FillValue": -9999.0,
         "valid_min": 0.0,
         "valid_max": 360.0,
         "method": "Spectral analysis method",
-        "ancillary_variable": "WAVE_quality_control",
-        "comment": "Direction (related to the magnetic north) from which the peak period waves are coming from",
+        "ancillary_variables": "WAVE_quality_control",
         "coordinates": "TIME LATITUDE LONGITUDE"
         },
         "WMDS": {
         "standard_name": "sea_surface_wave_directional_spread",
         "long_name": "spectral sea surface wave mean directional spread",
-        "units": "Degrees",
+        "units": "Degree",
         "positive": "clockwise",
         "_FillValue": -9999.0,
         "valid_min": 0.0,
         "valid_max": 360.0,
         "method": "Spectral analysis method",
-        "ancillary_variable": "WAVE_quality_control",
+        "ancillary_variables": "WAVE_quality_control",
         "coordinates": "TIME LATITUDE LONGITUDE"
         },
         "WPDS": {
         "standard_name": "sea_surface_wave_directional_spread_at_variance_spectral_density_maximum",
         "long_name": "spectral sea surface wave peak directional spread",
-        "units": "Degrees",
+        "units": "Degree",
         "_FillValue": -9999.0,
         "valid_min": 0.0,
         "valid_max": 360.0,
         "reference_datum": "true north",
         "positive": "clockwise",
         "method": "Spectral analysis method",
-        "ancillary_variable": "WAVE_quality_control",
+        "ancillary_variables": "WAVE_quality_control",
         "coordinates": "TIME LATITUDE LONGITUDE"
         },
         "WSSH": {
@@ -122,7 +115,7 @@
         "valid_min": 0.0,
         "valid_max": 100.0,
         "method": "Spectral analysis method",
-        "ancillary_variable": "WAVE_quality_control",
+        "ancillary_variables": "WAVE_quality_control",
         "coordinates": "TIME LATITUDE LONGITUDE"
         },
         "TEMP": {
@@ -132,8 +125,8 @@
         "_FillValue": -9999.0,
         "valid_min": 0.0,
         "valid_max": 100.0,
-        "method": "Hull mounted temperature sensor",
-        "ancillary_variable": "TEMP_quality_control",
+        "method": "Measured using thermistor embedded in wave buoy hull",
+        "ancillary_variables": "TEMP_quality_control",
         "coordinates": "TIME LATITUDE LONGITUDE"
         },
         "WAVE_quality_control": {
@@ -146,7 +139,7 @@
         "quality_control_convention": "Ocean Data Standards, UNESCO 2013 - IOC Manuals and Guides, 54, Volume 3 Version 1"
         },
         "TEMP_quality_control": {
-        "long_name": "primary Quality Control flag for sea surface temperature",
+        "long_name": "primary Quality Control flag for temperature variable",
         "_FillValue": -127,
         "valid_min": 1,
         "valid_max": 9,

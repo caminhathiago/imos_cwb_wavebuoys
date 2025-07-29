@@ -220,7 +220,7 @@ class ncAttrsExtractor:
     # from deployment metadata -------------
     def _extract_deployment_metadata_site_name(deployment_metadata: pd.DataFrame) -> str:
         site_name = deployment_metadata.loc["Site Name", "metadata_wave_buoy"]
-        return re.sub(r'\d+', '', site_name).strip()
+        return re.sub(r'(?<!^)(?=[A-Z0-9])', '-', site_name).upper().replace(" ", "")#re.sub(r'\d+', '', site_name).strip()
     
     def  _extract_deployment_metadata_instrument(deployment_metadata: pd.DataFrame):
         return deployment_metadata.loc["Instrument", "metadata_wave_buoy"]
@@ -723,6 +723,9 @@ class ncWriter(WaveBuoy):
         day = "01"
         return periods.strftime("%Y%m") + day
         
+    def _format_site_id_to_filename(self, site_id:str) -> str:
+        return re.sub(r'(?<!^)(?=[A-Z0-9])', '-', site_id)
+
     def compose_file_names(self,
                             site_id: str,
                             deployment_metadata: pd.DataFrame,
@@ -744,7 +747,7 @@ class ncWriter(WaveBuoy):
 
         for period in periods_formated:
             file_name = file_name_template.format(operating_institution=operating_institution,
-                                                     site_id=site_id,
+                                                     site_id=self._format_site_id_to_filename(site_id).upper(),
                                                      monthly_datetime=period
                                                 )
             file_names.append(file_name)
@@ -777,6 +780,12 @@ class ncWriter(WaveBuoy):
         qc_variables = [var for var in list(dataset.variables.keys()) if var.endswith("quality_control")]
         for qc_var in qc_variables:
             dataset[qc_var].encoding["coordinates"] = None
+        return dataset
+
+    def _remove_time_fillvalues(self, dataset: xr.Dataset) -> xr.Dataset:
+        time_variables = [var for var in list(dataset.variables.keys()) if var.startswith("TIME")]
+        for time_var in time_variables:
+            dataset[time_var].encoding["_FillValue"] = None
         return dataset
 
     def _process_encoding(self, dataset: xr.Dataset, parameters_type: str) -> dict:
@@ -838,6 +847,8 @@ class ncWriter(WaveBuoy):
         
         for file_path, backup_file_path, dataset in zip(file_paths, backup_file_paths, dataset_objects):
             dataset = self._remove_coordinates_qc_variables(dataset=dataset)
+            dataset = self._remove_time_fillvalues(dataset=dataset)
+
             encoding = self._process_encoding(dataset=dataset, parameters_type=parameters_type)
             
             if not self._is_file_locked(file_path):
