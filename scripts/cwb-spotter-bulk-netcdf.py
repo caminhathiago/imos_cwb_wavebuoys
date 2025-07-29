@@ -193,14 +193,16 @@ def main():
 
             qc = WaveBuoyQC(config_id=1)
 
-            all_data_df = qc.create_global_qc_columns(data=all_data_df)
+            all_data_df = qc.create_global_qc_columns(data=all_data_df, parameter_type="waves")
             
             qc.load_data(data=all_data_df)
-            parameters_to_qc = qc.get_parameters_to_qc(data=all_data_df, qc_config=qc.qc_config)      
+            parameters_to_qc = qc.get_parameters_to_qc(data=all_data_df, qc_config=qc.qc_config)
             qualified_data_embedded = qc.qualify(data=all_data_df,
-                                        parameters=parameters_to_qc,
-                                        gross_range_test=True,
-                                        rate_of_change_test=True)
+                                                 parameter_type="waves",
+                                                parameters=parameters_to_qc,
+                                                window = vargs.window,
+                                                gross_range_test=True,
+                                                rate_of_change_test=True)
             SITE_LOGGER.info("Qualification successfull")
             
             csvOutput.save_csv(data=all_data_df, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves_qc_subflags.csv")
