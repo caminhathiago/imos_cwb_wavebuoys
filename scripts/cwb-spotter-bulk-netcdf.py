@@ -197,7 +197,7 @@ def main():
             
             qc.load_data(data=all_data_df)
             parameters_to_qc = qc.get_parameters_to_qc(data=all_data_df, qc_config=qc.qc_config)
-            qualified_data_embedded = qc.qualify(data=all_data_df,
+            qualified_data_embedded, waves_subflags = qc.qualify(data=all_data_df,
                                                  parameter_type="waves",
                                                 parameters=parameters_to_qc,
                                                 window = vargs.window,
@@ -205,7 +205,7 @@ def main():
                                                 rate_of_change_test=True)
             SITE_LOGGER.info("Qualification successfull")
             
-            csvOutput.save_csv(data=all_data_df, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves_qc_subflags.csv")
+            csvOutput.save_csv(data=waves_subflags, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves_qc_subflags.csv")
             csvOutput.save_csv(data=qualified_data_embedded, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves_qc.csv")
             
             # Processing Nc File --------------------------------------------
