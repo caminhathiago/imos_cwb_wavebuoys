@@ -105,28 +105,32 @@ class ncPusher:
     def quit(self):
         return self._ftp.quit()
 
-    def grab_nc_files_to_push(self, incoming_path: str, lookback_hours: timedelta = 1) -> list:
+    def grab_nc_files_to_push(self, incoming_path: str, lookback_hours: timedelta = 1, push_all:bool = False) -> list:
         
         sites = glob.glob(os.path.join(incoming_path,"sites", "*"))
         file_paths = []
         for site in sites:
             file_paths.extend(glob.glob(os.path.join(site, "*.nc")))
         
-        file_times = []
-        for file_path in file_paths:
-            file_times.append({"file_name": os.path.basename(file_path),
-                                "creation_time": datetime.fromtimestamp(os.path.getctime(file_path)), 
-                                "modification_time": datetime.fromtimestamp(os.path.getmtime(file_path)),
-                                "file_path": file_path})
+        if push_all:
+            return tuple(file_paths)
+        
+        else:
+            file_times = []
+            for file_path in file_paths:
+                file_times.append({"file_name": os.path.basename(file_path),
+                                    "creation_time": datetime.fromtimestamp(os.path.getctime(file_path)), 
+                                    "modification_time": datetime.fromtimestamp(os.path.getmtime(file_path)),
+                                    "file_path": file_path})
 
-        lookback_time = datetime.now() - timedelta(hours=lookback_hours)
+            lookback_time = datetime.now() - timedelta(hours=lookback_hours)
 
-        files_to_push = []
-        for file_time in file_times:
-            if file_time["creation_time"] > lookback_time or file_time["modification_time"] > lookback_time:
-                files_to_push.append(file_time)
+            files_to_push = []
+            for file_time in file_times:
+                if file_time["creation_time"] > lookback_time or file_time["modification_time"] > lookback_time:
+                    files_to_push.append(file_time)
 
-        return tuple(files_to_push)
+            return tuple(files_to_push)
     
     def push_files_to_ftp(self, files_to_push: list):
         self._secure_data_connection()
