@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import os
 import logging
+from typing import Union
 
 from dotenv import load_dotenv
 import pandas as pd
@@ -149,7 +150,7 @@ class WaveBuoyQC():
                 data: pd.DataFrame,
                 parameters: list,
                 parameter_type:str,
-                window: int,
+                window: Union[int,str],
                 gross_range_test: bool = True,
                 rate_of_change_test: bool = True,
                 # flat_line_test:bool = True,
@@ -158,7 +159,12 @@ class WaveBuoyQC():
         
         self.check_qc_limits(qc_config=self.qc_config)
 
-        data_to_ignore, data_to_qualify = self._extract_qualification_window(data, window)
+        if window == "all":
+            data_to_qualify = data.copy()
+            data_to_ignore = data.copy()
+            data_to_ignore = data_to_ignore.drop(data_to_ignore.index)
+        elif isinstance(window, int):
+            data_to_ignore, data_to_qualify = self._extract_qualification_window(data, window)
 
         # for param in parameters:
         #     # implement static method approach
