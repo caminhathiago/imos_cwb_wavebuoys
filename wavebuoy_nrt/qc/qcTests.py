@@ -163,8 +163,10 @@ class WaveBuoyQC():
             data_to_qualify = data.copy()
             data_to_ignore = data.copy()
             data_to_ignore = data_to_ignore.drop(data_to_ignore.index)
-        elif isinstance(window, int):
+        elif isinstance(window, int) and window != "all":
             data_to_ignore, data_to_qualify = self._extract_qualification_window(data, window)
+        else:
+            raise TypeError(f"window type must be int or str: window type passed {type(window)}")
 
         # for param in parameters:
         #     # implement static method approach

@@ -200,7 +200,7 @@ def main():
             qualified_data_embedded, waves_subflags = qc.qualify(data=all_data_df,
                                                  parameter_type="waves",
                                                 parameters=parameters_to_qc,
-                                                window = vargs.window,
+                                                window = int(vargs.window),
                                                 gross_range_test=True,
                                                 rate_of_change_test=True)
             SITE_LOGGER.info("Qualification successfull")
