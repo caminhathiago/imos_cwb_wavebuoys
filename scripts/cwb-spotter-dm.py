@@ -164,7 +164,7 @@ if __name__ == "__main__":
     try:
     
         LOGGER.info("DM Processing started ".upper())
-        LOGGER.info(f"\nSD card data processing".upper())
+        LOGGER.info(f"SD card data processing ".upper() + "="*50)
         results = process_from_SD(vargs.log_path)
         
         disp, gps = filter_dates(disp=results['displacements'],
@@ -173,10 +173,10 @@ if __name__ == "__main__":
                                         deploy_end=vargs.deploy_dates_end,
                                         utc_offset=8)
         
-        LOGGER.info(f"\nSpectra Calculation".upper())
+        LOGGER.info(f"Spectra Calculation ".upper() + "="*50)
         spectra_bulk = calculate_spectra_from_displacements(disp, vargs.enable_dask)
 
-        LOGGER.info(f"\nSpectra results processing".upper())
+        LOGGER.info(f"Spectra results processing ".upper() + "="*50)
         spectra_bulk = align_gps(spectra_bulk, gps)
         
         # import pickle
@@ -189,14 +189,14 @@ if __name__ == "__main__":
         if vargs.output_type == 'netcdf':
             disp, spectra, bulk = convert_to_dataset(disp, gps, spectra, bulk)
 
-        LOGGER.info(f"\nOuputs saving as {vargs.output_type}".upper())
+        LOGGER.info(f"Ouputs saving as {vargs.output_type} ".upper() + "="*50)
         save_outputs(disp, gps, spectra, bulk, vargs.output_path)
 
-        LOGGER.info("\nDM Processing finished".upper())
+        LOGGER.info("DM Processing finished ".upper() + "="*50)
 
     except Exception as e:
         LOGGER.error(str(e), exc_info=True)  
     
-    LOGGER.info(f"EXECUTION TIME: {time.time() - start_exec_time} s")
+    LOGGER.info(f"EXECUTION TIME: {round(time.time() - start_exec_time, 2)} s")
     imos_logging.logging_stop(logger=LOGGER)
     

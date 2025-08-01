@@ -254,7 +254,7 @@ class csvConcat:
         results = self.map_concat_results()
 
         for suffix in self.files_suffixes.keys():
-            print(suffix)
+            # print(suffix)
             data_list = []
             
             for file in self.files_suffixes[suffix]:
@@ -271,7 +271,7 @@ class csvConcat:
             concat_df_lazy = pl.concat(data_list, how="vertical")    
             results.update({suffix:concat_df_lazy})
 
-            print("="*60)
+            # print("="*60)
 
         return results
 
