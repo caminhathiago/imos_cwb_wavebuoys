@@ -8,7 +8,7 @@ This repository provides tools to process data exported from SD cards used by **
 
 ### 1. Install package
 
-From the repo's root:
+With your preferred python virtual environment activated, from the repo's root:
 
 <pre> pip install . </pre>
 
