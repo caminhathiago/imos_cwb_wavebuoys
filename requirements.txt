@@ -16,3 +16,4 @@ dask
 dask[distributed]
 pyproj
 geopy
+pyarrow
