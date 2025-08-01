@@ -59,7 +59,21 @@ class csvConcat:
                         'BARO':{"timestamp (ticks/UTC)": pl.Float64,  
                                 "pressure (mbar)": pl.Float64 
                                 },
-                        # 'SENS_AGG':{}
+                        'SENS_AGG':{
+                                'bm_node_id': pl.Utf8,
+                                'node_position': pl.Int64,
+                                'node_app_name': pl.Utf8, 
+                                "timestamp (ticks/UTC)": pl.Float64, 
+                                'reading_count': pl.Int64
+                                 },
+                        'SENS_IND':{
+                                'bm_node_id': pl.Utf8,
+                                'node_position': pl.Int64,
+                                'node_app_name': pl.Utf8, 
+                                'reading_uptime_millis': pl.Int64,
+                                "reading_time_utc_s": pl.Float64, 
+                                'sensor_reading_time_s': pl.Float64
+                                 }
                         }
 
     def __init__(self,
@@ -87,13 +101,27 @@ class csvConcat:
         self.files_suffixes = self.map_files_suffixes()
         self.suffixes_schemas = self.scan_schemas()
         
-        self.expected_schemas = {'FLT': {'outx(mm)': 'x', 'outy(mm)': 'y', 'outz(mm)': 'z'},
-                            'SPC': {},
-                            'LOC': {'lat(deg)':'lat', 'lat(min*1e5)':'lat_min', 'long(deg)':'lon', 'long(min*1e5)':'lon_min'},
-                            'SST': {'temperature (C)':'temperature'},
-                            'HDR': {'dmx(mm)':'x', 'dmy(mm)':'y', 'dmz(mm)':'z', 'dmn(mm)':'n'},
-                            'BARO': {'pressure (mbar)':'baro_pressure'}
-                        }
+        self.expected_schemas = {
+            'FLT': {'outx(mm)': 'x', 'outy(mm)': 'y', 'outz(mm)': 'z'},
+            'SPC': {},
+            'LOC': {'lat(deg)':'lat', 'lat(min*1e5)':'lat_min', 'long(deg)':'lon', 'long(min*1e5)':'lon_min'},
+            'SST': {'temperature (C)':'temperature'},
+            'HDR': {'dmx(mm)':'x', 'dmy(mm)':'y', 'dmz(mm)':'z', 'dmn(mm)':'n'},
+            'BARO': {'pressure (mbar)':'baro_pressure'},
+            'SENS_AGG': {
+                'bm_node_id':'bm_node_id', 'node_position':'node_position', 
+                'node_app_name':'node_app_name', 'timestamp(ticks/UTC)':'timestamp',
+                'reading_count':'reading_count'
+                },
+            'SENS_IND': {
+                'bm_node_id':'bm_node_id',
+                'node_position':'node_position',
+                'node_app_name':'node_app_name',	
+                'reading_uptime_millis':'reading_uptime_millis',	
+                'reading_time_utc_s':'reading_time_utc_s',	
+                'sensor_reading_time_s':'sensor_reading_time_s'	
+                }
+            }
 
     @staticmethod
     def validate_schema(file_path: str, suffix: str) -> bool:
@@ -230,9 +258,9 @@ class csvConcat:
             data_list = []
             
             for file in self.files_suffixes[suffix]:
-                if self.ignore_files(file=file):# and self.validate_schema(file, suffix):
+                if self.ignore_files(file=file): #and self.validate_schema(file, suffix):
                     df_lazy = self.load_csv(file)
-                    print(list(df_lazy.collect_schema()))
+                    # print(list(df_lazy.collect_schema()))
                     data_list.append(df_lazy)
 
             if not data_list:

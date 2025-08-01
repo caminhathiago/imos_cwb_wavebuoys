@@ -1,5 +1,6 @@
 import os
 from typing import List, Tuple
+from datetime import timedelta
 
 from netCDF4 import date2num
 import xarray as xr
@@ -16,6 +17,34 @@ warnings.filterwarnings(
 )
 
 class Process:
+
+    DTYPES_BULK = {'WSSH':{"dtype":np.float64},
+                        'WPPE':{"dtype":np.float32},
+                        'WPFM':{"dtype":np.float32},
+                        'WPDI':{"dtype":np.float32},
+                        'WPDS':{"dtype":np.float32},
+                        'SSWMD':{"dtype":np.float32},
+                        'WMDS':{"dtype":np.float32},
+                        'TEMP':{"dtype":np.float32},
+                        'WAVE_quality_control':{"dtype":np.int8},
+                        'TEMP_quality_control':{"dtype":np.int8},
+                        # 'TIME':{"dtype":np.float64},
+                        'LATITUDE':{"dtype":np.float64},
+                        'LONGITUDE':{"dtype":np.float64},
+                        'timeSeries':{"dtype":np.int16}}\
+                        
+    
+    DTYPES_SPECTRAL = {
+                "FREQUENCY": {"dtype": np.float32},
+                "LATITUDE": {"dtype": np.float64},
+                "LONGITUDE": {"dtype": np.float64},
+                "A1": {"dtype": np.float32},
+                "B1": {"dtype": np.float32},
+                "A2": {"dtype": np.float32},
+                "B2": {"dtype": np.float32},
+                "ENERGY": {"dtype": np.float32},
+                'timeSeries':{"dtype":np.int16}
+            }
 
     def __init__(self):
         pass
@@ -68,6 +97,39 @@ class Process:
     def create_timeseries_variable(dataset: xr.Dataset) -> xr.Dataset:
         dataset["timeSeries"] = [np.int16(1)]
         return dataset
+
+    
+    @staticmethod
+    def convert_dtypes(dataset:tuple, parameters_type:str = "bulk") -> xr.Dataset:
+        
+        if parameters_type == 'bulk':
+            dtypes_dict = Process.DTYPES_BULK
+        elif parameters_type == 'spectral':
+            dtypes_dict = Process.DTYPES_SPECTRAL
+        else:
+            raise ValueError("Invalid parameters_type. Choose 'bulk' or 'spectral'.")
+
+        dataset = dataset.copy()
+
+        for var_name, target_dtype in dtypes_dict.items():
+            if var_name in dataset:
+                dataset[var_name] = dataset[var_name].astype(target_dtype["dtype"])
+
+        return dataset
+    
+    @staticmethod
+    def convert_dtypes_dataset_objects(dataset_objects: tuple, parameters_type:str = "bulk") -> List[xr.Dataset]:
+        
+        if parameters_type == 'bulk':
+            dtypes_dict = Process.DTYPES_BULK
+        elif parameters_type == 'spectral':
+            dtypes_dict = Process.DTYPES_SPECTRAL
+
+        for dataset in dataset_objects:
+            dataset = dataset.map(lambda x: x.astype(dtypes_dict[x.name]["dtype"]) if x.name in dtypes_dict else x )
+
+        return dataset_objects
+
 
 
 class ncSpectra(Process):
@@ -154,8 +216,9 @@ class ncDisp(Process):
         naive_times = times.tz_localize(None)  # Remove timezone if present (make it naive)
 
         # Create fortnightly periods manually by using the 14-day frequency from the first date
-        start_date = naive_times.min()  # Get the first date (earliest time)
-        periods = pd.date_range(start=start_date, end=naive_times.max(), freq='14D')
+        start_date = naive_times.min().floor('D')  # Get the first date (earliest time)
+        end_date = (naive_times.max() + pd.Timedelta(days=1)).normalize()
+        periods = pd.date_range(start=start_date, end=end_date, freq='14D')
 
         # Convert to periods and return unique periods
         unique = periods.to_period('D').unique()
@@ -164,10 +227,16 @@ class ncDisp(Process):
             unique = unique.append(pd.PeriodIndex([str(naive_times.max().date())], freq="D"))
 
         fortnight_periods = []
-        for i in range(len(unique) - 1):
-            start = unique[i] if i == 0 else fortnight_periods[-1][1] + 1
-            end = unique[i + 1]
-            fortnight_periods.append((start, end))
+        # for i in range(len(unique) - 1):
+        #     start = unique[i] if i == 0 else fortnight_periods[-1][1] + 1
+        #     end = unique[i + 1] - pd.Timedelta(days=1) if i != len(unique) else unique[i + 1]
+        #     fortnight_periods.append((start, end))
+        for i, period in enumerate(unique):
+            if period != unique[-1]:
+                start = period
+                end = unique[i + 1] - pd.Timedelta(days=1) if period != unique[-2] else unique[i + 1]
+                fortnight_periods.append((start, end))
+                
 
         # Display the result
         for pair in fortnight_periods:
@@ -179,8 +248,10 @@ class ncDisp(Process):
         dataset_objects = []
         for period in periods:
             print(period)
-            fortnightly_dataset = dataset.sel(TIME=slice(str(period[0]), str(period[1])),
-                                              TIME_LOCATION=slice(str(period[0]), str(period[1])))
+            start = str(period[0])
+            end = str(period[1]) #str(period[1] - timedelta(days=1)) if period != periods[-1] else str(period[1])
+            fortnightly_dataset = dataset.sel(TIME=slice(start, end),
+                                              TIME_LOCATION=slice(start, end))
             dataset_objects.append(fortnightly_dataset)
         return tuple(dataset_objects)
     
@@ -232,7 +303,7 @@ class ncBulk(Process):
         
         return data_vars
 
-    def compose_dataset(self, waves:pd.DataFrame, temp:pd.DataFrame, parameters_type:str = "bulk") -> xr.Dataset:
+    def compose_dataset(self, waves:pd.DataFrame, temp:pd.DataFrame = None, parameters_type:str = "bulk") -> xr.Dataset:
         
         coords = self._compose_coords_dimensions(waves=waves, temp=temp, parameters_type=parameters_type)
         data_vars = self._compose_data_vars(waves=waves, temp=temp, parameters_type=parameters_type)
@@ -256,3 +327,5 @@ class ncBulk(Process):
         #         "LONGITUDE": ("TIME", waves["LONGITUDE"].to_numpy())
         #     }
         # )
+
+
