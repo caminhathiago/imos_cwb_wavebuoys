@@ -1,6 +1,6 @@
 from typing import List, Dict
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -14,7 +14,7 @@ from geopy.distance import geodesic
 
 from wavebuoy_dm.config.config import AODN_COLUMNS_TEMPLATE
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(threadName)s - %(message)s')
+# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(threadName)s - %(message)s')
 
 
 class FLTProcess:
@@ -121,7 +121,7 @@ class csvProcess:
             (pl.col('y') / 1000),
             (pl.col('z') / 1000)]
         
-        if 'n' in df_lazy.schema:
+        if 'n' in df_lazy.collect_schema():
             operations.append((pl.col('n') / 1000))
         
         return df_lazy.with_columns(operations)
@@ -180,7 +180,12 @@ class csvProcess:
                 collected_result = results[suffix].collect()
                 collected_results.update({suffix: collected_result})
         
-        return collected_results
+        renamed_results = {
+            self.suffix_name_map.get(suffix, suffix): value  # Replace if key exists, else keep original
+            for suffix, value in collected_results.items()
+        }
+
+        return renamed_results
 
     # def collect_lazyframe_thread(self, suffix: str, lazy_frame: pl.LazyFrame, collected_results: dict):
     #     # Function to collect LazyFrames in a thread
@@ -335,18 +340,64 @@ class csvProcess:
                         pl.Series("LATITUDE", interpolated_lat)
                         )
     
-    def filter_deployment_dates(self, dataframe: pl.DataFrame, deploy_start: datetime, deploy_end: datetime) -> pl.DataFrame:
-        time_col = [col for col in dataframe.columns if "TIME" in col.upper()]
+    
 
-        return dataframe.filter(
-                (pl.col(time_col) >= deploy_start) & 
-                (pl.col(time_col) < deploy_end)
+    def filter_deployment_dates(self, 
+                                dataframe:pl.DataFrame,
+                                utc_offset:int,
+                                deploy_start:datetime, 
+                                deploy_end:datetime,
+                                time_crop_start:int = 18,
+                                time_crop_end:int = 6) -> pl.DataFrame:
+        
+        time_col = [col for col in dataframe.columns if "TIME" in col.upper()]
+        time_col_local = time_col.copy()
+        time_col_local[0] += "_local"
+
+        dataframe = dataframe.with_columns(
+        (pl.col(time_col) + timedelta(hours=utc_offset)).alias(time_col_local[0])
+        )
+
+        filter_start_time = deploy_start + timedelta(hours=time_crop_start)
+        filter_end_time = deploy_end + timedelta(hours=time_crop_end)
+
+        # filter deployment and recovery datetimes
+        dataframe = dataframe.filter(
+                (pl.col(time_col_local) >= filter_start_time) & 
+                (pl.col(time_col_local) <= filter_end_time)
             )
+
+        # filter hours_crop hours from first/last timepoints
+        # filter_start_time = dataframe[time_col][0].item() + timedelta(hours=hours_crop_start)
+        # filter_end_time = dataframe[time_col][-1].item() - timedelta(hours=hours_crop_end)
+
+        return dataframe.drop(time_col_local)
+    
+    def buffer_gps_times(self, disp: pl.DataFrame, gps: pl.DataFrame, time_minutes:int=2) -> pl.DataFrame:
+        
+        time_col = [col for col in disp.columns if "TIME" in col.upper()]
+        if not time_col:
+            raise ValueError("No TIME column found in disp DataFrame.")
+        time_col = time_col[0]
+
+        start_time = disp[time_col].min()
+        end_time = disp[time_col].max()
+
+        buffered_start_time = start_time - timedelta(minutes=time_minutes)
+
+        filtered_gps = gps.filter(
+            (pl.col(time_col) >= buffered_start_time) & (pl.col(time_col) <= end_time)
+        )
+
+        return filtered_gps
+
 
     def get_deployment_latlon(self, deployment_metadata: pd.DataFrame) -> tuple[float]:
         return (deployment_metadata.loc["Latitude_nominal", "metadata_wave_buoy"],
                 deployment_metadata.loc["Longitude_nominal", "metadata_wave_buoy"]
         )
+
+    # def watch_circle_from_mooring_metadata(self, )
 
     def filter_watch_circle_utm(self, 
                             dataframe:pl.DataFrame,
@@ -387,12 +438,66 @@ class csvProcess:
                     .drop(["EASTING", "NORTHING", "DIST_TO_DEPLOY"])
         )
 
+
+    def qc_watch_circle(self,
+                                    dataframe:pl.DataFrame,
+                                    deploy_lat:float,
+                                    deploy_lon:float,
+                                    watch_circle:float,
+                                    watch_circle_fail:float):
         
+        raw_records = dataframe.shape[0]
+
+        def calc_distance(lat, lon):
+            return geodesic((deploy_lat, deploy_lon), (lat, lon)).meters
+        
+        dataframe = dataframe.with_columns(
+            pl.struct(["LATITUDE", "LONGITUDE"]).map_elements(
+                lambda row: calc_distance(row["LATITUDE"], row["LONGITUDE"]),
+                return_dtype=pl.Float64
+            ).alias("distance")
+        )
+    
+        qc_flag_watch = "WATCH_quality_control_primary"
+        if qc_flag_watch in dataframe.columns:
+            qc_flag_watch = "WATCH_quality_control_secondary"
+
+        dataframe = dataframe.with_columns(
+            pl.when(pl.col("distance") >= watch_circle * watch_circle_fail).then(4)
+            .when(pl.col("distance") >= watch_circle).then(3)
+            .otherwise(1)  # or 0 if you prefer unflagged points to be 0
+            .alias(qc_flag_watch)
+        )
+
+        flag_counts = dataframe.select(pl.col(qc_flag_watch)).to_series().value_counts()
+
+        pct_flag_3 = (
+            flag_counts.filter(pl.col(qc_flag_watch) == 3)["count"][0] / raw_records * 100
+            if (flag_counts[qc_flag_watch] == 3).any()
+            else 0
+        )
+
+        pct_flag_4 = (
+            flag_counts.filter(pl.col(qc_flag_watch) == 4)["count"][0] / raw_records * 100
+            if (flag_counts[qc_flag_watch] == 4).any()
+            else 0
+        )
+
+        # filtered_df = dataframe.filter(pl.col("distance") >= watch_circle) # flag as 3
+        # filtered_df = dataframe.filter(pl.col("distance") >= watch_circle*watch_circle_fail) # flag as 4
+        
+        # percentage_cropped = (1 - (filtered_df.shape[0]/raw_records)) * 100
+
+        return dataframe, (pct_flag_3 + pct_flag_4)
+
+
+
     def filter_watch_circle_geodesic(self, 
                             dataframe:pl.DataFrame,
-                            deploy_lat: float,
-                            deploy_lon: float,
-                            max_distance: float = 100) -> pl.DataFrame:
+                            deploy_lat:float,
+                            deploy_lon:float,
+                            max_distance:float = 100,
+                            percentage_threshold:float = .97) -> pl.DataFrame:
         
         raw_records = dataframe.shape[0]
 
@@ -409,14 +514,30 @@ class csvProcess:
         filtered_df = dataframe.filter(pl.col("distance") <= max_distance)
         
         filtered_df = filtered_df.drop("distance")
+        percentage_cropped = 1 - (filtered_df.shape[0]/raw_records)
+        if filtered_df.shape[0]/raw_records < percentage_threshold:
+            
+            mean_lat = dataframe.select(pl.mean("LATITUDE")).item()
+            mean_lon = dataframe.select(pl.mean("LONGITUDE")).item()
+            
+            def calc_distance(lat, lon):
+                return geodesic((mean_lat, mean_lon), (lat, lon)).meters
+
+            dataframe = dataframe.with_columns(
+                pl.struct(["LATITUDE", "LONGITUDE"]).map_elements(
+                    lambda row: calc_distance(row["LATITUDE"], row["LONGITUDE"]),
+                    return_dtype=pl.Float64
+                ).alias("distance")
+            )
         
-        if filtered_df.is_empty():
-            raise ValueError(f"Filtering watch circle probably removed all time points. Please revise DeployLat and DeployLon on buoys_to_process.csv")
-
-        if filtered_df.shape[0]/raw_records < 0.7:
-            raise ValueError(f"Filtering watch circle removed more than 30% of records. Please revise DeployLat and DeployLon on buoys_to_process.csv")
-
-        return filtered_df
+            filtered_df = dataframe.filter(pl.col("distance") <= max_distance)
+            
+            filtered_df = filtered_df.drop("distance")
+            percentage_cropped = 1 - (filtered_df.shape[0]/raw_records)
+            if filtered_df.shape[0]/raw_records < percentage_threshold:
+                raise ValueError(f"Filtering watch circle removed more than 30% of records. Please revise DeployLat and DeployLon on buoys_to_process.csv")
+        
+        return filtered_df, percentage_cropped
 
     def convert_datatypes(self, dataframe: pl.DataFrame) -> pl.DataFrame:
         dtype_mapping = {

@@ -12,3 +12,8 @@ openpyxl
 ioos_qc
 polars
 setuptools
+dask
+dask[distributed]
+pyproj
+geopy
+pyarrow

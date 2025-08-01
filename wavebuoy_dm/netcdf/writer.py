@@ -65,13 +65,13 @@ class ncAttrsExtractor:
     # from deployment metadata -------------
     def _extract_deployment_metadata_site_name(deployment_metadata: pd.DataFrame) -> str:
         site_name = deployment_metadata.loc["Site Name", "metadata_wave_buoy"]
-        return re.sub(r'\d+', '', site_name).strip()
+        return re.sub(r'(?<!^)(?=[A-Z0-9])', '-', site_name).upper().replace(" ", "")#re.sub(r'\d+', '-', site_name).strip()
     
     def  _extract_deployment_metadata_instrument(deployment_metadata: pd.DataFrame):
         return deployment_metadata.loc["Instrument", "metadata_wave_buoy"]
 
-    def  _extract_deployment_metadata_transmission(deployment_metadata: pd.DataFrame) -> str:
-        return deployment_metadata.loc["Transmission", "metadata_wave_buoy"]
+    # def  _extract_deployment_metadata_transmission(deployment_metadata: pd.DataFrame) -> str:
+    #     return deployment_metadata.loc["Transmission", "metadata_wave_buoy"]
 
     def _extract_deployment_metadata_hull_serial_number(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Hull serial number", "metadata_wave_buoy"]
@@ -102,7 +102,7 @@ class ncAttrsExtractor:
     def _extract_deployment_metadata_instrument_burst_interval(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Instrument burst interval", "metadata_wave_buoy"]
     
-    def _extract_deployment_metadata_instrument_burst_units(deployment_metadata: pd.DataFrame) -> str:
+    def _extract_deployment_metadata_instrument_burst_unit(deployment_metadata: pd.DataFrame) -> str:
         return "s"
     
     def _extract_deployment_metadata_instrument_sampling_interval(deployment_metadata: pd.DataFrame) -> str:
@@ -133,6 +133,9 @@ class ncAttrsExtractor:
             return "IMOS"
         else:
             return operating_institution_code
+        
+    def _extract_deployment_metadata_watch_circle(deployment_metadata: pd.DataFrame) -> str:
+        return deployment_metadata.loc["watch_circle", "metadata_wave_buoy"]
 
     def _extract_regional_metadata_principal_investigator(regional_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame) -> str:
         operating_institution_code = ncAttrsExtractor._process_operating_institution(deployment_metadata=deployment_metadata)
@@ -161,10 +164,10 @@ class ncAttrsExtractor:
         return f"this file was file created on: {ncAttrsExtractor._extract_data_date_created(dataset=dataset)}"
     
     def _extract_general_author():
-        return "AODN"
+        return "Thiago Caminha"
     
     def _extract_general_author_email() -> str:
-        return "info@aodn.org.au"
+        return "thiago.caminha@uwa.edu.au"
     
     def _extract_general_data_centre() -> str:
         return "Australian Ocean Data Network (AODN)"
@@ -204,7 +207,11 @@ class ncAttrsExtractor:
     def _extract_general_disclaimer() -> str:
         return 'Data, products and services from UWA are provided \\"as is\\" without any warranty as to fitness for a particular purpose.'
 
-
+    def _extract_general_water_depth_reference() -> str:
+        return "mean sea level"
+    
+    def _extract_general_buoy_specification_url() -> str:
+        return "https://s3-ap-southeast-2.amazonaws.com/content.aodn.org.au/Documents/AODN/Waves/Instruments_manuals/Spotter_SpecSheet%20Expanded.pdf"
 
 class ncAttrsComposer:
     def __init__(self, 
@@ -227,6 +234,11 @@ class ncAttrsComposer:
         with open(file_path) as j:
             return json.load(j)
 
+    def _match_valid_min_max_dtype(self, variable:str, variables_attributes:dict , dataset: xr.Dataset,
+                                   min_attribute_name:str, max_attribute_name:str):
+        return (np.dtype(dataset[variable]).type(variables_attributes[min_attribute_name]),
+                np.dtype(dataset[variable]).type(variables_attributes[max_attribute_name]))
+
     def assign_variables_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
         variables = list(self.attrs_template['variables'].keys())
         # variables.remove("timeSeries")
@@ -237,6 +249,26 @@ class ncAttrsComposer:
                 if "quality_control" in variable:
                     variables_attributes["flag_values"] = np.int8(variables_attributes["flag_values"])
                 
+                if "valid_min" in variables_attributes or variable not in ("TIME","timeSeries", "FREQUENCY"):
+                    variables_attributes["valid_min"], variables_attributes["valid_max"] = self._match_valid_min_max_dtype(
+                                                                                variable=variable,
+                                                                                dataset=dataset,
+                                                                                variables_attributes=variables_attributes,
+                                                                                min_attribute_name="valid_min",
+                                                                                max_attribute_name="valid_max"
+                                                                            )
+                
+                if "min" in variables_attributes and variable == "FREQUENCY":
+                    variables_attributes["min"], variables_attributes["max"] = self._match_valid_min_max_dtype(
+                                                                                variable=variable,
+                                                                                dataset=dataset,
+                                                                                variables_attributes=variables_attributes,
+                                                                                min_attribute_name="min",
+                                                                                max_attribute_name="max"
+                                                                            )
+
+
+
                 dataset[variable] = (dataset[variable].assign_attrs(variables_attributes))
         
         return dataset
@@ -292,7 +324,7 @@ class ncAttrsComposer:
                     try:                        
                         extracted = method(**kwargs)
                     except:
-                        SITE_LOGGER.warning(f"grabing attribute from general_attrs.json for {key}")
+                        # SITE_LOGGER.warning(f"grabing attribute from general_attrs.json for {key}")
                         extracted = self._get_attribute_from_template(attribute_name=key, attributes_template=self.attrs_template)
                     
                     general_attributes.update({key:extracted})
@@ -323,6 +355,9 @@ class ncAttrsComposer:
 
 
 
+
+
+
 class ncWriter:
     
     ENCODING_ENFORCEMENT_SPECTRA = {
@@ -339,15 +374,15 @@ class ncWriter:
     
     ENCODING_ENFORCEMENT_BULK = {"TIME":{"_FillValue":None},
                             "TIME_TEMP":{"_FillValue":None},
-                            'WSSH':{"dtype":np.float64},
-                            'WPPE':{"dtype":np.float64},
-                            'WPFM':{"dtype":np.float64},
-                            'WPDI':{"dtype":np.float64},
-                            'WPDS':{"dtype":np.float64},
-                            'SSWMD':{"dtype":np.float64},
-                            'WMDS':{"dtype":np.float64},
-                            'TEMP':{"dtype":np.float64},
-                            # 'WAVE_quality_control':{"dtype":np.int8},
+                            'WSSH':{"dtype":np.float32},
+                            'WPPE':{"dtype":np.float32},
+                            'WPFM':{"dtype":np.float32},
+                            'WPDI':{"dtype":np.float32},
+                            'WPDS':{"dtype":np.float32},
+                            'SSWMD':{"dtype":np.float32},
+                            'WMDS':{"dtype":np.float32},
+                            'TEMP':{"dtype":np.float32},
+                            'WAVE_quality_control':{"dtype":np.int8},
                             'TEMP_quality_control':{"dtype":np.int8},
                             'TIME':{"dtype":np.float64},
                             'LATITUDE':{"dtype":np.float64},
@@ -396,6 +431,9 @@ class ncWriter:
     def _format_periods(self, periods: PeriodIndex) -> list:
         return [(period[0].strftime("%Y%m%d"), period[1].strftime("%Y%m%d")) for period in periods]
 
+    def _format_site_id_to_filename(self, site_id:str) -> str:
+        return re.sub(r'(?<!^)(?=[A-Z0-9])', '-', site_id)
+
     def compose_file_names(self,
                             site_id: str,
                             deployment_metadata: pd.DataFrame,
@@ -417,7 +455,7 @@ class ncWriter:
 
         for period in periods:
             file_name = file_name_template.format(operating_institution=operating_institution,
-                                                        site_id=site_id,
+                                                        site_id=self._format_site_id_to_filename(site_id).upper(),
                                                         start_date=period[0],
                                                         end_date=period[1]
                                                     )
@@ -440,7 +478,18 @@ class ncWriter:
                 del encoding["TIME_TEMP"]
         elif parameters_type == "displacements":
             return self.ENCODING_ENFORCEMENT_DISPLACEMENTS.copy()
-        
+    
+    def _remove_coordinates_qc_variables(self, dataset: xr.Dataset) -> xr.Dataset:
+        qc_variables = [var for var in list(dataset.variables.keys()) if var.endswith("quality_control")]
+        for qc_var in qc_variables:
+            dataset[qc_var].encoding["coordinates"] = None
+        return dataset
+    
+    def _remove_time_fillvalues(self, dataset: xr.Dataset) -> xr.Dataset:
+        time_variables = [var for var in list(dataset.variables.keys()) if var.startswith("TIME")]
+        for time_var in time_variables:
+            dataset[time_var].encoding["_FillValue"] = None
+        return dataset
 
     def save_nc_file(self, 
                      output_path: str,
@@ -454,6 +503,9 @@ class ncWriter:
             os.mkdir(output_path)
 
         for file_path, dataset in zip(file_paths, dataset_objects):
+            dataset = self._remove_coordinates_qc_variables(dataset=dataset)
+            dataset = self._remove_time_fillvalues(dataset=dataset)
+
             encoding = self._process_encoding(dataset=dataset, parameters_type=parameters_type)
             dataset.to_netcdf(file_path, engine="netcdf4",
                                 encoding=encoding)
