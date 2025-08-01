@@ -6,9 +6,11 @@ This repository provides tools to process data exported from SD cards used by **
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Install package
 
-<pre> pip install -r requirements.txt </pre>
+From the repo's root:
+
+<pre> pip install . </pre>
 
 ### 2. Processing script
 
