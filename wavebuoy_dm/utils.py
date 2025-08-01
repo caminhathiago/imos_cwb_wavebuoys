@@ -118,6 +118,7 @@ class IMOSLogging:
 
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
+        stream_handler.setFormatter(formatter)
 
         self.logger.addHandler(handler)
         self.logger.addHandler(stream_handler)
