@@ -36,7 +36,7 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
             buoys_metadata["region"] = self._get_regions(buoys_metadata=buoys_metadata)
             buoys_metadata = buoys_metadata.set_index('name')
             buoys_metadata = self._exclude_drifters(buoys_metadata=buoys_metadata)
-            buoys_metadata = self._filter_send_aodn(buoys_metadata=buoys_metadata)
+            buoys_metadata = self._filter_process_aodn(buoys_metadata=buoys_metadata)
             GENERAL_LOGGER.info("Buoys metadata grabbed successfully")
             return buoys_metadata
 
@@ -47,8 +47,8 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
     def _select_buoy_type(self, buoy_type:str, buoys_metadata:pd.DataFrame) -> pd.DataFrame:
         return buoys_metadata.loc[buoys_metadata["type"] == buoy_type]
 
-    def _filter_send_aodn(self, buoys_metadata:pd.DataFrame) -> pd.DataFrame:
-        return buoys_metadata.loc[buoys_metadata["send_aodn"] == 1]
+    def _filter_process_aodn(self, buoys_metadata:pd.DataFrame) -> pd.DataFrame:
+        return buoys_metadata.loc[buoys_metadata["process_aodn"] == 1]
 
     def _exclude_drifters(self, buoys_metadata: pd.DataFrame) -> pd.DataFrame:
         name_constraint = "drift".upper()

@@ -4,6 +4,7 @@ import ssl
 import ftplib
 import logging
 
+import pandas as pd
 import glob
 
 LOGGER = logging.getLogger("aodn_ftp_push_logger")
@@ -105,9 +106,22 @@ class ncPusher:
     def quit(self):
         return self._ftp.quit()
 
-    def grab_nc_files_to_push(self, incoming_path: str, lookback_hours: timedelta = 1, push_all:bool = False) -> list:
+    def _filter_buoys_metadata_send_aodn(self, buoys_metadata:pd.DataFrame) -> list:
         
-        sites = glob.glob(os.path.join(incoming_path,"sites", "*"))
+        return buoys_metadata.loc[buoys_metadata["send_aodn"] == 1].index
+
+
+
+    def grab_nc_files_to_push(self, 
+                              incoming_path:str,
+                              buoys_metadata:pd.DataFrame, 
+                              lookback_hours:timedelta = 1, 
+                              push_all:bool = False) -> list:
+        
+        sites = self._filter_buoys_metadata_send_aodn(buoys_metadata)
+
+        sites = [os.path.join(incoming_path, "sites", site) for site in sites]
+        
         file_paths = []
         for site in sites:
             file_paths.extend(glob.glob(os.path.join(site, "*.nc")))
