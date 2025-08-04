@@ -23,7 +23,8 @@ The script can be found in the scripts folder as:
 | Argument               | Description                                                                                                     |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `-l`, `--log-path`     | **(Required)** Directory where the Spotter SD card files are stored.                                            |
-| `-d`, `--deploy-dates` | **(Required)** Start and end datetime of the deployment period in the format `YYYYmmddTHHMMSS YYYYmmddTHHMMSS`. |
+| `-d`, `--deploy-dates` | *(Optional)* Start and end datetime of the deployment period in the format `YYYYmmddTHHMMSS YYYYmmddTHHMMSS`. |
+| `-u`, `--utc-offset` | *(Optional)* UTC offset of defined deploy-dates. Defaults to 0 (UTC).|
 | `-ed`, `--enable-dask` | *(Optional)* Enables parallel spectra calculation using Dask for faster processing                                 |
 | `-ot`, `--output-type` | *(Optional)* Choose output format: `csv` or `netcdf` (default: `netcdf`).                                       |
 
@@ -33,6 +34,7 @@ The script can be found in the scripts folder as:
 <pre> python scripts/cwb-spotter-dm.py \
   --log-path /path/to/sdcard/files \
   --deploy-dates 20240101T000000 20240131T235959 \
+  --utc-offset 8 \
   --output-type netcdf \
   --enable-dask  </pre>
 
