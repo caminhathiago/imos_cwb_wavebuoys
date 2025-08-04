@@ -62,6 +62,10 @@ def args_processing_dm():
                         help="Deployment datetimes period to be processed. Please pass start and end dates as YYYYmmddTHHMMSS YYYYmmdd, separated by a blank space",
                         required=True)
 
+    parser.add_argument('-u', '--utc-offset', dest='utc_offset', type=float, default=.0,
+                        help="Desired offset from utc in hours. Defaults to 0 (UTC)",
+                        required=False)
+
     parser.add_argument('-ed', '--enable-dask', dest='enable_dask', action='store_true',
                     help="Whether to enable spectra calculation with dask threading")
 
