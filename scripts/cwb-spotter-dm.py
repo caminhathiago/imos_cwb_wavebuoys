@@ -167,11 +167,14 @@ if __name__ == "__main__":
         LOGGER.info(f"SD card data processing ".upper() + "="*50)
         results = process_from_SD(vargs.log_path)
         
-        disp, gps = filter_dates(disp=results['displacements'],
-                                        gps=results['gps'],
-                                        deploy_start=vargs.deploy_dates_start,
-                                        deploy_end=vargs.deploy_dates_end,
-                                        utc_offset=8)
+        if vargs.deploy_dates:
+            disp, gps = filter_dates(disp=results['displacements'],
+                                            gps=results['gps'],
+                                            deploy_start=vargs.deploy_dates_start,
+                                            deploy_end=vargs.deploy_dates_end,
+                                            utc_offset=vargs.utc_offset)
+        else:
+            disp, gps = results['displacements'], results['gps']
         
         LOGGER.info(f"Spectra Calculation ".upper() + "="*50)
         spectra_bulk = calculate_spectra_from_displacements(disp, vargs.enable_dask)

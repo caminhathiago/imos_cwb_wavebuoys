@@ -418,19 +418,22 @@ class Spectra:
             list of pl.DataFrame: A list of Polars dataframe chunks.
         """
         total_rows = len(data)
-        chunk_size = total_rows // num_workers
+        
+        iterable = total_rows if total_rows < num_workers else num_workers
+        
+        chunk_size = total_rows // iterable
 
         dask_chunks = []
         start_idx = 0
 
-        for i in range(num_workers):
+        for i in range(iterable):
             if i == num_workers - 1: 
                 end_idx = total_rows
             else:
                 end_idx = start_idx + chunk_size
             dask_chunks.append(data[start_idx:end_idx])
             start_idx = end_idx
-
+        
         return dask_chunks
 
     def process_dask_chunk(self, dask_chunk, nfft, nover, fs, merge, data_type, info):
