@@ -60,7 +60,7 @@ def args_processing_dm():
     
     parser.add_argument('-d', '--deploy-dates', dest='deploy_dates', type=str, default=None, nargs=2,
                         help="Deployment datetimes period to be processed. Please pass start and end dates as YYYYmmddTHHMMSS YYYYmmdd, separated by a blank space",
-                        required=True)
+                        required=False)
 
     parser.add_argument('-u', '--utc-offset', dest='utc_offset', type=float, default=.0,
                         help="Desired offset from utc in hours. Defaults to 0 (UTC)",
@@ -84,7 +84,7 @@ def args_processing_dm():
     if vargs.deploy_dates:
         vargs.deploy_dates_start = datetime.strptime(vargs.deploy_dates[0],"%Y%m%dT%H%M%S")
         vargs.deploy_dates_end = datetime.strptime(vargs.deploy_dates[1],"%Y%m%dT%H%M%S")
-
+    
     return vargs
 
 
