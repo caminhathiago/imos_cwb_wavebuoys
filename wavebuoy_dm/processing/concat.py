@@ -183,12 +183,12 @@ class csvConcat:
         # If no valid schema found, return the original LazyFrame
         return lf
 
-    def ignore_files(self, file: str, size: int = 50, file_id: str = '0000'):
+    def ignore_files(self, file: str, size: int = 70, file_id: str = '0000'):
         """
         size in kbytes
         """
         if os.path.isfile(file):
-            if os.path.getsize(file) < size * 1024 or file_id in os.path.basename(file):
+            if os.path.getsize(file) < size or file_id in os.path.basename(file):
                 return False
         
         return True
