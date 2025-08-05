@@ -362,7 +362,7 @@ class ncWriter:
     
     ENCODING_ENFORCEMENT_SPECTRA = {
                 "TIME": {"dtype": np.float64, "_FillValue":None},
-                "FREQUENCY": {"dtype": np.float32},
+                "FREQUENCY": {"dtype": np.float32, "_FillValue":None},
                 "LATITUDE": {"dtype": np.float64},
                 "LONGITUDE": {"dtype": np.float64},
                 "A1": {"dtype": np.float32},
@@ -485,10 +485,14 @@ class ncWriter:
             dataset[qc_var].encoding["coordinates"] = None
         return dataset
     
-    def _remove_time_fillvalues(self, dataset: xr.Dataset) -> xr.Dataset:
+    def _remove_fillvalue_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
         time_variables = [var for var in list(dataset.variables.keys()) if var.startswith("TIME")]
         for time_var in time_variables:
             dataset[time_var].encoding["_FillValue"] = None
+
+        if "FREQUENCY" in list(dataset.variables.keys()):
+            dataset["FREQUENCY"].encoding["_FillValue"] = None
+        
         return dataset
 
     def save_nc_file(self, 
@@ -504,7 +508,7 @@ class ncWriter:
 
         for file_path, dataset in zip(file_paths, dataset_objects):
             dataset = self._remove_coordinates_qc_variables(dataset=dataset)
-            dataset = self._remove_time_fillvalues(dataset=dataset)
+            dataset = self._remove_fillvalue_attributes(dataset=dataset)
 
             encoding = self._process_encoding(dataset=dataset, parameters_type=parameters_type)
             dataset.to_netcdf(file_path, engine="netcdf4",
