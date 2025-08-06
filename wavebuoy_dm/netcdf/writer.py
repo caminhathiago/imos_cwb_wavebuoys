@@ -405,7 +405,6 @@ class ncWriter:
 
     def _get_operating_institution(self, deployment_metadata: pd.DataFrame) -> str:
         operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
-        print(operating_institution)
         if "IMOS" in operating_institution:
             operating_institution = "IMOS_COASTAL-WAVE-BUOYS"
         elif "IMOS" not in operating_institution:

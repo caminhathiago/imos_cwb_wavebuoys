@@ -9,7 +9,7 @@ import pandas as pd
 from dotenv import load_dotenv
 
 load_dotenv()
-SITE_LOGGER = logging.getLogger("site_logger")
+SITE_LOGGER = logging.getLogger("DM_processing")
 
 # path = Path(r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves\Data\wawaves\OceanBeach\delayedmode\OceanBeach_deploy20240701_retrieve20241205_SPOT31395C\log")
 
@@ -135,7 +135,6 @@ class WaveBuoy():
     def load_regional_metadata(self) -> pd.DataFrame:
         metadata_path = os.path.normpath(os.getenv("METADATA_PATH"))
         regional_metadata_path = os.path.join(metadata_path, "regional_metadata.csv")
-        SITE_LOGGER.warning(regional_metadata_path)
         return pd.read_csv(regional_metadata_path)
     
     def load_buoys_to_process(self, region:str) -> pd.DataFrame:
