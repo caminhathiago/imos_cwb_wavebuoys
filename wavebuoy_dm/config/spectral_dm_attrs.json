@@ -10,9 +10,7 @@
             "calendar": "gregorian",
             "standard_name": "time",
             "long_name": "time",
-            "axis": "T",
-            "valid_min": 0.0,
-            "valid_max": 90000.0
+            "axis": "T"
             },
         "FREQUENCY": {
             "units": "Hz",
@@ -41,53 +39,43 @@
             "reference_datum": "WGS84 coordinate reference system; EPSG:4326"
             },
         "A1": {
-            "standard_name": "first_term_Fourier_cosine_series",
             "long_name": "first term of the Fourier cosine series",
-            "units": 1,
-            "_FillValue": -999,
+            "units": "1",
+            "_FillValue": -9999,
             "valid_min": -1,
             "valid_max": 1,
-            "comment": "",
             "coordinates": "TIME LATITUDE LONGITUDE"
             },
         "A2": {
-            "standard_name": "second_term_Fourier_cosine_series",
             "long_name": "second term of the Fourier cosine series",
-            "units": 1,
-            "_FillValue": -999,
+            "units": "1",
+            "_FillValue": -9999,
             "valid_min": -1,
             "valid_max": 1,
-            "comment": "",
             "coordinates": "TIME LATITUDE LONGITUDE"
             },
         "B1": {
-            "standard_name": "first_term_Fourier_sine_series",
             "long_name": "first term of the Fourier sine series",
-            "units": 1,
-            "_FillValue": -999,
+            "units": "1",
+            "_FillValue": -9999,
             "valid_min": -1,
             "valid_max": 1,
-            "comment": "",
             "coordinates": "TIME LATITUDE LONGITUDE"
             },
         "B2": {
-            "standard_name": "second_term_Fourier_sine_series",
             "long_name": "second term of the Fourier sine series",
-            "units": 1,
-            "_FillValue": -999,
+            "units": "1",
+            "_FillValue": -9999,
             "valid_min": -1,
             "valid_max": 1,
-            "comment": "",
             "coordinates": "TIME LATITUDE LONGITUDE"
             },
         "ENERGY": {
-            "standard_name": "spectral_energy_density",
             "long_name": "spectral energy density",
             "units": "m2 Hz",
-            "_FillValue": -999,
+            "_FillValue": -9999,
             "valid_min": 0,
             "valid_max": 2000000,
-            "comment": "",
             "coordinates": "TIME LATITUDE LONGITUDE"
             }
         

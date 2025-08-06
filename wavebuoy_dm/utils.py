@@ -8,7 +8,7 @@ import sys
 from dotenv import load_dotenv
 load_dotenv()
 
-def args_processing():
+def args_aodn_processing():
  
     parser = argparse.ArgumentParser(description='Creates NetCDF files.\n '
                                      'Prints out the path of the new locally generated NetCDF file.')
@@ -28,6 +28,9 @@ def args_processing():
     parser.add_argument('-r', '--region', dest='region', type=str, default=None,
                         help="directory where SD card files are stored",
                         required=True)
+    
+    parser.add_argument('-ed', '--enable-dask', dest='enable_dask', action='store_true',
+                    help="Whether to enable spectra calculation with dask threading")
 
     vargs = parser.parse_args()
     
@@ -89,6 +92,7 @@ def args_processing_dm():
 
 
 class IMOSLogging:
+
     unexpected_error_message = "An unexpected error occurred when processing {site_name}\n Please check the site log for details"
 
     def __init__(self):
@@ -171,3 +175,17 @@ class IMOSLogging:
             os.rename(file_path, new_file_name)
 
         return os.path.join(file_path, new_file_name)
+    
+
+class DebuggingHelpers:
+
+    @staticmethod
+    def pickle_files(data:tuple, file_name:str, output_path:str = "test/pickle_files", mode:str = "wb"):
+        import pickle
+        with open(os.path.join(output_path,f"{file_name}.pkl"), mode) as f:
+            if mode == "wb":
+                pickle.dump(data, f)
+            elif mode == "rb":
+                return pickle.load(f)
+            else:
+                raise ValueError(f"{mode} not accepted as mode. Options: ['wb', 'rb'] ")
