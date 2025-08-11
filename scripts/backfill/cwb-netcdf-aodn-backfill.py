@@ -62,7 +62,7 @@ def main():
                     if not all("passed" in result for result in validation_results):
                         raise Exception("One or more validation checks failed.")   
                         
-                    # ncp.push_file_to_ftp(file=file)
+                    ncp.push_file_to_ftp(file=file)
                     LOGGER.info(f"file pushed: {file['file_name']}")
 
                     ncp.update_files_report(files_report=files_report,
