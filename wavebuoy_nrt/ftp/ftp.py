@@ -126,17 +126,19 @@ class ncPusher:
         for site in sites:
             file_paths.extend(glob.glob(os.path.join(site, "*.nc")))
         
+        file_times = []
+        for file_path in file_paths:
+            file_times.append({"file_name": os.path.basename(file_path),
+                                "creation_time": datetime.fromtimestamp(os.path.getctime(file_path)), 
+                                "modification_time": datetime.fromtimestamp(os.path.getmtime(file_path)),
+                                "file_path": file_path})
+        
+
         if push_all:
-            return tuple(file_paths)
+            return tuple(file_times)
         
         else:
-            file_times = []
-            for file_path in file_paths:
-                file_times.append({"file_name": os.path.basename(file_path),
-                                    "creation_time": datetime.fromtimestamp(os.path.getctime(file_path)), 
-                                    "modification_time": datetime.fromtimestamp(os.path.getmtime(file_path)),
-                                    "file_path": file_path})
-
+            
             lookback_time = datetime.now() - timedelta(hours=lookback_hours)
 
             files_to_push = []
