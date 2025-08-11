@@ -52,7 +52,7 @@
         "A2": {
             "long_name": "second term of the Fourier cosine series",
             "units": "1",
-            "_FillValue": -999,
+            "_FillValue": -9999,
             "valid_min": -1,
             "valid_max": 1,
             "coordinates": "TIME LATITUDE LONGITUDE"
@@ -60,7 +60,7 @@
         "B1": {
             "long_name": "first term of the Fourier sine series",
             "units": "1",
-            "_FillValue": -999,
+            "_FillValue": -9999,
             "valid_min": -1,
             "valid_max": 1,
             "coordinates": "TIME LATITUDE LONGITUDE"
@@ -68,7 +68,7 @@
         "B2": {
             "long_name": "second term of the Fourier sine series",
             "units": "1",
-            "_FillValue": -999,
+            "_FillValue": -9999,
             "valid_min": -1,
             "valid_max": 1,
             "coordinates": "TIME LATITUDE LONGITUDE"
@@ -76,7 +76,7 @@
         "ENERGY": {
             "long_name": "spectral energy density",
             "units": "m2 Hz",
-            "_FillValue": -999,
+            "_FillValue": -9999,
             "valid_min": 0,
             "valid_max": 2000000,
             "coordinates": "TIME LATITUDE LONGITUDE"
