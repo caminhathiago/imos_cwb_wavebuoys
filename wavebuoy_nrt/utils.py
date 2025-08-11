@@ -1,6 +1,6 @@
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import re
 import argparse
@@ -43,6 +43,10 @@ def args_processing():
 
     parser.add_argument('-wu', '--window-unit', dest='window_unit', type=str, default="hours",
                         help="desired window unit (hours:Default, months).",
+                        required=False)
+
+    parser.add_argument('-bfw', '--backfill-wb-log', dest='backfill_wb_log', type=str, default=None, nargs=1,
+                        help="Deployment datetimes period to be processed. Please pass start and end dates as YYYYmmddTHHMMSS",
                         required=False)
 
     def parse_site_list(value):
@@ -127,6 +131,8 @@ def args_processing():
     else:
         vargs.email_alert = False
 
+    if vargs.backfill_wb_log:
+        vargs.backfill_wb_log = datetime.strptime(vargs.backfill_wb_log[0],"%Y%m%dT%H%M%S")
 
     return vargs
 
@@ -327,6 +333,7 @@ class csvOutput:
 
 
 class ncAttributesValidator:
+
     def __init__(self):
         pass
 
@@ -402,3 +409,111 @@ class ncAttributesValidator:
             print("-==================")
         
         return to_revize
+    
+
+
+class Backfill:
+
+    @staticmethod
+    def load_and_process_wavebuoy_log(region:str) -> pd.DataFrame:
+        wb_log_path = os.path.join(os.getenv("WB_LOG_PATH"), "WaveBuoy_log.xlsx")
+        if region == "WA":
+            sheet_name = "WAWaves"
+        elif region in ("VIC", "NSW", "SA", "QLD", "NT", "TAS"):
+            sheet_name = "National"
+        
+        wavebuoy_log = pd.read_excel(wb_log_path, sheet_name=sheet_name, skiprows=1)
+        wavebuoy_log["deploy_datetime"] = Backfill.clean_datetime_cols(wavebuoy_log, "DEP Date", "DEP Time", timezone="Australia/Perth", convert_utc=True)
+        wavebuoy_log["recovery_datetime"] = Backfill.clean_datetime_cols(wavebuoy_log, "REC Date", "REC Time", timezone="Australia/Perth", convert_utc=True)
+        wavebuoy_log["Site Name"] = wavebuoy_log["Site Name"].str.replace(" ", "")
+        
+        return wavebuoy_log[["Site Name", "Serial #", "DEP Date", "REC Date", "deploy_datetime", "recovery_datetime"]]
+    
+    @staticmethod
+    def select_site(wavebuoy_log:pd.DataFrame, site_name:str) -> pd.DataFrame:
+    
+        site_wb_log = wavebuoy_log.loc[(wavebuoy_log["Site Name"] == site_name)]
+    
+        if not site_wb_log.empty:
+            return site_wb_log
+        else:
+            raise ValueError(f"Site {site_name} not found in wavebuoy_log. Check for slight differences in strings, or if the site is simply not listed in wavebuoy_log.")    
+    
+
+    @staticmethod
+    def filter_by_deploy_date(site_wavebuoy_log:pd.DataFrame, backfill_start:datetime) -> pd.DataFrame:
+        deploy_date_str = backfill_start.strftime("%Y-%m-%dT%H:%M:%S")
+        return (site_wavebuoy_log
+                .loc[(
+                    (site_wavebuoy_log['deploy_datetime'] > deploy_date_str) | 
+                    (site_wavebuoy_log['recovery_datetime'] > deploy_date_str)
+        )]
+        )
+    
+    @staticmethod
+    def clean_datetime_cols(df, date_col, time_col, timezone="Australia/Perth", convert_utc=False):
+        
+        cleaned_time = df[time_col].astype(str).str.replace("AWST", "", regex=False).str.strip().fillna("")
+        cleaned_date = df[date_col].astype(str).str.strip().fillna("")
+
+        datetime_str = cleaned_date + " " + cleaned_time
+
+        datetime_series = pd.to_datetime(datetime_str, errors='coerce')
+        datetime_series = pd.to_datetime(datetime_series, errors='coerce')
+
+        import pytz
+
+        tz = pytz.timezone(timezone)
+        
+        datetime_series = datetime_series.dt.tz_localize(tz, ambiguous='NaT', nonexistent='NaT')
+
+        if convert_utc == True:
+            datetime_series = datetime_series.dt.tz_convert("UTC").dt.tz_localize(None)
+
+        return datetime_series
+
+    @staticmethod
+    def process_backfill_windows(site_wavebuoy_log:pd.DataFrame, backfill_start:datetime) -> list:
+        
+        windows = []
+        
+        for idx, site in site_wavebuoy_log.iterrows():
+            window_config = {"spot_id": site["Serial #"],
+                             "window_end_time": site["recovery_datetime"].to_pydatetime()}
+
+            if idx == site_wavebuoy_log.index[0]:
+                window_config.update({"window_start_time": backfill_start})                
+            else:
+                window_config.update({"window_start_time": site["deploy_datetime"].to_pydatetime()})
+
+            if idx == site_wavebuoy_log.index[-1] and site["recovery_datetime"] is pd.NaT:
+                window_config.update({"window_end_time": datetime.now()})
+                
+            windows.append(window_config)
+
+        return windows    
+            
+    @staticmethod
+    def process_auswaves_data(site_name, path:str=r"C:\Users\00116827\cwb\wavebuoy_aodn\tests\backfilling_20250601\test_auswaves_data") -> list:
+        
+        import glob
+        data_files = glob.glob(os.path.join(path, f"{site_name}*.csv"))
+        if data_files:
+            data_file = data_files[0]
+        else:
+            raise ValueError(f"auswaves csv not found for {site_name}.")
+
+        data = pd.read_csv(data_file)
+        
+        data["TIME"] = pd.to_datetime(data["Timestamp (UTC)"], format="%d-%b-%Y %H:%M:%S")
+
+        windows_df = data.groupby("BuoyID")["TIME"].agg(["min", "max"])
+        windows = []
+        for idx, row in windows_df.iterrows():
+            windows.append({"spot_id": row.name,
+            "window_start_time": row['min'].to_pydatetime(),
+            "window_end_time": row['max'].to_pydatetime()})
+
+        return windows
+
+

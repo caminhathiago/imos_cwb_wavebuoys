@@ -8,7 +8,6 @@ from wavebuoy_nrt.ftp.ftp import ncPusher
 from wavebuoy_nrt.utils import args_pushing, IMOSLogging, generalTesting
 from wavebuoy_nrt.netcdf.validation import ncValidator
 from wavebuoy_nrt.alerts.email import Email
-from wavebuoy_nrt.wavebuoy import WaveBuoy
 
 load_dotenv()
 
@@ -24,8 +23,6 @@ def main():
     LOGGER.info(f"Uploader script started".upper())
     LOGGER.info(f"pushing NC files created/modified within the last {vargs.lookback_hours} hours")
     
-    wb = WaveBuoy(buoy_type="sofar")
-
     try:
         ncp = ncPusher(host=os.getenv("FTP_HOST"),
                     user=os.getenv("FTP_USER"),
@@ -33,9 +30,8 @@ def main():
         LOGGER.info("successfully connected with FTP server")
 
         files_to_push = ncp.grab_nc_files_to_push(incoming_path=vargs.incoming_path,
-                                                  buoys_metadata=wb.buoys_metadata,
                                                   lookback_hours=vargs.lookback_hours,
-                                                  push_all=True)
+                                                  push_all=False)
 
         if files_to_push:
             LOGGER.info(f"files to push:")
@@ -61,7 +57,7 @@ def main():
                     if not all("passed" in result for result in validation_results):
                         raise Exception("One or more validation checks failed.")   
                         
-                    ncp.push_file_to_ftp(file=file)
+                    # ncp.push_file_to_ftp(file=file)
                     LOGGER.info(f"file pushed: {file['file_name']}")
 
                     ncp.update_files_report(files_report=files_report,

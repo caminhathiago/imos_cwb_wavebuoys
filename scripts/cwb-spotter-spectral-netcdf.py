@@ -216,7 +216,7 @@ def main():
             # # SITE_LOGGER.info("variables dtypes converted and now conforming to template")
 
             nc_file_names_embedded = nc_writer.compose_file_names(
-                                        site_id=site.name.upper(),
+                                        site_id=site.name,
                                         periods=periods_embedded,
                                         deployment_metadata=deployment_metadata,
                                         regional_metadata=regional_metadata,
