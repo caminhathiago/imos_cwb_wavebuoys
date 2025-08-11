@@ -121,13 +121,13 @@
         "TEMP": {
         "standard_name": "sea_surface_temperature",
         "long_name": "sea surface temperature",
-        "units": "degrees_celcius",
+        "units": "degrees_Celsius",
         "_FillValue": -9999.0,
         "valid_min": 0.0,
         "valid_max": 100.0,
         "method": "Measured using thermistor embedded in wave buoy hull",
         "ancillary_variables": "TEMP_quality_control",
-        "coordinates": "TIME LATITUDE LONGITUDE"
+        "coordinates": "TIME_TEMP"
         },
         "WAVE_quality_control": {
         "long_name": "primary Quality Control flag for wave variables",
