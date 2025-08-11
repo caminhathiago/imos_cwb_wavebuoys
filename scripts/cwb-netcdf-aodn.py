@@ -35,7 +35,7 @@ def main():
         files_to_push = ncp.grab_nc_files_to_push(incoming_path=vargs.incoming_path,
                                                   buoys_metadata=wb.buoys_metadata,
                                                   lookback_hours=vargs.lookback_hours,
-                                                  push_all=True)
+                                                  push_all=False)
 
         if files_to_push:
             LOGGER.info(f"files to push:")
