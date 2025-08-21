@@ -232,8 +232,24 @@ class ncAttrsExtractor:
         return deployment_metadata.loc["Hull serial number", "metadata_wave_buoy"]
         # return NetCDFFileHandler()._get_operating_institution(deployment_metadata=deployment_metadata)
     
-    def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame) -> str:
-        return deployment_metadata.loc["Water depth", "metadata_wave_buoy"]
+    def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame) -> float:
+        try:
+            water_depth = deployment_metadata.loc["Water depth", "metadata_wave_buoy"]
+        except KeyError:
+            raise ValueError("Water depth metadata is missing") 
+
+        if isinstance(water_depth, str):
+            
+            match = re.search(r'(\d+(\.\d+)?)', water_depth)
+            if match:
+                water_depth = match.group(1)
+            else:
+                raise ValueError("No numeric water depth found")
+
+        try:
+            return np.float32(water_depth)
+        except (TypeError, ValueError):
+            raise ValueError("Invalid water depth format")
     
     def _extract_deployment_metadata_water_depth_units(deployment_metadata: pd.DataFrame) -> str:
         return "m"
@@ -723,8 +739,12 @@ class ncWriter(WaveBuoy):
         day = "01"
         return periods.strftime("%Y%m") + day
         
-    def _format_site_id_to_filename(self, site_id:str) -> str:
-        return re.sub(r'(?<!^)(?=[A-Z0-9])', '-', site_id)
+    # def _format_site_id_to_filename(self, site_id:str) -> str:
+    #     return re.sub(r'(?<!^)(?=[A-Z0-9])', '-', site_id)
+    def _format_site_id_to_filename(self, site_id: str) -> str:
+        site_id = re.sub(r'([a-z])([A-Z])', r'\1-\2', site_id)   # lower→UPPER boundary
+        site_id = re.sub(r'([A-Za-z])(\d+)', r'\1-\2', site_id)
+        return site_id.upper()
 
     def compose_file_names(self,
                             site_id: str,
@@ -747,7 +767,7 @@ class ncWriter(WaveBuoy):
 
         for period in periods_formated:
             file_name = file_name_template.format(operating_institution=operating_institution,
-                                                     site_id=self._format_site_id_to_filename(site_id).upper(),
+                                                     site_id=self._format_site_id_to_filename(site_id),
                                                      monthly_datetime=period
                                                 )
             file_names.append(file_name)
