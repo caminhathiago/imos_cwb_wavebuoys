@@ -232,8 +232,24 @@ class ncAttrsExtractor:
         return deployment_metadata.loc["Hull serial number", "metadata_wave_buoy"]
         # return NetCDFFileHandler()._get_operating_institution(deployment_metadata=deployment_metadata)
     
-    def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame) -> str:
-        return deployment_metadata.loc["Water depth", "metadata_wave_buoy"]
+    def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame) -> float:
+        try:
+            water_depth = deployment_metadata.loc["Water depth", "metadata_wave_buoy"]
+        except KeyError:
+            raise ValueError("Water depth metadata is missing") 
+
+        if isinstance(water_depth, str):
+            
+            match = re.search(r'(\d+(\.\d+)?)', water_depth)
+            if match:
+                water_depth = match.group(1)
+            else:
+                raise ValueError("No numeric water depth found")
+
+        try:
+            return np.float32(water_depth)
+        except (TypeError, ValueError):
+            raise ValueError("Invalid water depth format")
     
     def _extract_deployment_metadata_water_depth_units(deployment_metadata: pd.DataFrame) -> str:
         return "m"
