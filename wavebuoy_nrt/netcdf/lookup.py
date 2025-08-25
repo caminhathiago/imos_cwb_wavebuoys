@@ -133,6 +133,11 @@ class NetCDFFileHandler():
             except:
                 raise ValueError(f"{operating_institution} not valid. Please make sure the operating institution code is valid in the deployment metadata file")
 
+    def _format_site_id_to_filename(self, site_id: str) -> str:
+        site_id = re.sub(r'([a-z])([A-Z])', r'\1-\2', site_id)   # lower→UPPER boundary
+        site_id = re.sub(r'([A-Za-z])(\d+)', r'\1-\2', site_id)
+        return site_id.upper()
+
     def get_available_nc_files(self, 
                                files_path: str, 
                                deployment_metadata: pd.DataFrame, 
@@ -143,7 +148,8 @@ class NetCDFFileHandler():
         #                                             monthly_datetime="*",
         #                                             site_id=site_id.upper())
         
-        site_name_processed = site_id.replace("_","")
+        site_name_folder = site_id.replace("_","")
+        site_name_processed = self._format_site_id_to_filename(site_id)
 
         if parameters_type == "bulk":
             nc_file_filter = f"*{site_name_processed.upper()}_RT_WAVE-PARAMETERS*.nc"
@@ -158,7 +164,7 @@ class NetCDFFileHandler():
         if not os.path.exists(sites_path):
             os.mkdir(sites_path)
 
-        nc_file_path = os.path.join(sites_path, site_name_processed)
+        nc_file_path = os.path.join(sites_path, site_name_folder)
         if not os.path.exists(nc_file_path):
             os.mkdir(nc_file_path)
 
