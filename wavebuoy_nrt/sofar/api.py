@@ -358,7 +358,7 @@ class SofarAPI:
         if not records:
             message = f"Latest data empty for {parameters_type}. Probably spotter is under a gap"
             SITE_LOGGER.warning(message)
-            raise Exception(message)
+            return
 
         latest_available_time = datetime.strptime(
             records[-1]["timestamp"], "%Y-%m-%dT%H:%M:%S.%fZ"
