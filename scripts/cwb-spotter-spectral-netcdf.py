@@ -57,6 +57,9 @@ def main():
                                                                         token=site.sofar_token,
                                                                         data_type="spectral",
                                                                         processing_sources="embedded")
+            if not latest_available_time:
+                SITE_LOGGER.warning("Skipping to next site. If trying to fetch for Spectra, this site probably doesn't have Spectra in NRT enabled.")
+                continue
             SITE_LOGGER.info(f"grabed latest_available_time: {latest_available_time}")
 
             window_start_time = wb.generate_window_start_time(latest_available_datetime=latest_available_time,
