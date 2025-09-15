@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 import requests
 import logging
 
@@ -157,7 +157,7 @@ class SofarAPI:
                 spot_id=spot_id,
                 token=token,
                 start_date=current_start_date,
-                end_date=end_date + timedelta(hours=1),
+                end_date=end_date + timedelta(minutes=5),
                 **kwargs
             )
             
@@ -286,7 +286,7 @@ class SofarAPI:
             print(f"Unsuccessfull API call, status {response.status_code}")
             return
 
-    def get_latest_available_time(self, spot_id: str, token: str, dataset_type: str = "bulk") -> datetime:
+    def get_latest_available_time_deprecated(self, spot_id: str, token: str, dataset_type: str = "bulk") -> datetime:
       
         latest_data = self.get_latest_data(spot_id=spot_id, token=token)
         SITE_LOGGER.warning(latest_data)
@@ -317,6 +317,56 @@ class SofarAPI:
         latest_available_time = datetime.strptime(latest_available_time, "%Y-%m-%dT%H:%M:%S.%fZ")
         
         return latest_available_time
+
+    def get_latest_available_time(self, spot_id:str, token:str, data_type:str = "bulk", processing_sources:str = "embedded") -> datetime:
+
+        start_date = datetime.now(UTC) - timedelta(hours=5)
+        start_date = datetime(2025,9,11,15,0,0)
+        
+        end_date = datetime.now(UTC) + timedelta(hours=2)
+        
+        
+        # Centralize the data_type logic in one place
+        type_config = {
+            "bulk": ("waves", True, False, False),
+            "spectral": ("frequencyData", False, True, True),
+        }
+
+        if data_type not in type_config:
+            raise ValueError(f"Unsupported data_type: {data_type}")
+
+        parameters_type, include_waves_data, include_frequency_data, include_directional_moments = type_config[data_type]
+
+        latest_data = self._get_wave_data(
+            spot_id=spot_id,
+            token=token,
+            start_date=start_date,
+            end_date=end_date,
+            include_frequency_data=include_frequency_data,
+            include_waves=include_waves_data,
+            include_surface_temp_data=False,
+            include_wind_data=False,
+            include_directional_moments=include_directional_moments,
+            include_partition_data=False,
+            include_barometer_data=False,
+            include_track=False,
+            processing_sources=processing_sources
+        )
+
+        # Fetch the latest timestamp safely
+        records = latest_data.get(parameters_type, [])
+        if not records:
+            message = f"Latest data empty for {parameters_type}. Probably spotter is under a gap"
+            SITE_LOGGER.warning(message)
+            raise Exception(message)
+
+        latest_available_time = datetime.strptime(
+            records[-1]["timestamp"], "%Y-%m-%dT%H:%M:%S.%fZ"
+        )
+
+        return latest_available_time
+
+
 
     def _get_status_code(self, response: requests.Response) -> int:
         return response.status_code

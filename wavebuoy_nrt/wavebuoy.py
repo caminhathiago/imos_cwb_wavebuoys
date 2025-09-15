@@ -95,9 +95,17 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
     def sort_datetimes(self, data: pd.DataFrame) -> pd.DataFrame:
         return data.sort_values("TIME")
 
-    def concat_previous_new(self, previous_data: pd.DataFrame, new_data: pd.DataFrame) -> pd.DataFrame:
-        return pd.concat([previous_data, new_data], axis=0)
-    
+    def concat_previous_new(self, previous_data: pd.DataFrame, new_data: pd.DataFrame, drop_duplicates:bool = True) -> pd.DataFrame:
+        
+        concat_data = pd.concat([previous_data, new_data], axis=0)
+        
+        time_col = [col for col in concat_data.columns if "TIME" in col][0]
+
+        if drop_duplicates:
+            return concat_data.drop_duplicates(subset=time_col)
+        else:
+            return concat_data     
+        
     def create_timeseries_aodn_column(self, data: pd.DataFrame) -> pd.DataFrame:
         data["timeSeries"] = float(1)
         return data
