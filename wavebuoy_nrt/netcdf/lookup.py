@@ -245,7 +245,8 @@ class NetCDFFileHandler():
         return global_dataframe
 
     def _pivot_previous_spectral(self, dataframe: pd.DataFrame) -> pd.DataFrame:
-        return dataframe.groupby("TIME").agg({
+        
+        return dataframe.drop_duplicates().groupby("TIME").agg({
                                         "FREQUENCY": list,
                                         "A1": list,
                                         "B1": list,

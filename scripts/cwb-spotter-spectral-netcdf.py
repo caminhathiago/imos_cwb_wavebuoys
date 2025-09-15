@@ -53,7 +53,10 @@ def main():
             deployment_metadata = meta_data_loader.load_latest_deployment_metadata(site_name=site.name)
             regional_metadata = meta_data_loader.load_regional_metadata()
 
-            latest_available_time = sofar_api.get_latest_available_time(spot_id=site.serial, token=site.sofar_token)
+            latest_available_time = sofar_api.get_latest_available_time(spot_id=site.serial, 
+                                                                        token=site.sofar_token,
+                                                                        data_type="spectral",
+                                                                        processing_sources="embedded")
             SITE_LOGGER.info(f"grabed latest_available_time: {latest_available_time}")
 
             window_start_time = wb.generate_window_start_time(latest_available_datetime=latest_available_time,
@@ -172,7 +175,8 @@ def main():
                     previous_data_df["processing_source"] = "embedded"
                     # END OF TEMPORARY SETUP (REMOVE WHEN DONE)
                     spectra = wb.concat_previous_new(previous_data=previous_data_df,
-                                                    new_data=spectra)
+                                                    new_data=spectra,
+                                                    drop_duplicates=True)
                     SITE_LOGGER.info("concatenate new data with previous since available")
            
             csvOutput.save_csv(data=spectra, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_spectra_all_data.csv")

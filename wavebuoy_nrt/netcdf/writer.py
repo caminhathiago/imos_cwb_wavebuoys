@@ -561,7 +561,7 @@ class ncProcessor:
             }
 
         if parameters_type == "spectral":
-            coords.update({"FREQUENCY": ("FREQUENCY", data["FREQUENCY"].iloc[0])})
+            coords.update({"FREQUENCY": ("FREQUENCY", data["FREQUENCY"].iloc[-1])})
 
         return coords 
 
