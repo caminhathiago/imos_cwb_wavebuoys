@@ -157,7 +157,7 @@ class SofarAPI:
                 spot_id=spot_id,
                 token=token,
                 start_date=current_start_date,
-                end_date=end_date,
+                end_date=end_date + timedelta(hours=1),
                 **kwargs
             )
             
@@ -179,7 +179,6 @@ class SofarAPI:
             # if test_not_owned:
             #     SITE_LOGGER.info(f"Not owned Spotter, pagination not necessary")
             #     break
-
 
 
             if latest_extracted_time >= end_date:
