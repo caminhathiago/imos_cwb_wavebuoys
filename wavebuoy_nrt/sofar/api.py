@@ -297,8 +297,8 @@ class SofarAPI:
 
         if latest_data[parameters_type]:
             latest_available_time = latest_data[parameters_type][-1]["timestamp"]
-        elif latest_data["track"]:
-            latest_available_time = latest_data["track"][-1]["timestamp"]
+        # elif latest_data["track"]:
+        #     latest_available_time = latest_data["track"][-1]["timestamp"]
         else:
             message = f"Latest data empty for {parameters_type} and track. Probably spotter is under a gap"
             SITE_LOGGER.warning(message)
