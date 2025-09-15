@@ -188,6 +188,11 @@ class SofarAPI:
                 current_start_date = latest_extracted_time
                 page += 1
                 print(page)
+            
+            if page == 10:
+                message = f"Too many paginations executed (page = {page}). Check if spotter is operational and toggle off aodn processing in buoys_metadata"
+                SITE_LOGGER.warning(message)
+                raise Exception(message)
 
         return raw_data
     
