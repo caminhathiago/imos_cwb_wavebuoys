@@ -5,6 +5,13 @@ import re
 import argparse
 import sys
 
+import xarray as xr
+import pandas as pd
+import numpy as np
+# import cartopy.crs as ccrs
+# import cartopy.feature as cfeature
+# import cartopy.io.shapereader as shpreader
+import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -90,6 +97,13 @@ def args_processing_dm():
     
     return vargs
 
+
+def args_processing_dm_test(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--log_path")
+    parser.add_argument("--output_path")
+    parser.add_argument("--enable_dask", type=bool)
+    return parser.parse_args(argv)
 
 class IMOSLogging:
 
@@ -189,3 +203,213 @@ class DebuggingHelpers:
                 return pickle.load(f)
             else:
                 raise ValueError(f"{mode} not accepted as mode. Options: ['wb', 'rb'] ")
+
+
+class Plots:
+
+    def __init__(self, site_name:str, output_path:str):
+        
+        if not os.path.exists(output_path):
+            raise NotADirectoryError(f"{output_path} is not a valid directory")
+        else:
+            self.output_path = os.path.join(output_path, "plots")
+            os.makedirs(self.output_path, exist_ok=True)
+
+        self.site_name = site_name
+
+    def convert_CF_time_to_datetime(self, dataset) -> xr.Dataset:
+
+        time_label = [lab for lab in dataset.variables if "TIME" in lab][0]
+
+        datetimes = pd.to_datetime(dataset[time_label].values, origin='1950-01-01', unit='D')
+
+        dataset[time_label] = datetimes
+        
+        return dataset
+
+    def qc_subflags_each_variable(self,
+                                dataset,
+                                waves_subflags,
+                                temp_subflags,
+                                figsize=(15, 3),
+                                variable=None):
+
+        # dataset = self.convert_CF_time_to_datetime(dataset)
+
+        vars = ['LATITUDE', 'LONGITUDE', 'WSSH', 'WPFM', 'WPPE', 'SSWMD', 
+                'WPDI', 'WMDS', 'WPDS']
+        subflags_vars = waves_subflags.filter(regex="_test").columns.tolist()
+        subflags_vars.extend(temp_subflags)
+
+        waves_subflags = waves_subflags.set_index("TIME")
+
+        if "TEMP" in dataset.variables:
+            vars.append('TEMP')
+            temp_subflags = temp_subflags.set_index("TIME_TEMP")
+
+        n_vars = len(vars)
+        if n_vars == 0:
+            print("No variables to plot.")
+            return
+        
+        if variable:
+            vars = [variable]
+
+        for var in vars:
+            if var not in dataset.variables:
+                continue
+            
+            data_subflags = waves_subflags
+            if var == "TEMP":
+                primary_flags_column = "TEMP_quality_control"
+                data_subflags = temp_subflags
+            else:
+                primary_flags_column = "WAVE_quality_control"
+
+            import matplotlib.pyplot as plt
+            fig, ax = plt.subplots(3,1, figsize=(figsize[0], figsize[1]*3), sharex=True)
+
+            data_subflags[var].plot(marker='o', ax=ax[0], ms=2, label='python')
+            data_subflags[primary_flags_column].plot(marker='o', ax=ax[2], ms=2)
+            data_subflags[var].plot(marker='o', ax=ax[1], ms=2, label='python', alpha=0.4)
+
+            if var not in ("LATITUDE", "LONGITUDE") and not var.endswith("_quality_control"):
+                
+                if "TEMP" in var:
+                    subflags_data = temp_subflags
+                    subflags_preffix = "TEMP_QC_"
+                else:
+                    subflags_data = waves_subflags
+                    subflags_preffix = "WAVE_QC_"
+
+                var_subflags = subflags_data.filter(regex=var).columns.tolist()
+                var_subflags.remove(var)
+                var_subflags = [var_subflag for var_subflag in var_subflags if not var_subflag.endswith("_quality_control")]
+                # var_subflags = [var_subflag for var_subflag in subflags_vars if var in var_subflag]
+                
+                for subflag in var_subflags:
+                
+                    subflag_names_codes = {
+                        f"{subflags_preffix}{var}_spike_test": 10,
+                        f"{subflags_preffix}{var}_mean_std_test": 15,
+                        f"{subflags_preffix}{var}_flat_line_test": 16,
+                        f"{subflags_preffix}{var}_gross_range_test": 19,
+                        f"{subflags_preffix}{var}_rate_of_change_test": 20,
+
+                    }
+
+                    base_flag = subflag.replace(f"{subflags_preffix}{var}_", "")
+                    flag_code = subflag_names_codes.get(f"{subflags_preffix}{var}_{base_flag}", None)
+
+                    plot_subflags_kwargs = dict(marker='o', linestyle="None", ms=4,
+                                ax=ax[1], label=f"{subflag.replace(f"{subflags_preffix}{var}","")}")
+                    
+                    flags_2 = subflags_data.loc[subflags_data[subflag] == 2, var]
+                    flags_3 = subflags_data.loc[subflags_data[subflag] == 3, var]
+                    flags_4 = subflags_data.loc[subflags_data[subflag] == 4, var]
+
+                    for flags, color in zip([flags_2, flags_3, flags_4], ["green", "orange", "red"]):
+                        if not flags.empty:
+                            flags.plot(**plot_subflags_kwargs, color=color)
+
+                            for time, val in flags.items():
+                                ax[1].annotate(
+                                    str(flag_code),
+                                    xy=(time, val),
+                                    xytext=(5, 5),
+                                    textcoords="offset points",
+                                    fontsize=8,
+                                    ha='left',
+                                    va='bottom'
+                                )
+        
+
+            ax[0].legend()
+            ax[0].grid(True)
+            ax[1].grid(True)
+            ax[2].grid(True)
+
+            import matplotlib.patches as mpatches
+            import matplotlib.lines as mlines
+            custom_legend = [
+                # QC test code descriptions
+                mpatches.Patch(color='white', label='10: spike '),
+                mpatches.Patch(color='white', label='15: mean std'),
+                mpatches.Patch(color='white', label='16: flat line'),
+                mpatches.Patch(color='white', label='19: max/min range'),
+                mpatches.Patch(color='white', label='20: roc'),
+
+                # Flag color points
+                mlines.Line2D([], [], color='green', marker='o', linestyle='None', label='not assessed'),
+                mlines.Line2D([], [], color='orange', marker='o', linestyle='None', label='suspect'),
+                mlines.Line2D([], [], color='red', marker='o', linestyle='None', label='fail')
+            ]
+
+            ax[1].legend(
+                handles=ax[1].get_legend_handles_labels()[0] + custom_legend,
+                loc='center left',
+                bbox_to_anchor=(1.0, 0.5),
+                frameon=True
+            )
+
+            plt.tight_layout()
+            output_file_name = f"{self.site_name}_{var}_subflags.png"
+            plt.savefig(os.path.join(self.output_path, output_file_name), dpi=300)
+
+    
+    def map_positions(self,
+                    data:pd.DataFrame,
+                    map_coverage:tuple=(10.,20.),
+                    figsize:tuple=(8, 8)):
+
+        lats = data["LATITUDE"].values 
+        lons = data["LONGITUDE"].values 
+
+        lat_center = np.mean(lats)
+        lon_center = np.mean(lons)
+
+        for i, coverage in enumerate(map_coverage):
+            
+            fig, ax = plt.subplots(
+                subplot_kw={'projection': ccrs.PlateCarree()},
+                figsize=figsize
+            )
+
+            km_to_deg_lat = coverage / 111.0
+            km_to_deg_lon = coverage / 111.0 * np.cos(np.radians(lat_center))
+
+            lat_min = lat_center - km_to_deg_lat
+            lat_max = lat_center + km_to_deg_lat
+            lon_min = lon_center - km_to_deg_lon
+            lon_max = lon_center + km_to_deg_lon           
+
+            ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+
+            ax.add_feature(cfeature.LAND, facecolor='lightgray')
+            ax.add_feature(cfeature.COASTLINE)
+            ax.add_feature(cfeature.BORDERS, linestyle=':')
+            ax.gridlines(draw_labels=True, linestyle="--")
+
+            ax.scatter(lons, lats, color='red', s=8, transform=ccrs.PlateCarree(), label="Position (Lat/Lon)")
+            ax.scatter(lon_center, lat_center, color='blue', s=8, marker="x", transform=ccrs.PlateCarree(), label="Mean Lat/Lon")
+
+            shapename = 'admin_0_countries'
+            populated_places = shpreader.natural_earth(resolution='110m',
+                                                    category='cultural',
+                                                    name='populated_places')
+
+            reader = shpreader.Reader(populated_places)
+            for city in reader.records():
+                lon, lat = city.geometry.x, city.geometry.y
+                if (lon_min <= lon <= lon_max) and (lat_min <= lat <= lat_max):
+                    ax.plot(lon, lat, marker='o', color='black', markersize=4,
+                            transform=ccrs.PlateCarree())
+                    ax.text(lon, lat, city.attributes['NAME'],
+                            fontsize=8, transform=ccrs.PlateCarree())
+
+
+            ax.legend()
+            ax.set_title(f"Map {coverage} km around average location")
+            plt.tight_layout()
+            output_file_name = f"{self.site_name}_positions-{coverage}km.png"
+            plt.savefig(os.path.join(self.output_path, output_file_name), dpi=300)
