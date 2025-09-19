@@ -14,9 +14,7 @@ With your preferred python (>=3.12,<3.13) virtual environment activated, from th
 
 ### 2. Processing script
 
-The script can be found in the scripts folder as:
-
-<pre> wavebuoy_dm/dm_processing.py </pre>
+The script `wavebuoy_dm/dm_processing.py` can be used to process data either in standalone or programmatic approaches, both described in the sections 2.1 and 2.2.
 
 #### 2.1 Standalone approach
 
