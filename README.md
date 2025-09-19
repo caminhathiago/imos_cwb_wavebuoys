@@ -49,19 +49,20 @@ The processing tool can also be imported within an external python script as:
 ```python
 from wavebuoy_dm.dm_processor import DMSpotterProcessor
 
+# config arguments follow the same structure and requirements as the standalone approach
 config = {
     "log_path": "/path/to/sdcard/files",
     "utc_offset": 0,
-    "deploy_dates": ["20240101T000000", "20240131T235959"],
+    "deploy_dates": ["20240101T000000", "20240131T235959"], # pass start and end dates as a list formatted as ISO 8601 (YYYY-mm-ddTHH:MM:SS)
     "enable_dask": True,
     "output_type": "netcdf"
 }
 
-processor = DMSpotterProcessor(config)
-processor.run(save_outputs=True)
+dm = DMSpotterProcessor(config)
+dm.run(save_outputs=True) # 
 ```
 
-At the end of the processing execution, the defined instance will have the following attributes:
+At the end of the processing execution, the defined instance (e.g. `dm`) will have the attributes below. Dataset types will be determined pending on what `output_type` was passed in the config dictionary (`csv` -> `polars.DataFrame`, `netcdf` -> `xarray.Dataset`).
 
 | Argument               | Description                                                                                                     |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
