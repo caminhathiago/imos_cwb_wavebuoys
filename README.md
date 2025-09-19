@@ -20,7 +20,7 @@ The script `wavebuoy_dm/dm_processing.py` can be used to process data either in 
 
 The script cab be directly executed from the command line by providing the following arguments:
 
-#### Arguments
+##### Arguments
 
 | Argument               | Description                                                                                                     |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -31,7 +31,7 @@ The script cab be directly executed from the command line by providing the follo
 | `-ot`, `--output-type` | *(Optional)* Choose output format: `csv` or `netcdf` (default: `netcdf`).                                       |
 
 
-### Execution example
+##### Execution example
 
 <pre> python scripts/cwb-spotter-dm.py \
   --log-path /path/to/sdcard/files \
