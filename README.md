@@ -1,6 +1,6 @@
 # Sofar Spotter SD Card Processor
 
-This repository provides tools to process data exported from SD cards used by **Sofar Spotter** wave buoys. The main script extracts, filters, and calculates spectral data from raw log files within a specified deployment window.
+This repository provides tools to process data exported from SD cards used by **Sofar Spotter** wave buoys. The main script extracts, filters, and calculates spectral data from raw log files.
 
 ---
 
