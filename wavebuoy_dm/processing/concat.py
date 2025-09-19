@@ -41,7 +41,7 @@ class csvConcat:
                                 "Szx_im": pl.Float64,
                                 "Szy_im": pl.Float64
                                 },
-                        'LOC':{"GPS_Epoch_Time(s)": pl.Int64,
+                        'LOC':{"GPS_Epoch_Time(s)": (pl.Float64, pl.Int64),
                                 "lat(deg)": pl.Int64,
                                 "lat(min*1e5)": pl.Int64,
                                 "long(deg)": pl.Int64,
@@ -124,7 +124,7 @@ class csvConcat:
             }
 
     @staticmethod
-    def validate_schema(file_path: str, suffix: str) -> bool:
+    def validate_schema_dep(file_path: str, suffix: str) -> bool:
         """Check if a CSV file matches the expected schema."""
         try:
             df = pl.scan_csv(file_path)
@@ -150,6 +150,46 @@ class csvConcat:
             print(f"Error processing {file_path}: {e}")
             return False
         
+    def validate_schema(self, file_path: str, suffix: str) -> bool:
+        """Check if a CSV file matches the expected schema and log mismatches."""
+        try:
+            df = pl.scan_csv(file_path)
+            inferred_schema = df.collect_schema()
+            expected_schema = csvConcat.EXPECTED_SCHEMAS[suffix]
+
+            inferred_columns = list(inferred_schema.keys())
+            expected_columns = list(expected_schema.keys())
+
+            missing = set(expected_columns) - set(inferred_columns)
+            extra = set(inferred_columns) - set(expected_columns)
+            if missing or extra:
+                print(f"Schema mismatch in {file_path}:")
+                if missing:
+                    print(f"  Missing columns: {missing}")
+                if extra:
+                    print(f"  Extra columns: {extra}")
+                return False
+
+            for col in expected_columns:
+                inferred_type = inferred_schema[col]
+                expected_type = expected_schema[col]
+                if isinstance(expected_type, tuple):
+                    if inferred_type not in expected_type:
+                        print(f"Schema mismatch in {file_path}: column '{col}' "
+                            f"has type {inferred_type}, expected one of {expected_type}")
+                        return False
+                else:
+                    if inferred_type != expected_type:
+                        print(f"Schema mismatch in {file_path}: column '{col}' "
+                            f"has type {inferred_type}, expected {expected_type}")
+                        return False
+
+            return True
+
+        except Exception as e:
+            print(f"Error processing {file_path}: {e}")
+            return False
+
     def _validate_schemas():
         pass
 
@@ -258,7 +298,7 @@ class csvConcat:
             data_list = []
             
             for file in self.files_suffixes[suffix]:
-                if self.ignore_files(file=file): #and self.validate_schema(file, suffix):
+                if self.ignore_files(file=file) and self.validate_schema(file, suffix):
                     df_lazy = self.load_csv(file)
                     # print(list(df_lazy.collect_schema()))
                     data_list.append(df_lazy)
