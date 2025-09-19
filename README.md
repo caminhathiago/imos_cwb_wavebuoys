@@ -62,7 +62,7 @@ dm = DMSpotterProcessor(config)
 dm.run(save_outputs=True) # 
 ```
 
-At the end of the processing execution, the defined instance (e.g. `dm`) will have the attributes below. Dataset types will be determined pending on what `output_type` was passed in the config dictionary (`csv` -> `polars.DataFrame`, `netcdf` -> `xarray.Dataset`).
+At the end of the processing execution, the defined instance (e.g. `dm`) has the attributes below. Dataset types are determined pending on what `output_type` was passed in the config dictionary (`csv` -> `polars.DataFrame`, `netcdf` -> `xarray.Dataset`).
 
 | Argument               | Description                                                                                                     |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -74,7 +74,7 @@ At the end of the processing execution, the defined instance (e.g. `dm`) will ha
 
 #### Outputs
 
-Processing results will be saved in the output directory `processed`, which will be created in the specified in the configuration (see below). For programmatic usage, outputs are saved only if save_outputs is set to True in the run method.
+Processing results are saved in the output directory `processed` created in the specified in the configuration (see below). For programmatic usage, outputs are saved only if save_outputs is set to True in the run method.
 
  <pre> /path/to/sdcard/files/processed/ </pre>
 
