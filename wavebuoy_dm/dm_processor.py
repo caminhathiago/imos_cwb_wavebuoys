@@ -1,8 +1,10 @@
 import os
 import time
+from datetime import datetime
 
 from xarray import Dataset
 import polars as pl
+import multiprocessing
 from multiprocessing import cpu_count
 from dask.distributed import Client
 import dask
@@ -11,55 +13,72 @@ from wavebuoy_dm.spectra import Spectra
 from wavebuoy_dm.processing.concat import csvConcat
 from wavebuoy_dm.processing.process import csvProcess
 from wavebuoy_dm.netcdf.process import ncSpectra, ncDisp, ncBulk
-from wavebuoy_dm.utils import IMOSLogging, args_processing_dm
+from wavebuoy_dm.utils import IMOSLogging, args_processing_dm, Plots
 
 
 class DMSpotterProcessor:
-    def __init__(self, config=None):
+    def __init__(self, config=None, client=None, spectra_info=None, to_process=["displacements", "gps"]):
+    
+        # Templates
+        self.output_types = ("netcdf", "csv")
+        self.spectra_variables = ['TIME', 'LONGITUDE', 'LATITUDE', 'FREQUENCY', 'A1', 'B1', 'A2', 'B2', 'ENERGY']
+        self.bulk_variables = ['TIME', 'LONGITUDE', 'LATITUDE', 'WSSH', 'WPFM', 'WPPE', 'SSWMD', 'WPDI', 'WMDS', 'WPDS']
+
+        # Files to process
+        self.map_variablestype_suffix = {
+            "displacements": "FLT",
+            "gps": "LOC",
+            "surface_temp": "SST",
+            "atmospheric_pressure": "BARO",
+            "smart_mooring": "XXX"
+        }
+        self.suffixes_to_process = self.to_process(to_process)
+
+        # Config
         self.vargs = self.load_config(config)
-        self.client = None
+        
+        # Dask client
+        self.client = client if client else None
+
+        # Logger
         self.imos_logging = IMOSLogging()
         self.LOGGER = self.imos_logging.logging_start(
             logging_filepath=self.vargs.output_path,
             logger_name="DM_spotter_processing.log"
         )
 
-    def process_config(self, config:dict):
-        import argparse
-        vargs = argparse.ArgumentParser()
-
-        if not os.path.exists(config['log_path']):
-            raise ValueError('{path} not a valid path'.format(path=config.log_path))
+        # Spectra calculation config
+        if spectra_info:
+            self.spectra_info
+        else:
+            self.spectra_info = {
+                "hab": None,
+                "fmaxSS": 1/8,
+                "fmaxSea": 1/2,
+                "bad_data_thresh": 2/3,
+                "hs0_thresh": 3,
+                "t0_thresh": 5,
+                "fs": 2.5,
+                "spec_window": 30,
+                "nover": 0.5,
+            }
         
-        else:
-            vargs.log_path = config['log_path']
+        self.calculate_spectra_info(self.spectra_info)
             
-            output_path = os.path.join(config['log_path'], "processed")
-            if not os.path.exists(output_path):
-                os.makedirs(output_path)
-
-            vargs.output_path = output_path
-
-        if config.get('deploy_dates'):
-            from datetime import datetime
-            vargs.deploy_dates_start = datetime.strptime(vargs.deploy_dates[0],"%Y%m%dT%H%M%S")
-            vargs.deploy_dates_end = datetime.strptime(vargs.deploy_dates[1],"%Y%m%dT%H%M%S")
-        else:
-            vargs.deploy_dates = None
-
-        if config.get('enable_dask'):
-            vargs.enable_dask = config['enable_dask']
-
-        output_type = config.get('output_type')
-        if output_type:
-            if output_type in ("netcdf, csv"):
-                vargs.output_type = config['output_type']
+    def to_process(self, to_process):
+        
+        suffixes = []
+        suffixes_unmatched = []
+        for variables_type in to_process:
+            if variables_type in self.map_variablestype_suffix.keys():
+                suffixes.append(self.map_variablestype_suffix[variables_type])
             else:
-                raise ValueError(f'{output_type} not a valid path')
-        else:
-            vargs.output_type = 'netcdf'
+                suffixes_unmatched.append(variables_type)
+        
+        if suffixes_unmatched:
+            raise ValueError(f"""The following suffixes are not available {suffixes_unmatched}. Please check for typos. List of available variables types: {tuple(self.map_variablestype_suffix.keys())}""")
 
-        return vargs
+        return [self.map_variablestype_suffix[variables_type] for variables_type in to_process]
 
     def load_config(self, config: dict = None):
         
@@ -69,60 +88,60 @@ class DMSpotterProcessor:
             import argparse
             vargs = argparse.ArgumentParser()
 
-            if not os.path.exists(config['log_path']):
-                raise ValueError('{path} not a valid path'.format(path=config.log_path))
+           # Paths
+            log_path = config.get("log_path", os.getcwd())
+            if not os.path.exists(log_path):
+                raise ValueError(f"{log_path} is not a valid path")
+
+            vargs.log_path = log_path
+
+            output_path = os.path.join(log_path, "processed")
+            os.makedirs(output_path, exist_ok=True)
+
+            vargs.output_path = output_path
+
+            # Deployment dates and UTC offset
+            deploy_dates = config.get('deploy_dates', None)
+            if deploy_dates:
+                vargs.deploy_dates_start = datetime.strptime(deploy_dates[0],"%Y-%m-%dT%H:%M:%S")
+                vargs.deploy_dates_end = datetime.strptime(deploy_dates[1],"%Y-%m-%dT%H:%M:%S")
             
-            else:
-                vargs.log_path = config['log_path']
-                
-                output_path = os.path.join(config['log_path'], "processed")
-                if not os.path.exists(output_path):
-                    os.makedirs(output_path)
+            vargs.deploy_dates = deploy_dates
 
-                vargs.output_path = output_path
-
-            if config.get('deploy_dates'):
-                from datetime import datetime
-                vargs.deploy_dates_start = datetime.strptime(config['deploy_dates'][0],"%Y-%m-%dT%H:%M:%S")
-                vargs.deploy_dates_end = datetime.strptime(config['deploy_dates'][1],"%Y-%m-%dT%H:%M:%S")
-                vargs.deploy_dates = config['deploy_dates']
-            else:
-                vargs.deploy_dates = None
-
-            if config.get('utc_offset'):
+            if config.get('utc_offset', 0): # UTC if nothing is provided
                 vargs.utc_offset = config['utc_offset']
-            else:
-                vargs.utc_offset = 0 # UTC
 
-            if config.get('enable_dask'):
-                vargs.enable_dask = config['enable_dask']
+            # Dask enabling
+            enable_dask = config.get("enable_dask", False)
+            if isinstance(enable_dask, str):
+                enable_dask = enable_dask.lower() in ("true")
+            vargs.enable_dask = enable_dask
 
-            output_type = config.get('output_type')
-            if output_type:
-                if output_type in ("netcdf, csv"):
-                    vargs.output_type = config['output_type']
-                else:
-                    raise ValueError(f'{output_type} not a valid path')
-            else:
-                vargs.output_type = 'netcdf'
+            # Final output types
+            output_type = config.get("output_type", "netcdf")
+            if output_type not in self.output_types:
+                raise ValueError(f"{output_type} is not a valid output type")
+
+            vargs.output_type = output_type
 
             return vargs      
 
     def setup_dask(self):
-        if self.vargs.enable_dask:
-            self.num_workers = max(cpu_count() // 2, 1)
-            self.client = Client(n_workers=self.num_workers)
-            self.LOGGER.info(f"Dask client started with {self.num_workers} workers")
+        if self.vargs.enable_dask and self.client is None:
+            if multiprocessing.current_process().name == "MainProcess":
+                self.num_workers = max(cpu_count() // 2, 1)
+                self.client = Client(n_workers=self.num_workers)
+                self.LOGGER.info(f"Dask client started with {self.num_workers} workers")
 
     def close_dask(self):
         if hasattr(self, "client") and self.client is not None:
             self.client.close()
             self.LOGGER.info("Dask client closed")
 
-    def process_from_SD(self, raw_data_path, suffixes_to_concat=["FLT", "LOC"]) -> list[pl.DataFrame]:
+    def process_from_SD(self, raw_data_path) -> list[pl.DataFrame]:
 
-        self.LOGGER.info(f"Lazy concatenating csv files for {suffixes_to_concat}")
-        cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat) 
+        self.LOGGER.info(f"Lazy concatenating csv files for {self.suffixes_to_process}")
+        cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=self.suffixes_to_process) 
         lazy_concat_results = cc.lazy_concat_files()
 
         cp = csvProcess()
@@ -132,40 +151,75 @@ class DMSpotterProcessor:
         self.LOGGER.info("Collecting processed csv files")
         collected_results = cp.collect_results(lazy_processed_results)
 
+        if isinstance(collected_results.get("surface_temp"), pl.DataFrame) and not collected_results["surface_temp"].is_empty():
+            collected_results["surface_temp"] = collected_results["surface_temp"].rename(
+                {"temperature": "TEMP", "datetime": "TIME_TEMP"}
+            )
+
+        if isinstance(collected_results.get("barometer"), pl.DataFrame) and not collected_results["barometer"].is_empty():
+            collected_results["barometer"] = collected_results["barometer"].rename(
+                {"baro_pressure": "ATM_PRESSURE", "datetime": "TIME_ATM_PRESSURE"}
+            )
+
         return collected_results
 
-    def filter_dates(self, disp, gps, utc_offset, deploy_start, deploy_end) -> list[pl.DataFrame]:
-
+    def filter_dates(self, results, utc_offset, deploy_start, deploy_end) -> list[pl.DataFrame]:
 
         cp = csvProcess()
-        self.LOGGER.info(f"Filtering displacements data with passed deployment datetimes: {deploy_start} - {deploy_end}")
-        disp = cp.filter_deployment_dates(dataframe=disp, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
-                                        time_crop_start=0, time_crop_end=0)
-        
-        self.LOGGER.info(f"Filtering gps data with passed deployment datetimes: {deploy_start} - {deploy_end}")
-        gps = cp.filter_deployment_dates(dataframe=gps, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
-                                        time_crop_start=0, time_crop_end=0)
 
-        return disp, gps
+        results_filtered = []
+        for result in results:
+            self.LOGGER.info(f"Filtering displacements data with passed deployment datetimes: {deploy_start} - {deploy_end}")
+            result = cp.filter_deployment_dates(dataframe=result, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
+                                            time_crop_start=0, time_crop_end=0)
+            results_filtered.append(result)
 
-    def calculate_spectra_from_displacements(self, disp: pl.DataFrame, enable_dask:bool):
+        return results_filtered
+
+    def calculate_spectra_info(self, spectra_info) -> dict:
         
         s = Spectra()
         
-        self.LOGGER.info(f"Setting spectra calculation parameters")
-        info = {
-            "hab": None,
-            "fmaxSS": 1/8,
-            "fmaxSea": 1/2,
-            "bad_data_thresh": 2/3,
-            "hs0_thresh": 3,
-            "t0_thresh": 5
-        }
-        fs = 2.5
-        min_samples = s.calculate_min_samples(fs=fs, spec_window=30)
-        nfft = s.calculate_nfft(fs=fs, spec_window=30)
+        min_samples = s.calculate_min_samples(fs=spectra_info["fs"], spec_window=spectra_info["spec_window"])
+        nfft = s.calculate_nfft(fs=spectra_info["fs"], spec_window=spectra_info["spec_window"])
         merge = s.define_merging(nfft=nfft)
-        nover = 0.5
+
+        self.spectra_info.update({
+            "min_samples": min_samples,
+            "nfft": nfft,
+            "merge": merge
+        })
+
+    def check_dataset_empty(self, results:dict, variables_type:str) -> None:
+        
+        results_keys = list(results.keys())
+
+        if variables_type not in results_keys:
+            raise ValueError(
+                f"'{variables_type}' key is missing in results. Please check input files or processing configurations."
+            )
+
+        result = results[variables_type]
+        check = (isinstance(result, pl.DataFrame) and result.is_empty()) or (isinstance(result, list) and len(result) == 0)
+
+        if check:
+            raise ValueError(
+                f"'{variables_type}' dataset is empty. Please check if files are corrupted or processing configurations are correct."
+            )
+        
+    def calculate_spectra_from_displacements(self, results:dict, enable_dask:bool):
+        
+        self.check_dataset_empty(results, 'displacements')
+        disp = results['displacements']
+
+        s = Spectra()
+        
+        self.LOGGER.info(f"Setting spectra calculation parameters")
+        fs = self.spectra_info['fs']
+        min_samples = self.spectra_info['min_samples']
+        nfft = self.spectra_info['nfft']
+        merge = self.spectra_info['merge']
+        nover = self.spectra_info['nover']
 
         if enable_dask:
             self.LOGGER.info(f"Processing dask chunks for spectra calculation")
@@ -177,7 +231,7 @@ class DMSpotterProcessor:
 
             self.LOGGER.info(f"Creating dask tasks")
             disp_tasks = [dask.delayed(s.process_dask_chunk)
-                    (dask_chunk, nfft, nover, fs, merge, 'xyz', info) 
+                    (dask_chunk, nfft, nover, fs, merge, 'xyz', self.spectra_info) 
                     for dask_chunk in disp_dask_chunks]
 
             self.LOGGER.info(f"Computing dask tasks")
@@ -190,9 +244,12 @@ class DMSpotterProcessor:
         
         else:
             self.LOGGER.info(f"Calculating spectra with whole displacements data")
-            return s.spectra_from_dataframe(disp, nfft, nover, fs, merge, 'xyz', min_samples, info)
+            return s.spectra_from_dataframe(disp, nfft, nover, fs, merge, 'xyz', min_samples, self.spectra_info)
 
-    def align_gps(self, spectra_bulk_df, gps) -> pl.DataFrame:
+    def align_gps(self, spectra_bulk_df, results:dict) -> pl.DataFrame:
+
+        self.check_dataset_empty(results, 'gps')
+        gps = results['gps']
 
         cp = csvProcess()
 
@@ -201,38 +258,44 @@ class DMSpotterProcessor:
 
         return spectra_bulk_df
 
-    def split_spectra_bulk(self, spectra_bulk) -> list[pl.DataFrame]:
+    def split_spectra_bulk(self, spectra_bulk:pl.DataFrame, results:dict) -> list[pl.DataFrame]:
         
         self.LOGGER.info(f"Splitting spectra_bulk into spectra and bulk individual polars dataframes")
-        return (
-            spectra_bulk[['TIME', 'LONGITUDE', 'LATITUDE', 'FREQUENCY', 'A1', 'B1', 'A2', 'B2', 'ENERGY']],
-            spectra_bulk[['TIME', 'LONGITUDE', 'LATITUDE', 'WSSH', 'WPFM', 'WPPE', 'SSWMD', 'WPDI', 'WMDS', 'WPDS']],
-                    )
-
-    def convert_to_dataset(self, disp, gps, spectra, bulk) -> list[Dataset]:
+        results['bulk'] = spectra_bulk[self.bulk_variables]
+        results['spectra'] = spectra_bulk[self.spectra_variables]
         
-        self.LOGGER.info(f"Converting raw displacements dataframe to dataset")
-        disp = ncDisp().compose_dataset(disp, gps)        
+        return results
 
-        self.LOGGER.info(f"Converting spectra dataframe to dataset")
-        spectra = ncSpectra().compose_dataset(spectra)
+    def convert_to_dataset(self, results:dict) -> list:
         
-        self.LOGGER.info(f"Converting bulk dataframe to dataset")
-        bulk = ncBulk().compose_dataset(bulk.to_pandas())
+        # Convert displacements to Dataset if GPS is available
+        if 'displacements' in results and 'gps' in results:
+            self.LOGGER.info("Converting displacements dataframe to dataset")
+            results['displacements'] = ncDisp().compose_dataset(results['displacements'], results['gps'])
 
-        return disp, spectra, bulk
+        # Convert spectra
+        if 'spectra' in results:
+            self.LOGGER.info("Converting spectra dataframe to dataset")
+            results['spectra'] = ncSpectra().compose_dataset(results['spectra'])
 
-    def save_outputs(self, disp, gps, spectra, bulk, output_path):
+        # Convert bulk
+        if "bulk" in results:
+            self.LOGGER.info("Converting bulk dataframe to dataset")
+            
+            args = {"waves":results["bulk"].to_pandas()}
+            
+            temperature_data = results.get("surface_temp")
+            if isinstance(temperature_data, pl.DataFrame) and not temperature_data.is_empty():
+                args["temp"] = temperature_data
+                # No temperature data → call without it
+            results["bulk"] = ncBulk().compose_dataset(**args)
 
-        outputs = {
-            "raw_displacements": disp,
-            "gps": gps,
-            "spectra": spectra,
-            "bulk": bulk
-        }
+        return results
+
+    def save_outputs(self, results, output_path):
 
         self.LOGGER.info(f"Iterating over datasets")
-        for name, data in outputs.items():
+        for name, data in results.items():
 
             if isinstance(data, pl.DataFrame):
                 filepath = os.path.join(output_path, f"{name}.csv")
@@ -247,12 +310,17 @@ class DMSpotterProcessor:
                 self.LOGGER.info(f"Saving {name} data as {filepath}")
                 data.to_netcdf(filepath, engine="netcdf4")
 
-            else:
-                self.LOGGER.warning(f"Unsupported data type for {name}: {type(data)}")
+            elif isinstance(data, list):
+                self.LOGGER.warning(f"Not saving '{name}' as it is an empty list. This spotter may not have this sensor or it must not be working.")
 
-    def run(self, save_outputs=True):
-        start_exec_time = time.time()
+    def _set_dataset_attributes(self, results: dict):
+        for key in results:
+            if not isinstance(results[key], list):
+                setattr(self, key, results[key])
+
+    def run(self, save_outputs=True, map_plots=True):
         
+        start_exec_time = time.time() 
         try:
             self.LOGGER.info("DM Processing started ".upper())
             
@@ -263,35 +331,34 @@ class DMSpotterProcessor:
             results = self.process_from_SD(self.vargs.log_path)
 
             if self.vargs.deploy_dates:
-                disp, gps = self.filter_dates(
-                    disp=results['displacements'],
-                    gps=results['gps'],
+                results = self.filter_dates(
+                    results=results,
                     deploy_start=self.vargs.deploy_dates_start,
                     deploy_end=self.vargs.deploy_dates_end,
                     utc_offset=self.vargs.utc_offset
                 )
-            else:
-                disp, gps = results['displacements'], results['gps']
+    
 
             self.LOGGER.info(f"Spectra Calculation ".upper() + "="*50)
-            spectra_bulk = self.calculate_spectra_from_displacements(disp, self.vargs.enable_dask)
+            spectra_bulk = self.calculate_spectra_from_displacements(results, self.vargs.enable_dask)
 
             self.LOGGER.info(f"Spectra results processing ".upper() + "="*50)
-            spectra_bulk = self.align_gps(spectra_bulk, gps)
+            spectra_bulk = self.align_gps(spectra_bulk, results)
 
-            spectra, bulk = self.split_spectra_bulk(spectra_bulk)
+            results = self.split_spectra_bulk(spectra_bulk, results)
             if self.vargs.output_type == 'netcdf':
-                disp, spectra, bulk = self.convert_to_dataset(disp, gps, spectra, bulk)
+                results = self.convert_to_dataset(results)
 
-            self.disp, self.spectra, self.bulk, self.gps = disp, spectra, bulk, gps
+            self._set_dataset_attributes(results)
 
             if save_outputs:
                 self.LOGGER.info(f"Outputs saving as {self.vargs.output_type} ".upper() + "="*50)
-                self.save_outputs(disp, gps, spectra, bulk, self.vargs.output_path)
+                self.save_outputs(results, self.vargs.output_path)
 
             self.LOGGER.info("DM Processing finished ".upper() + "="*50)
 
             self.close_dask()
+                
 
         except Exception as e:
             self.LOGGER.error(str(e), exc_info=True)
@@ -303,13 +370,13 @@ class DMSpotterProcessor:
             self.imos_logging.logging_stop(logger=self.LOGGER)
 
 
-if __name__ == "__main__":
-
-    from wavebuoy_dm.dm_processor import DMSpotterProcessor
-    
-    
+def main():
 
     vargs = args_processing_dm()
     processor = DMSpotterProcessor()
     processor.run()
 
+if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support() 
+    main()    
