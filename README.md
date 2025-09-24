@@ -42,7 +42,7 @@ The script cab be directly executed from the command line by providing the follo
 
 #### 2.2 Programmatic usage
 
-The processing tool can also be imported within an external python script or jupyter notebook. Please note for Windows machines the following must be wraped in a top-level code environment (i.e. inside a if __name__ == "__main__" block) to prevent conflicts between dask and Windows multiprocessing.
+The processing tool can also be imported within an external python script or jupyter notebook. __Please note for Windows machines the following must be wraped in a top-level code environment (i.e. inside a 'if __name__ == "__main__"' block) to prevent conflicts between dask and Windows multiprocessing.__
 
 In a Jupyter notebook:
 ```python
