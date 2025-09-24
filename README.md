@@ -112,5 +112,7 @@ Files created are listed below:
 | `"logs/DM_spotter_processing"`     | Processing log for debugging purposes | `.log` | 
 | `raw-displacements`     | Contains raw displacements as `Z` (heave), `Y` (east), `X` (north) and `TIME` (datetime) | `.nc` or `.csv` | 
 | `gps` | Contains gps data as `LATITUDE`, `LONGITUDE` and `TIME` (datetime) | `.csv` | 
-| `bulk` |  Contains calculated bulk wave parameters |  `.nc` or `.csv` | 
+| `bulk` |  Contains calculated bulk wave parameters. May contain surface temperature data if processed |  `.nc` or `.csv` | 
 | `spectra` | Contains calculated spectra wave parameters | `.nc` or `.csv` | 
+| `surface_temp` | Contains hull mounted temperature sensor data | `.csv` | 
+| `barometer` | Contains barometer sensor data | `.csv` | 
