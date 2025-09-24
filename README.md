@@ -44,7 +44,7 @@ The script cab be directly executed from the command line by providing the follo
 
 The processing tool can also be imported within an external python script or jupyter notebook. __Please note for Windows machines the following must be wraped in a top-level code environment (i.e. inside a 'if __name__ == "__main__"' block) to prevent conflicts between dask and Windows multiprocessing.__
 
-In a Jupyter notebook:
+In a Jupyter notebook ir python executable in Linux environment:
 ```python
 from wavebuoy_dm.dm_processor import DMSpotterProcessor
 
@@ -61,7 +61,7 @@ dm = DMSpotterProcessor(config, to_process=["displacements", "gps", "surface_tem
 dm.run(save_outputs=True)
 ```
 
-In an executable python script:
+In an executable python script in Windows environment:
 ```python
 def main():
     from wavebuoy_dm.dm_processor import DMSpotterProcessor
