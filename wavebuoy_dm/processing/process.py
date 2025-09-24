@@ -1,6 +1,7 @@
 from typing import List, Dict
 import logging
 from datetime import datetime, timedelta
+import os 
 
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -69,7 +70,7 @@ class csvProcess:
 
         self.suffix_name_map = {"FLT":"displacements",
                             "HDR":"displacements_hdr",
-                            "BARO": "baro",
+                            "BARO": "barometer",
                             "SST": "surface_temp",
                             "LOC": "gps"}
 
