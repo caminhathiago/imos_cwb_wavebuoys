@@ -42,32 +42,59 @@ The script cab be directly executed from the command line by providing the follo
 
 #### 2.2 Programmatic usage
 
-The processing tool can also be imported within an external python script as:
+The processing tool can also be imported within an external python script or jupyter notebook. Please note for Windows machines the following must be wraped in a top-level code environment (i.e. inside a if __name__ == "__main__" block) to prevent conflicts between dask and Windows multiprocessing.
 
+In a Jupyter notebook:
 ```python
 from wavebuoy_dm.dm_processor import DMSpotterProcessor
 
 # config arguments follow the same structure and requirements as the standalone approach
 config = {
-    "log_path": "/path/to/sdcard/files",
+    "log_path": "/path/to/sdcard/files", # if not provided, the processor will try to fing SD card files in the working directory
     "utc_offset": 0,
     "deploy_dates": ["20240101T000000", "20240131T235959"], # pass start and end dates as a list formatted as ISO 8601 (YYYY-mm-ddTHH:MM:SS)
     "enable_dask": True,
     "output_type": "netcdf"
 }
 
-dm = DMSpotterProcessor(config)
-dm.run(save_outputs=True) # 
+dm = DMSpotterProcessor(config, to_process=["displacements", "gps", "surface_temp", "atmospheric_pressure"])
+dm.run(save_outputs=True)
 ```
 
-At the end of the processing execution, the defined instance (e.g. `dm`) has the attributes below. Dataset types are determined pending on what `output_type` was passed in the config dictionary (`csv` -> `polars.DataFrame`, `netcdf` -> `xarray.Dataset`).
+In an executable python script:
+```python
+def main():
+    from wavebuoy_dm.dm_processor import DMSpotterProcessor
 
-| Argument               | Description                                                                                                     |
+    config = {
+        "log_path": "/path/to/sdcard/files", # if not provided, the processor will try to fing SD card files in the working directory
+        "enable_dask": True,
+        "output_type": "netcdf",
+        }
+
+    dm = DMSpotterProcessor(config, to_process=["displacements", "gps", "surface_temp", "atmospheric_pressure"])
+    dm.run(save_outputs=True)
+
+if __name__ == "__main__":
+    main()
+```
+
+At the end of the processing execution, the defined instance (e.g. `dm`) offers the attributes below. Dataset types are determined pending on what `output_type` was passed in the config dictionary (`csv` -> `polars.DataFrame`, `netcdf` -> `xarray.Dataset`).
+
+| Attribute               | Type| Description                                                                                                     |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `bulk`     | Data processing results for waves integral (bulk) parameters (`polars.DataFrame` or `xarray.Dataset`)   |
-| `spectra` | Data processing results for waves spectra (`polars.DataFrame` or `xarray.Dataset`) |
-| `disp` | Data processing results for raw displacements (`polars.DataFrame` or `xarray.Dataset`) |
-| `gps` | Data processing results for raw displacements (`polars.DataFrame` or `xarray.Dataset`) |
+| `bulk`  | Data | results for waves integral (bulk) parameters, may contain surface temperature data if present and processed (`polars.DataFrame` or `xarray.Dataset`)   |
+| `spectra` | Data | results for waves spectra (`polars.DataFrame` or `xarray.Dataset`) |
+| `disp` | Data | results for raw displacements (`polars.DataFrame` or `xarray.Dataset`) |
+| `gps` | Data | results for raw displacements (`polars.DataFrame`) |
+| `surface_temp` | Data | results for raw displacements (`polars.DataFrame`) |
+| `barometer` | Data| results for raw displacements (`polars.DataFrame`) |
+| `suffixes_to_process` | Config | SD card Files suffixes to be processed (e.g. 'FLT', 'LOC') |
+| `spectra_variables` | Config | variables present in bulk dataset |
+| `bulk_variables` | Config | variables present in spectra dataset  |
+| `client` | Config | dask client if provided |
+| `spectra_info` | Config | configuration parameters to spectra calculations (to be documented) |
+| `vargs` | Config | various general configuration parameters (extracted from config or vargs passed when using standalone approach) |
 
 
 #### Outputs
