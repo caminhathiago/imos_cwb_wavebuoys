@@ -68,6 +68,8 @@ def main():
 
     config = {
         "log_path": "/path/to/sdcard/files", # if not provided, the processor will try to fing SD card files in the working directory
+        "utc_offset": 0,
+        "deploy_dates": ["20240101T000000", "20240131T235959"], # pass start and end dates as a list formatted as ISO 8601 (YYYY-mm-ddTHH:MM:SS)
         "enable_dask": True,
         "output_type": "netcdf",
         }
@@ -81,8 +83,8 @@ if __name__ == "__main__":
 
 At the end of the processing execution, the defined instance (e.g. `dm`) offers the attributes below. Dataset types are determined pending on what `output_type` was passed in the config dictionary (`csv` -> `polars.DataFrame`, `netcdf` -> `xarray.Dataset`).
 
-| Attribute               | Type| Description                                                                                                     |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Attribute               | Type | Description                                                                                                     |
+| ---------------------- |------| --------------------------------------------------------------------------------------------------------------- |
 | `bulk`  | Data | results for waves integral (bulk) parameters, may contain surface temperature data if present and processed (`polars.DataFrame` or `xarray.Dataset`)   |
 | `spectra` | Data | results for waves spectra (`polars.DataFrame` or `xarray.Dataset`) |
 | `disp` | Data | results for raw displacements (`polars.DataFrame` or `xarray.Dataset`) |
