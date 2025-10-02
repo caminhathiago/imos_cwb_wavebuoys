@@ -294,7 +294,8 @@ class ncBulk(Process):
         for var in vars_to_include:
             if parameters_type == "bulk":
                 if var in ("TEMP","TEMP_quality_control"):
-                    data_vars.update({var:(("TIME_TEMP"), temp[var])})
+                    if var in temp:
+                        data_vars.update({var:(("TIME_TEMP"), temp[var])})
                 else:
                     data_vars.update({var:(tuple(dimensions), waves[var])})
 
