@@ -4,10 +4,12 @@ from datetime import datetime, timedelta
 import re
 import argparse
 import sys
+import importlib.resources as resources
 
 import xarray as xr
 import pandas as pd
 import numpy as np
+import geopandas as gpd
 # import cartopy.crs as ccrs
 # import cartopy.feature as cfeature
 # import cartopy.io.shapereader as shpreader
@@ -207,7 +209,7 @@ class DebuggingHelpers:
 
 class Plots:
 
-    def __init__(self, site_name:str, output_path:str):
+    def __init__(self, output_path:str, deployment_folder:str, site_name:str):
         
         if not os.path.exists(output_path):
             raise NotADirectoryError(f"{output_path} is not a valid directory")
@@ -216,6 +218,8 @@ class Plots:
             os.makedirs(self.output_path, exist_ok=True)
 
         self.site_name = site_name
+        self.deployment_folder_path = deployment_folder
+        self.deployment_folder = os.path.basename(deployment_folder)
 
     def convert_CF_time_to_datetime(self, dataset) -> xr.Dataset:
 
@@ -239,13 +243,15 @@ class Plots:
         vars = ['LATITUDE', 'LONGITUDE', 'WSSH', 'WPFM', 'WPPE', 'SSWMD', 
                 'WPDI', 'WMDS', 'WPDS']
         subflags_vars = waves_subflags.filter(regex="_test").columns.tolist()
-        subflags_vars.extend(temp_subflags)
 
         waves_subflags = waves_subflags.set_index("TIME")
 
         if "TEMP" in dataset.variables:
             vars.append('TEMP')
             temp_subflags = temp_subflags.set_index("TIME_TEMP")
+            temp_subflag_vars = temp_subflags.filter(regex="_test").columns.tolist()
+            subflags_vars.extend(temp_subflag_vars)
+
 
         n_vars = len(vars)
         if n_vars == 0:
@@ -323,6 +329,10 @@ class Plots:
                                     va='bottom'
                                 )
         
+            ax[0].set_ylabel(var)
+            ax[1].set_ylabel(var)
+            ax[2].set_ylabel(primary_flags_column)
+
 
             ax[0].legend()
             ax[0].grid(True)
@@ -337,7 +347,7 @@ class Plots:
                 mpatches.Patch(color='white', label='15: mean std'),
                 mpatches.Patch(color='white', label='16: flat line'),
                 mpatches.Patch(color='white', label='19: max/min range'),
-                mpatches.Patch(color='white', label='20: roc'),
+                mpatches.Patch(color='white', label='20: rate of change'),
 
                 # Flag color points
                 mlines.Line2D([], [], color='green', marker='o', linestyle='None', label='not assessed'),
@@ -413,3 +423,136 @@ class Plots:
             plt.tight_layout()
             output_file_name = f"{self.site_name}_positions-{coverage}km.png"
             plt.savefig(os.path.join(self.output_path, output_file_name), dpi=300)
+
+
+    def map_positions_shapefiles(self,
+                                data: pd.DataFrame,
+                                deployment_center:tuple,
+                                watch_circle:float,
+                                map_coverage: tuple = (10., 20.),
+                                figsize: tuple = (8, 8)):
+        
+        with resources.path("wavebuoy_dm.maps", "AUS_2021_AUST_GDA2020.shp") as shp_path:
+            aus = gpd.read_file(shp_path)
+
+        watch_circle_cols = [col for col in data.columns if "WATCH_quality_control" in col]
+
+        lats = data["LATITUDE"].values
+        lons = data["LONGITUDE"].values
+
+        lat_center = deployment_center[0]
+        lon_center = deployment_center[1]
+
+        lat_mean = np.mean(lats)
+        lon_mean = np.mean(lons)
+
+        import matplotlib.gridspec as gridspec
+
+        for coverage in map_coverage:
+
+            fig = plt.figure(figsize=figsize)
+            outer = gridspec.GridSpec(1, 2, width_ratios=[1, 1], figure=fig)
+
+            # Left: one big panel
+            ax_left = fig.add_subplot(outer[0, 0])
+
+            # Right: split vertically into 2
+            right_gs = gridspec.GridSpecFromSubplotSpec(
+                2, 1, subplot_spec=outer[0, 1], height_ratios=[1, 1],
+            )
+            ax_top_right = fig.add_subplot(right_gs[0, 0])
+            ax_bottom_right = fig.add_subplot(right_gs[1, 0])
+
+            # Map
+            km_to_deg_lat = coverage / 111.0
+            km_to_deg_lon = coverage * 1.5 / 111.0 * np.cos(np.radians(lat_center))
+
+            lat_min = lat_center - km_to_deg_lat
+            lat_max = lat_center + km_to_deg_lat
+            lon_min = lon_center - km_to_deg_lon
+            lon_max = lon_center + km_to_deg_lon
+
+            aus.plot(ax=ax_left, color="lightgray", edgecolor="black")
+
+            # Map positions
+            ax_left.scatter(lons, lats, color="blue", s=8, label="Positions")
+            if watch_circle_cols:
+                if "WATCH_quality_control_primary" in data.columns:
+                    mask = data["WATCH_quality_control_primary"] == 3
+                    ax_left.scatter(data.loc[mask, "LONGITUDE"], data.loc[mask, "LATITUDE"], color="goldenrod", ls="None", s=8, label="Out primary watch circle")
+                if "WATCH_quality_control_secondary" in data.columns:
+                    mask = data["WATCH_quality_control_secondary"] == 4
+                    ax_left.scatter(data.loc[mask, "LONGITUDE"], data.loc[mask, "LATITUDE"], color="red", ls="None", s=8, label="Out secondary watch circle")
+
+            ax_left.scatter(lon_mean, lat_mean, color="green", s=40, marker="x", label=f"Mean Position ({round(lat_mean,5)}, {round(lon_mean,5)})")
+            ax_left.scatter(lon_center, lat_center, color="grey", s=40, marker="^", label="Watch circle center")
+
+            # Watch1 circle plots
+            deg_lat = watch_circle/ (1000*111) 
+            deg_lon = watch_circle / (1000*(111 * np.cos(np.radians(lat_center))))
+
+            theta = np.linspace(0, 2*np.pi, 100)
+            lat_circle = deployment_center[0] + deg_lat * np.sin(theta)
+            lon_circle = deployment_center[1] + deg_lon * np.cos(theta)
+            
+            from shapely.geometry import Point
+            circle_geom = gpd.GeoSeries([Point(lon, lat) for lon, lat in zip(lon_circle, lat_circle)]).unary_union.convex_hull
+
+            circle_gdf = gpd.GeoDataFrame(geometry=[circle_geom])
+            circle_gdf.plot(ax=ax_left, edgecolor='grey', linestyle='--',facecolor='none', linewidth=2, alpha=0.6)
+           
+            watch_circle_label = f"Watch circle ({watch_circle:.1f} m)"
+            from matplotlib.lines import Line2D
+            circle_handle = Line2D(
+                [0], [0],
+                color="grey",
+                linestyle="--",
+                linewidth=2,
+                alpha=0.6,
+                label=watch_circle_label,
+            )
+
+            # LatLon timeseries
+            ax_top_right.plot(data["TIME"], data['LATITUDE'], marker='.')
+            ax_bottom_right.plot(data["TIME"], data['LONGITUDE'], marker='.')
+            
+            watch_circle_cols = [col for col in data.columns if "WATCH_quality_control" in col]
+            for col in watch_circle_cols:
+                if "primary" in col:
+                    mask = data[col] == 3
+                    color = "goldenrod"
+                    ax_top_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LATITUDE'], marker='.', color=color)
+                    ax_bottom_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LONGITUDE'], marker='.', color=color)
+                elif "secondary" in col:
+                    mask = data[col] == 4
+                    color = "red"
+                    ax_top_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LATITUDE'], marker='.', color=color)
+                    ax_bottom_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LONGITUDE'], marker='.', color=color)
+                
+
+            # Plots configs
+            ax_left.set_xlim(lon_min, lon_max)
+            ax_left.set_ylim(lat_min, lat_max)
+
+            ax_left.set_xlabel("Longitude")
+            ax_left.set_ylabel("Latitude")
+            
+            handles, labels = ax_left.get_legend_handles_labels()
+            handles.append(circle_handle)
+            labels.append(watch_circle_label)
+            ax_left.legend(handles, labels)
+            
+            ax_left.set_title(f"{self.deployment_folder} - {coverage} km")
+
+            ax_left.grid()
+            ax_top_right.grid()
+            ax_bottom_right.grid()
+
+            ax_top_right.set_title("LATITUDE")
+            ax_bottom_right.set_title("LONGITUDE")
+
+            ax_top_right.set_xticklabels("")
+
+            plt.tight_layout()
+            output_file_name = f"{self.site_name}_positions-{coverage}km.png"
+            plt.savefig(os.path.join(self.output_path, output_file_name), dpi=100, bbox_inches="tight")

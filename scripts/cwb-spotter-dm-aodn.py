@@ -17,7 +17,7 @@ from wavebuoy_dm.processing.process import csvProcess
 from wavebuoy_dm.netcdf.process import ncSpectra, ncDisp, ncBulk, Process
 from wavebuoy_dm.netcdf.writer import ncWriter, ncAttrsComposer
 from wavebuoy_dm.wavebuoy import WaveBuoy
-from wavebuoy_dm.utils import IMOSLogging, args_aodn_processing
+from wavebuoy_dm.utils import IMOSLogging, args_aodn_processing, Plots
 from wavebuoy_dm.qc.qc import WaveBuoyQC
 
 
@@ -334,7 +334,9 @@ def generate_bulk_NC_file(spectra_bulk_df,
                         deploy_start,
                         deploy_end,
                         raw_data_path,
-                        output_path) -> None:
+                        output_path,
+                        generate_plots:bool = True,
+                        report_qc:bool = True) -> None:
 
     bulk = Spectra().select_parameters(spectra_bulk_df, dataset_type="bulk")  
 
@@ -412,6 +414,7 @@ def generate_bulk_NC_file(spectra_bulk_df,
     else:
         DEP_LOGGER.info(f"No temp data")
         temp_qualified = None
+        temp_df = None
         
 
     DEP_LOGGER.info(f"Composing dataset")
@@ -457,6 +460,22 @@ def generate_bulk_NC_file(spectra_bulk_df,
                         )
 
     DEP_LOGGER.info(f"WAVE-PARAMETERS netCDFs successfully generated")
+
+    if generate_plots:
+        
+        p = Plots(site_name=site_name,
+                  deployment_folder=site_buoys_to_process.loc["datapath"],
+                  output_path=output_path)
+        # p.map_positions(data=bulk_df, map_coverage=(40,20,5,1,.3), figsize=(10,10))
+        DEP_LOGGER.info(f"Generating subflags plots for each variable")
+        p.qc_subflags_each_variable(dataset=bulk_ds,
+                                    waves_subflags=bulk_df, 
+                                    temp_subflags=temp_df,
+                                            )
+
+    if report_qc:
+        DEP_LOGGER.info(f"Generating QC report for wave parameters")
+        qc.report_qc([bulk_df, temp_df], parameters_to_qc, output_path)
 
 def generate_raw_displacements_NC_files(disp,
                                         gps,
