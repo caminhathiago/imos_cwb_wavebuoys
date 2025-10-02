@@ -547,7 +547,7 @@ if __name__ == "__main__":
   
     imos_logging = IMOSLogging()
     
-    GENERAL_LOGGER = IMOSLogging().logging_start(logger_name="general_logger.log",
+    GENERAL_LOGGER = IMOSLogging().logging_start(logger_name=f"{datetime.now().strftime("%Y%m%dTH%M%S")}_{vargs.region}_general_logger.log",
                                                 logging_filepath=os.getenv("GENERAL_LOGGER_PATH"))
 
     buoys_to_process = WaveBuoy().load_buoys_to_process()
