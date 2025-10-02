@@ -764,6 +764,49 @@ class WaveBuoyQC():
 
         return data
 
+    def report_qc(self, data:list[pd.DataFrame], parameters:list, output_path:str) -> None:
+        
+        qc_reports = []
+        for df in data:
+            if df is None or df.empty:
+                continue
+            
+            tests = list(df.filter(regex="_test").columns)
+            
+            import re
+            index_tests = [
+                    re.sub(r'^(WAVE_QC_|TEMP_QC_)', '', test, flags=re.IGNORECASE) 
+                    for test in tests
+            ]
+            
+            columns = [
+                'n',
+                '1_count', '1_perc',
+                '2_count', '2_perc',
+                '3_count', '3_perc',
+                '4_count', '4_perc'
+            ]
+            
+            qc_report = pd.DataFrame(index=index_tests, columns=columns)
+            
+            qc_report['n'] = df.shape[0]
+            
+            for test, index in zip(tests, index_tests):
+                counts = df[test].value_counts()
+                percs = df[test].value_counts(normalize=True) * 100
+                
+                for idx, row in counts.items():
+                    qc_report.loc[index, f'{idx}_count'] = int(counts.loc[idx])
+                    qc_report.loc[index, f'{idx}_perc'] = round(percs.loc[idx],2)
+
+            qc_reports.append(qc_report)
+
+        qc_report = pd.concat(qc_reports)
+
+        file_name = f'QC_subflags_reports.csv'
+        file_path = os.path.join(output_path, file_name)
+        qc_report.to_csv(file_path)
+
 
    # def compose_config(self,
     #                    data: pd.DataFrame,
