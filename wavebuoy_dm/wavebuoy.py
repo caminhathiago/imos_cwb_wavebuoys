@@ -17,12 +17,11 @@ class WaveBuoy():
 
     def extract_region_site_name(self, path: str) -> str:
         parts = Path(path).parts 
-        regions = {"wawaves", "sawaves", "qldwaves", "vicwaves", "nswwaves"}
-        # return "CollaroyNarrabeen", "nswwaves"
+        regions = {"wawaves", "sawaves", "qldwaves", "vicwaves", "nswwaves", "taswaves", "ntwaves"}
         for i, part in enumerate(parts):
             if part in regions:
                 if i + 1 < len(parts):
-                    return parts[i + 1], part
+                    return parts[-2].split("_")[0], part#return parts[i + 1], part
                 else:
                     raise Exception("Invalid path structure: no folder after region name")
 
@@ -137,7 +136,7 @@ class WaveBuoy():
         regional_metadata_path = os.path.join(metadata_path, "regional_metadata.csv")
         return pd.read_csv(regional_metadata_path)
     
-    def load_buoys_to_process(self, region:str) -> pd.DataFrame:
+    def load_buoys_to_process_by_region(self, region:str) -> pd.DataFrame:
         'waves'
         region_path = os.path.join(os.getenv('IRDS_PATH'), 'Data', region + 'waves')
         pattern = f"{region}_delayed_mode_buoys_to_process.csv"
@@ -149,9 +148,21 @@ class WaveBuoy():
         else:
             raise NotADirectoryError(f"{file_path} does not exist")
 
+    def load_buoys_to_process(self) -> pd.DataFrame:
+        'waves'
+        region_path = os.path.join(os.getenv('IRDS_PATH'), 'Data', 'aodn_dm_python')
+        pattern = f"delayed_mode_buoys_to_process.csv"
+        file_path = glob.glob(os.path.join(region_path, pattern))[0]
+        if os.path.exists(file_path):
+            buoys_to_process = pd.read_csv(file_path)
+            buoys_to_process = buoys_to_process.loc[buoys_to_process['process']==1]
+            return buoys_to_process
+        else:
+            raise NotADirectoryError(f"{file_path} does not exist")
+
     def extract_deploy_dates_spotid_from_path(self, deployment_folder_name:str) -> list[datetime]:
         
-        pattern = r'deploy(\d{8})_retrieve(\d{8})_SPOT-(\w+)'
+        pattern = r'deploy(\d{8})_retrieve(\d{8})_SPOT(\w+)'
         match = re.search(pattern, deployment_folder_name)
 
         if match:

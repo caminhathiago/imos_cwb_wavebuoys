@@ -36,10 +36,10 @@ class MetadataArgs:
 def process_paths(site_buoys_to_process):
 
     dm_deployment_path = site_buoys_to_process.loc["datapath"]
-    dm_deployment_path = os.path.dirname(dm_deployment_path
-                                        .replace("Y:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
-                                        .replace("X:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
-                                        )
+    # dm_deployment_path = os.path.dirname(dm_deployment_path
+    #                                     .replace("Y:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
+    #                                     .replace("X:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
+    #                                     )
     output_path = os.path.join(dm_deployment_path, "processed_py")
     if not os.path.exists(output_path):
         os.mkdir(output_path)
@@ -48,10 +48,11 @@ def process_paths(site_buoys_to_process):
 
 def load_metadata(site_buoys_to_process:pd.DataFrame, dm_deployment_path) -> list[pd.DataFrame]:
 
+    raw_data_path = dm_deployment_path
     if os.path.basename(dm_deployment_path) != "log":                         
-        raw_data_path = os.path.join(dm_deployment_path, 'log')
+        raw_data_path = os.path.join(raw_data_path, 'log')
     
-    if not os.path.exists(raw_data_path):
+    if not os.path.exists(dm_deployment_path):
         raise FileNotFoundError(f"path {raw_data_path} does not exist. Check if deployment path exists, and if SD card data is in the folder log.")
 
     deploy_start, deploy_end, spot_id = WaveBuoy().extract_deploy_dates_spotid_from_path(site_buoys_to_process.datapath)
@@ -549,7 +550,7 @@ if __name__ == "__main__":
     GENERAL_LOGGER = IMOSLogging().logging_start(logger_name="general_logger.log",
                                                 logging_filepath=os.getenv("GENERAL_LOGGER_PATH"))
 
-    buoys_to_process = WaveBuoy().load_buoys_to_process(vargs.region)
+    buoys_to_process = WaveBuoy().load_buoys_to_process()
 
     for idx, site in buoys_to_process.iterrows():
         start_exec_time = time.time()
