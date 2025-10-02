@@ -466,8 +466,7 @@ class WaveBuoyQC():
                 else:
                     check_data = np.diff(data[ii - suspect_threshold: ii + 1])
                     QCFlag_suspect[ii] = check_suspect(check_data, tolerance)
-                    if QCFlag_suspect[ii] ==3:
-                        print('break')
+
             QCFlag_fail = np.zeros(len(data), dtype=int)
             for ii in range(len(data)):
                 if ii <= fail_threshold:
