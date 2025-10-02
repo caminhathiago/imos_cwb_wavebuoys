@@ -14,7 +14,7 @@ load_dotenv()
 
 class WaveBuoyQC():
     waves_parameters = ['SSWMD', 'WMDS', 'WPDI', 'WPDS', 'WPFM', 'WPPE', 'WSSH']
-    
+
     def __init__(self, config_id: int = 1):
         self.qc_configs = self.get_qc_configs()
         self.qc_config = self.select_qc_config(qc_configs=self.qc_configs, config_id=config_id)
@@ -31,6 +31,8 @@ class WaveBuoyQC():
             raise FileNotFoundError(error_message)
         
     def select_qc_config(self, qc_configs: pd.DataFrame, config_id: int) -> pd.DataFrame:
+        if not (isinstance(config_id, int) or isinstance(config_id, float)):
+            raise ValueError(f"config id passed ({config_id}) is not valid. Check buoys_to_process.csv")
         return qc_configs.loc[qc_configs["config_id"] == config_id]
     
     def convert_qc_config_to_dict(self, qc_config: pd.DataFrame) -> dict:
