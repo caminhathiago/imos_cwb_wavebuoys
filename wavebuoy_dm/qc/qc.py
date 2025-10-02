@@ -467,8 +467,6 @@ class WaveBuoyQC():
             
             QCFlag_suspect = np.zeros(len(data), dtype=int)
             for ii in range(len(data)):
-                if ii == 26032:
-                    print("break")
                 if ii <= suspect_threshold:
                     QCFlag_suspect[ii] = 2
                 else:
