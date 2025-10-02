@@ -272,7 +272,10 @@ class csvConcat:
         for suffix in map_suffixes_files.keys():
             files_list = self.filter_files_suffix(suffix=suffix)
             map_suffixes_files.update({suffix: files_list})
-        
+
+        if not map_suffixes_files.get("FLT") or not map_suffixes_files.get("LOC"):
+            raise FileNotFoundError(f"No files found for FLT or LOC. Please check if path contains SD card files.")
+
         return map_suffixes_files
 
     def map_concat_results(self) -> dict:
