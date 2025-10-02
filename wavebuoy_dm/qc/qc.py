@@ -146,6 +146,8 @@ class WaveBuoyQC():
         
         self.check_qc_limits(qc_config=self.qc_config)
 
+        time_col = [col for col in data.columns if "TIME" in col.upper()][0]
+
         if start_date and end_date:
             data = (data
                     .set_index("TIME")
