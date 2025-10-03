@@ -412,7 +412,7 @@ def generate_bulk_NC_file(spectra_bulk_df,
     bulk_qualified.to_csv(os.path.join(output_path, "bulk_qc.csv"))
     DEP_LOGGER.info("Bulk parameters qualification successfull")
     
-    if not isinstance(temp,list) and temp:
+    if isinstance(temp, pl.DataFrame) and not temp.is_empty():
         DEP_LOGGER.info(f"Starting temperature qualification")
 
         DEP_LOGGER.info(f"Converting to pandas dataframe")
