@@ -321,7 +321,6 @@ class SofarAPI:
     def get_latest_available_time(self, spot_id:str, token:str, data_type:str = "bulk", processing_sources:str = "embedded") -> datetime:
 
         start_date = datetime.now(UTC) - timedelta(hours=5)
-        start_date = datetime(2025,9,11,15,0,0)
         
         end_date = datetime.now(UTC) + timedelta(hours=2)
         
