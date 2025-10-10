@@ -198,8 +198,25 @@ class WaveBuoyQC():
 
         data_qualified_ignored = self._concatenate_qualified_ignored(data_to_qualify, data_to_ignore)
 
+        self._test_illegal_qc_flags(data_qualified_ignored)
+
         return data_qualified_ignored, qualified_subflags
     
+    def _test_illegal_qc_flags(self, data:pd.DataFrame) -> None:
+        
+        import json
+        with open("wavebuoy_nrt/config/bulk_attrs.json") as f:
+            bulk_attrs = json.load(f)
+
+        qc_columns = [col for col in data.columns if "quality_control" in col]
+
+        for qc_col in qc_columns:
+            unique_flags = list(data[qc_col].unique())
+            allowed_flags = bulk_attrs['variables'][qc_col]['flag_values']
+            
+            if any(flag not in allowed_flags for flag in unique_flags):
+                raise ValueError(f"At least one illegal flag was assigned to {qc_col}. Unique flags: {unique_flags}, Allowed flags: {allowed_flags}")
+
     def gross_range(self,
                     parameter:str,
                     inp:pd.Series,
