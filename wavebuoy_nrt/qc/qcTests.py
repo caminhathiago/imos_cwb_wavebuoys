@@ -243,21 +243,25 @@ class WaveBuoyQC():
         SITE_LOGGER.info(f"{parameter} | gross range test completed")
         return data
     
-    def rate_of_change(self, inp, tinp, threshold):
-        
+    def rate_of_change(self, inp, threshold, directional=False):
         inp = np.asarray(inp)
         QCFlag = np.zeros(len(inp), dtype=int)
 
         for i in range(len(inp)):
             if i == 0:
-                QCFlag[i] = 2  # Not evaluated
+                QCFlag[i] = 2
             else:
-                if abs(inp[i] - inp[i - 1]) >= threshold:
-                    QCFlag[i] = 4  # Fail
+                if directional:
+                    diff = abs((inp[i] - inp[i - 1] + 180) % 360 - 180)
                 else:
-                    QCFlag[i] = 1  # Pass
+                    diff = abs(inp[i] - inp[i - 1])
+                
+                QCFlag[i] = 4 if diff >= threshold else 1
 
         return QCFlag
+
+    def classify_directional_parameter(self, parameter: str) -> bool:
+        return "D" in parameter
 
     def rate_of_change_test(self,
                         data: pd.DataFrame,
@@ -270,10 +274,12 @@ class WaveBuoyQC():
 
         threshold = qc_config[parameter]["rate_of_change_threshold"]# / time_freq (timefreq needs to be used with qartod.rate_of_change_test)
 
+        directional = self.classify_directional_parameter(parameter)
+
         results = self.rate_of_change(
             inp=data[parameter],
-            tinp=data[time_col],
-            threshold=threshold
+            threshold=threshold,
+            directional=directional,
         )
         
         test_name = "rate_of_change_test"
