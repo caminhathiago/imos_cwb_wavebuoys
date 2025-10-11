@@ -204,18 +204,40 @@ class WaveBuoyQC():
     
     def _test_illegal_qc_flags(self, data:pd.DataFrame) -> None:
         
+        from importlib import resources
         import json
-        with open("wavebuoy_nrt/config/bulk_attrs.json") as f:
+
+        import wavebuoy_nrt.config as wavebuoys_config
+
+        with resources.files(wavebuoys_config).joinpath("bulk_attrs.json").open("r", encoding="utf-8") as f:
             bulk_attrs = json.load(f)
 
         qc_columns = [col for col in data.columns if "quality_control" in col]
 
+        illegal_flags_summary = {}
+
         for qc_col in qc_columns:
             unique_flags = list(data[qc_col].unique())
-            allowed_flags = bulk_attrs['variables'][qc_col]['flag_values']
-            
-            if any(flag not in allowed_flags for flag in unique_flags):
-                raise ValueError(f"At least one illegal flag was assigned to {qc_col}. Unique flags: {unique_flags}, Allowed flags: {allowed_flags}")
+            allowed_flags = bulk_attrs["variables"][qc_col]["flag_values"]
+
+            illegal_flags = [flag for flag in unique_flags if flag not in allowed_flags]
+            if illegal_flags:
+                illegal_flags_summary[qc_col] = {
+                    "illegal_flags": illegal_flags,
+                    "allowed_flags": allowed_flags,
+                    "unique_flags": unique_flags,
+                }
+
+        if illegal_flags_summary:
+            msg = "Illegal QC flags detected:\n"
+            for col, details in illegal_flags_summary.items():
+                msg += (
+                    f"  - {col}:\n"
+                    f"      Illegal flags: {details['illegal_flags']}\n"
+                    f"      Allowed flags: {details['allowed_flags']}\n"
+                    f"      Unique flags:  {details['unique_flags']}\n"
+                )
+            raise ValueError(msg)
 
     def gross_range(self,
                     parameter:str,
