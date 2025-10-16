@@ -173,7 +173,6 @@ class IMOSLogging:
             os.replace(file_path, new_file_name)
         else:
             os.rename(file_path, new_file_name)
-        # GENERAL_LOGGER.info(f"{site_name} log file renamed as {new_file_name}")
 
         return os.path.join(file_path, new_file_name)
 
@@ -237,8 +236,6 @@ class Plots:
                                 temp_subflags,
                                 figsize=(15, 3),
                                 variable=None):
-
-        # dataset = self.convert_CF_time_to_datetime(dataset)
 
         vars = ['LATITUDE', 'LONGITUDE', 'WSSH', 'WPFM', 'WPPE', 'SSWMD', 
                 'WPDI', 'WMDS', 'WPDS']
@@ -339,17 +336,23 @@ class Plots:
             ax[1].grid(True)
             ax[2].grid(True)
 
+            from matplotlib.dates import DayLocator, DateFormatter
+            ax[2].xaxis.set_major_locator(DayLocator(interval=10))
+            
+            ax[2].xaxis.set_major_formatter(DateFormatter("%Y-%m-%d"))
+            for label in ax[2].get_xticklabels():
+                label.set_rotation(90)
+                label.set_ha("center")
+
             import matplotlib.patches as mpatches
             import matplotlib.lines as mlines
             custom_legend = [
-                # QC test code descriptions
                 mpatches.Patch(color='white', label='10: spike '),
                 mpatches.Patch(color='white', label='15: mean std'),
                 mpatches.Patch(color='white', label='16: flat line'),
                 mpatches.Patch(color='white', label='19: max/min range'),
                 mpatches.Patch(color='white', label='20: rate of change'),
 
-                # Flag color points
                 mlines.Line2D([], [], color='green', marker='o', linestyle='None', label='not assessed'),
                 mlines.Line2D([], [], color='orange', marker='o', linestyle='None', label='suspect'),
                 mlines.Line2D([], [], color='red', marker='o', linestyle='None', label='fail')
@@ -458,10 +461,11 @@ class Plots:
 
             # Right: split vertically into 2
             right_gs = gridspec.GridSpecFromSubplotSpec(
-                2, 1, subplot_spec=outer[0, 1], height_ratios=[1, 1],
+                3, 1, subplot_spec=outer[0, 1], height_ratios=[1, 1, 1],
             )
             ax_top_right = fig.add_subplot(right_gs[0, 0])
-            ax_bottom_right = fig.add_subplot(right_gs[1, 0])
+            ax_middle_right = fig.add_subplot(right_gs[1, 0])
+            ax_bottom_right = fig.add_subplot(right_gs[2, 0])
 
             # Map
             km_to_deg_lat = coverage / 111.0
@@ -514,20 +518,24 @@ class Plots:
 
             # LatLon timeseries
             ax_top_right.plot(data["TIME"], data['LATITUDE'], marker='.')
-            ax_bottom_right.plot(data["TIME"], data['LONGITUDE'], marker='.')
+            ax_middle_right.plot(data["TIME"], data['LONGITUDE'], marker='.')
+            ax_bottom_right.plot(data["TIME"], data['distance'], marker='.')
+            ax_bottom_right.plot(data["TIME"], np.repeat(watch_circle, len(data["TIME"])), ls="dashed", lw=1, color="grey", label=f"Watch circle = {round(watch_circle,1)} m")
             
             watch_circle_cols = [col for col in data.columns if "WATCH_quality_control" in col]
             for col in watch_circle_cols:
                 if "primary" in col:
                     mask = data[col] == 3
                     color = "goldenrod"
-                    ax_top_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LATITUDE'], marker='.', color=color)
-                    ax_bottom_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LONGITUDE'], marker='.', color=color)
+                    ax_top_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LATITUDE'], marker='.', color=color, ls="None")
+                    ax_middle_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LONGITUDE'], marker='.', color=color, ls="None")
+                    ax_bottom_right.plot(data.loc[mask,"TIME"], data.loc[mask,'distance'], marker='.', color=color, ls="None")
                 elif "secondary" in col:
                     mask = data[col] == 4
                     color = "red"
                     ax_top_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LATITUDE'], marker='.', color=color)
-                    ax_bottom_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LONGITUDE'], marker='.', color=color)
+                    ax_middle_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LONGITUDE'], marker='.', color=color)
+                    ax_bottom_right.plot(data.loc[mask,"TIME"], data.loc[mask,'distance'], marker='.', color=color)
                 
 
             # Plots configs
@@ -541,17 +549,30 @@ class Plots:
             handles.append(circle_handle)
             labels.append(watch_circle_label)
             ax_left.legend(handles, labels)
-            
             ax_left.set_title(f"{self.deployment_folder} - {coverage} km")
 
             ax_left.grid()
             ax_top_right.grid()
+            ax_middle_right.grid()
             ax_bottom_right.grid()
 
-            ax_top_right.set_title("LATITUDE")
-            ax_bottom_right.set_title("LONGITUDE")
+            ax_top_right.set_ylabel("LATITUDE")
+            ax_middle_right.set_ylabel("LONGITUDE")
+            ax_bottom_right.set_ylabel("Distance from\nWatchCircle Center\n(m)")
+            ax_bottom_right.legend()
 
-            ax_top_right.set_xticklabels("")
+            ax_top_right.tick_params(labelbottom=False)
+            ax_middle_right.tick_params(labelbottom=False)
+
+            from matplotlib.dates import DayLocator, DateFormatter
+            ax_top_right.xaxis.set_major_locator(DayLocator(interval=10))
+            ax_middle_right.xaxis.set_major_locator(DayLocator(interval=10))
+            ax_bottom_right.xaxis.set_major_locator(DayLocator(interval=10))
+            
+            ax_bottom_right.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d"))
+            for label in ax_bottom_right.get_xticklabels():
+                label.set_rotation(90)
+                label.set_ha("center")
 
             plt.tight_layout()
             output_file_name = f"{self.site_name}_positions-{coverage}km.png"
