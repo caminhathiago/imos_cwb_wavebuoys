@@ -162,6 +162,12 @@ class csvConcat:
 
             missing = set(expected_columns) - set(inferred_columns)
             extra = set(inferred_columns) - set(expected_columns)
+            
+            # if missing:
+            #     print(f"Trying forcing header to {file_path}")
+            #     # df, missing, extra, inferred_schema = self._force_header_corrupted_file(file_path, expected_columns)
+            #     df, missing, extra, inferred_schema = self.fix_corrupted_csv(file_path, expected_columns)
+
             if missing or extra:
                 print(f"Schema mismatch in {file_path}:")
                 if missing:
@@ -190,8 +196,67 @@ class csvConcat:
             print(f"Error processing {file_path}: {e}")
             return False
 
-    def _validate_schemas():
-        pass
+    def _force_header_corrupted_file(self, file_path:str, expected_columns):
+
+        df_lazy = pl.scan_csv(file_path, has_header=False, new_columns=expected_columns)
+        inferred_schema = df_lazy.collect_schema()
+        inferred_columns = list(inferred_schema.keys())
+        missing = set(expected_columns) - set(inferred_columns)
+        extra = set(inferred_columns) - set(expected_columns)
+
+        if not missing or extra:
+            base, ext = os.path.splitext(file_path)
+            backup_path = f"{base}_header_corrupted{ext}"
+
+            os.rename(file_path, backup_path)
+            print(f"[Info] Original corrupted file renamed to: {backup_path}")
+
+            df = pl.read_csv(backup_path, has_header=False, new_columns=expected_columns)
+
+            df.write_csv(file_path)
+            print(f"[Info] Fixed CSV with headers saved as original filename: {file_path}")
+
+        return df_lazy, missing, extra, inferred_schema
+
+    def fix_corrupted_csv(self, file_path, expected_columns):
+        # Step 1: backup original
+        base, ext = os.path.splitext(file_path)
+        backup_path = f"{base}_header_corrupted{ext}"
+        os.rename(file_path, backup_path)
+        print(f"Original file backed up as: {backup_path}")
+
+        # Step 2: read lines manually and parse
+        cleaned_rows = []
+        with open(backup_path, newline='') as f:
+            import csv
+            reader = csv.reader(f)
+            for row in reader:
+                # skip completely empty rows
+                if not row:
+                    continue
+                # keep only the first N columns (truncate extra)
+                truncated_row = row[:len(expected_columns)]
+                # pad missing columns with empty string or None
+                while len(truncated_row) < len(expected_columns):
+                    truncated_row.append(None)
+                cleaned_rows.append(truncated_row)
+
+        # Step 3: convert list of lists to dict of columns
+        columns_dict = {col: [row[i] for row in cleaned_rows] for i, col in enumerate(expected_columns)}
+
+        # Step 4: create Polars DataFrame
+        df = pl.DataFrame(columns_dict)
+
+        inferred_schema = df.collect_schema()
+        inferred_columns = list(inferred_schema.keys())
+        missing = set(expected_columns) - set(inferred_columns)
+        extra = set(inferred_columns) - set(expected_columns)
+
+        # Step 5: save cleaned CSV as original filename
+        df.write_csv(file_path)
+        print(f"Cleaned CSV saved as: {file_path}")
+
+        return df.lazy(), missing, extra, inferred_columns
 
     @staticmethod
     def _correct_corrupted_no_headers(file_path: str, suffix: str) -> pl.LazyFrame:
