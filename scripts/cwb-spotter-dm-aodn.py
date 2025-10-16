@@ -582,6 +582,9 @@ if __name__ == "__main__":
 
     buoys_to_process = WaveBuoy().load_buoys_to_process()
 
+    log_dep_ids = buoys_to_process[['dep_id', 'name', 'datapath']].to_dict(orient='records')
+    GENERAL_LOGGER.info(f"Deployments being processed: {json.dumps(log_dep_ids, indent=6)}")
+
     for idx, site in buoys_to_process.iterrows():
         start_exec_time = time.time()
         try:
