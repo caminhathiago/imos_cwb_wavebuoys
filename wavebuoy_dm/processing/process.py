@@ -322,6 +322,26 @@ class csvProcess:
                     .drop(["EASTING", "NORTHING", "DIST_TO_DEPLOY"])
         )
 
+    def calculate_watch_circle(self, site_buoys_to_process:pd.DataFrame, reprocess:bool = False):
+        
+        s = site_buoys_to_process
+
+        mainline = s.mainline_length + (s.mainline_length*s.mooring_stretch_factor)
+        catenary = s.catenary_length + (s.catenary_length*s.mooring_stretch_factor)
+        
+        if reprocess:
+            mainline = mainline + s.mainline_length_error
+            catenary = catenary + s.catenary_length_error
+
+            mainline *= (1 + s.mooring_stretch_factor)
+            catenary *= (1 + s.mooring_stretch_factor)
+
+        watch_circle = np.sqrt(mainline**2 - s.DeployDepth**2) + catenary + s.watch_circle_gps_error
+        
+        if np.isnan(watch_circle):
+            raise ValueError(f"Calculated watchcircle lead to a NaN. Please check if mainline, catenary, deploy_depth and respective error configurations are provided in buoys_to_process.csv")
+
+        return mainline, catenary, watch_circle
 
     def qc_watch_circle(self,
                         dataframe:pl.DataFrame,
@@ -424,6 +444,48 @@ class csvProcess:
                 raise ValueError(f"Filtering watch circle removed more than 30% of records. Please revise DeployLat and DeployLon on buoys_to_process.csv")
         
         return filtered_df, percentage_cropped
+
+    def save_qc_watch_circle_csv(self, data:pl.DataFrame, output_path:str) -> None:
+        
+        columns = ['TIME', 'LATITUDE', 'LONGITUDE', 'distance']
+        watch_qc_cols = [col for col in data.columns if "WATCH_quality_control" in col]
+        columns.extend(watch_qc_cols)
+
+        data_file_name = os.path.join(output_path, "spectra_bulk_df_qc_watch.csv")
+        data[columns].to_pandas().to_csv(data_file_name, index=False)
+
+        return data_file_name
+
+    def extract_drifting_periods(self, data:pl.DataFrame, output_path:str, reprocess:bool = False)-> None:
+        
+        if reprocess:
+            col_flag = "WATCH_quality_control_secondary"
+            flag = 4
+        
+        else:
+            col_flag = "WATCH_quality_control_primary"
+            flag = 3
+
+        data = data.with_columns(
+            (pl.col(col_flag) == flag).alias("WATCH_fail")
+        )
+
+        data = data.with_columns(
+            (pl.col("WATCH_fail") != pl.col("WATCH_fail").shift(1)).cum_sum().alias("drifting_periods_id")
+        )
+
+        drifting_periods = (
+            data.filter(pl.col("WATCH_fail"))
+            .group_by("drifting_periods_id")
+            .agg([
+                pl.col("TIME").min().alias("drifting_start"),
+                pl.col("TIME").max().alias("drifting_end")
+            ])
+            .sort("drifting_start")
+        )
+
+        drifting_periods_file_name = os.path.join(output_path, "drifting_periods_qc_watch.csv")
+        drifting_periods.to_pandas().to_csv(drifting_periods_file_name, index=False)
 
     def convert_datatypes(self, dataframe: pl.DataFrame) -> pl.DataFrame:
         dtype_mapping = {
