@@ -350,7 +350,7 @@ class csvConcat:
             if not data_list:
                 continue
 
-            
+            concat_df_lazy = pl.concat(data_list, how="vertical")    
             results.update({suffix:concat_df_lazy})
 
         return results
