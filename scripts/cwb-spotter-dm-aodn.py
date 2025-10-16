@@ -405,7 +405,7 @@ def generate_bulk_NC_file(spectra_bulk_df,
                                 rate_of_change_test=True,
                                 flat_line_test=True,
                                 mean_std_test=True,
-                                spike_test=False)
+                                spike_test=True)
    
     DEP_LOGGER.info(f"Saving QC results as csvs")
     bulk_df.to_csv(os.path.join(output_path, "bulk_qc_subflags.csv"))

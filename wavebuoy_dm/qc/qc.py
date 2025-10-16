@@ -674,7 +674,7 @@ class WaveBuoyQC():
 
         return QCFlag.values
     
-    def spike(self, time: pd.DatetimeIndex, data: pd.Series, roc: float) -> pd.Series:
+    def spike(self, time: pd.DatetimeIndex, data: pd.Series, roc: float, directional:bool = False) -> pd.Series:
         
         QCFlags = []
 
@@ -682,25 +682,30 @@ class WaveBuoyQC():
             if i == 0 or i == len(time) - 1:
                 QCFlags.append(2)
             else:
-                dum = np.diff(data[i-1:i+2])
+                if directional:
+                    diff1 = diff2 = abs((data[i] - data[i - 1] + 180) % 360 - 180)
 
-                # spike chec
-                if dum[0] > 0 and dum[1] < 0 and all(np.abs(dum) > roc):
-                    QCFlags.append(4)
-                elif dum[0] < 0 and dum[1] > 0 and all(np.abs(dum) > roc):
+                else:
+                    diff1 = data[i] - data[i-1]
+                    diff2 = data[i+1] - data[i]
+                
+                if abs(diff1) > roc and abs(diff2) > roc:
                     QCFlags.append(4)
                 else:
                     QCFlags.append(1)
-        
+            
         return QCFlags
 
     def spike_test(self, data: pd.DataFrame, parameter:str, qc_config: dict):
         
         time_col = [col for col in data.columns if "TIME" in col][0]
-
+        
+        directional = self.classify_directional_parameter(parameter)
+        
         results = self.spike(data=data[parameter], 
                             time=data[time_col],
-                            roc=qc_config[parameter]["spike_test_roc"])
+                            roc=qc_config[parameter]["spike_test_roc"],
+                            directional=directional)
         
         test_name = "spike_test"
         param_qc_column, data = self._create_parameters_qc_column(data=data, parameter=parameter, test=test_name)
