@@ -28,8 +28,6 @@ class ncSpectralAttrsExtractor:
                 Retrieved Feb 21, 2022, from https://journals.ametsoc.org/view/journals/phoc/18/7/1520-0485_1988_018_1020_amftra_2_0_co_2.xml"""
     
 class ncAttrsExtractor:
-    # def __init__(self, buoys_metadata: pd.DataFrame):
-        # self.deployment_metadata = metaDataLoader(buoys_metadata=buoys_metadata)._load_deployment_metadata()
 
     # from the data itself -------------
     def _extract_data_time_coverage_start(dataset: xr.Dataset) -> str:
@@ -65,13 +63,11 @@ class ncAttrsExtractor:
     # from deployment metadata -------------
     def _extract_deployment_metadata_site_name(deployment_metadata: pd.DataFrame) -> str:
         site_name = deployment_metadata.loc["Site Name", "metadata_wave_buoy"]
-        return re.sub(r'(?<!^)(?=[A-Z0-9])', '-', site_name).upper().replace(" ", "")#re.sub(r'\d+', '-', site_name).strip()
+        return re.sub(r'(?<!^)(?=[A-Z0-9])', '-', site_name).upper().replace(" ", "")
     
     def  _extract_deployment_metadata_instrument(deployment_metadata: pd.DataFrame):
         return deployment_metadata.loc["Instrument", "metadata_wave_buoy"]
 
-    # def  _extract_deployment_metadata_transmission(deployment_metadata: pd.DataFrame) -> str:
-    #     return deployment_metadata.loc["Transmission", "metadata_wave_buoy"]
 
     def _extract_deployment_metadata_hull_serial_number(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Hull serial number", "metadata_wave_buoy"]
@@ -83,12 +79,14 @@ class ncAttrsExtractor:
                           "IMOS":"IMOS Coastal Wave Buoys",
                           "SARDI": "South Australian Research and Development Institute"
                           }
+        
         operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
+        
         if "IMOS" in operating_institution:
             return op_inst_code["IMOS"]
+       
         else:
             return op_inst_code[operating_institution]
-        # return NetCDFFileHandler()._get_operating_institution(deployment_metadata=deployment_metadata)
     
     def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Water depth", "metadata_wave_buoy"]
@@ -115,10 +113,12 @@ class ncAttrsExtractor:
         return deployment_metadata.loc["Wave sensor serial number", "metadata_wave_buoy"]
 
     def _extract_deployment_metadata_title(deployment_metadata: pd.DataFrame) -> str:
+        
         base_title = """Near real time integral wave parameters from wave buoys collected by {operating_institution} using a {instrument} at {site_name}"""
         operating_institution = ncAttrsExtractor._extract_deployment_metadata_institution(deployment_metadata=deployment_metadata)
         instrument = ncAttrsExtractor._extract_deployment_metadata_instrument(deployment_metadata=deployment_metadata)
         site_name = ncAttrsExtractor._extract_deployment_metadata_site_name(deployment_metadata=deployment_metadata)
+        
         return base_title.format(operating_institution=operating_institution,
                                 instrument=instrument,
                                 site_name=site_name)
@@ -128,9 +128,11 @@ class ncAttrsExtractor:
 
     # from regional metadata -------------
     def _process_operating_institution(deployment_metadata: pd.DataFrame) -> str:
+        
         operating_institution_code = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
         if "IMOS" in operating_institution_code:
             return "IMOS"
+        
         else:
             return operating_institution_code
         
@@ -160,7 +162,6 @@ class ncAttrsExtractor:
 
     # generally pre-defined --------------------
     def _extract_data_history(dataset: xr.Dataset) -> str:
-        # return f"this file was file created on: {datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M%SZ")}"
         return f"this file was file created on: {ncAttrsExtractor._extract_data_date_created(dataset=dataset)}"
     
     def _extract_general_author():
@@ -182,9 +183,7 @@ class ncAttrsExtractor:
         return "NetCDF Climate and Forecast CF Standard Name Table Version 78"
     
     def _extract_general_naming_authority() -> str:
-        naming_authority = "IMOS"
-        
-        return naming_authority
+        return 'IMOS'
     
     def _extract_general_license() -> str:
         return 'http://creativecommons.org/licenses/by/4.0/'
@@ -230,18 +229,21 @@ class ncAttrsComposer:
         self.attrs_template = self._get_template_imos(file_name=self.attrs_templates_files[parameters_type])
     
     def _get_template_imos(self, file_name: str) -> dict:
+        
         file_path = os.path.join(os.path.dirname(config.__file__), file_name)
         with open(file_path) as j:
             return json.load(j)
 
     def _match_valid_min_max_dtype(self, variable:str, variables_attributes:dict , dataset: xr.Dataset,
                                    min_attribute_name:str, max_attribute_name:str):
+        
         return (np.dtype(dataset[variable]).type(variables_attributes[min_attribute_name]),
                 np.dtype(dataset[variable]).type(variables_attributes[max_attribute_name]))
 
     def assign_variables_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
+        
         variables = list(self.attrs_template['variables'].keys())
-        # variables.remove("timeSeries")
+        
         for variable in variables:
             if variable in list(dataset.variables):
                 variables_attributes = self.attrs_template['variables'][variable]
@@ -267,8 +269,6 @@ class ncAttrsComposer:
                                                                                 max_attribute_name="max"
                                                                             )
 
-
-
                 dataset[variable] = (dataset[variable].assign_attrs(variables_attributes))
         
         return dataset
@@ -280,11 +280,7 @@ class ncAttrsComposer:
         return dataset_objects
 
     def assign_general_attributes(self, dataset: xr.Dataset, site_name: str) -> xr.Dataset:
-        
-        # general_attributes = self.template_imos
-        # # del general_attributes["_dimensions"]
-        # # del general_attributes["_variables"]
-        
+                
         general_attributes  = self._compose_general_attributes(dataset=dataset, site_name=site_name)
         dataset = dataset.assign_attrs(general_attributes)
 
@@ -324,16 +320,17 @@ class ncAttrsComposer:
                     try:                        
                         extracted = method(**kwargs)
                     except:
-                        # SITE_LOGGER.warning(f"grabing attribute from general_attrs.json for {key}")
                         extracted = self._get_attribute_from_template(attribute_name=key, attributes_template=self.attrs_template)
                     
                     general_attributes.update({key:extracted})
 
         if self.parameters_type == "spectral":
-            # extracted = ncSpectralAttrsExtractor._extract_general_spectral_analysis_technique()
+
             for name in dir(ncSpectralAttrsExtractor): 
+                
                 if name.startswith("_extract_"): 
                     method = getattr(ncSpectralAttrsExtractor, name)
+                    
                     if callable(method):
                         if name.startswith("_extract_general_"):
                                 key = name.removeprefix("_extract_general_") 
@@ -348,15 +345,12 @@ class ncAttrsComposer:
         return attributes_template[attribute_name]
 
     def _compose_abstract(self, institution: str, instrument: str, site_name:str) -> str:
+        
         base_abstact = """Near real time integral wave parameters from wave buoys collected by {institution} using a {instrument} at {site_name}"""
+        
         return base_abstact.format(institution=institution,
                                 instrument=instrument,
                                 site_name=site_name)
-
-
-
-
-
 
 class ncWriter:
     
@@ -399,9 +393,6 @@ class ncWriter:
                 "YDIS": {"dtype": np.float32},
                 "ZDIS": {"dtype": np.float32},
             }
-    
-    def __init__(self):
-        pass
 
     def _get_operating_institution(self, deployment_metadata: pd.DataFrame) -> str:
         operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
@@ -430,8 +421,12 @@ class ncWriter:
     def _format_periods(self, periods: PeriodIndex) -> list:
         return [(period[0].strftime("%Y%m%d"), period[1].strftime("%Y%m%d")) for period in periods]
 
-    def _format_site_id_to_filename(self, site_id:str) -> str:
-        return re.sub(r'(?<!^)(?=[A-Z0-9])', '-', site_id)
+    def _format_site_id_to_filename(self, site_id: str) -> str:
+        
+        site_id = re.sub(r'([a-z])([A-Z])', r'\1-\2', site_id)   # lower→UPPER boundary
+        site_id = re.sub(r'([A-Za-z])(\d+)', r'\1-\2', site_id)
+        
+        return site_id.upper()
 
     def compose_file_names(self,
                             site_id: str,
@@ -441,9 +436,11 @@ class ncWriter:
         
         if parameters_type == "spectral":
             file_name_template = NC_SPECTRAL_FILE_NAME_TEMPLATE
+        
         elif parameters_type == "displacements":
             file_name_template = NC_DISPLACEMENTS_FILE_NAME_TEMPLATE
             periods = self._format_periods(periods)
+        
         elif parameters_type == "bulk":
             file_name_template = NC_BULK_FILE_NAME_TEMPLATE
 
@@ -454,7 +451,7 @@ class ncWriter:
 
         for period in periods:
             file_name = file_name_template.format(operating_institution=operating_institution,
-                                                        site_id=self._format_site_id_to_filename(site_id).upper(),
+                                                        site_id=self._format_site_id_to_filename(site_id),
                                                         start_date=period[0],
                                                         end_date=period[1]
                                                     )
@@ -469,23 +466,32 @@ class ncWriter:
                 
         if parameters_type == "spectral":
             return self.ENCODING_ENFORCEMENT_SPECTRA.copy()
+        
         elif parameters_type == "bulk":
+            
             encoding = self.ENCODING_ENFORCEMENT_BULK.copy()
+            
             if "TEMP" not in list(dataset.variables):
                 del encoding["TEMP"]
                 del encoding["TEMP_quality_control"]
                 del encoding["TIME_TEMP"]
+        
         elif parameters_type == "displacements":
             return self.ENCODING_ENFORCEMENT_DISPLACEMENTS.copy()
     
     def _remove_coordinates_qc_variables(self, dataset: xr.Dataset) -> xr.Dataset:
+        
         qc_variables = [var for var in list(dataset.variables.keys()) if var.endswith("quality_control")]
+        
         for qc_var in qc_variables:
             dataset[qc_var].encoding["coordinates"] = None
+        
         return dataset
     
     def _remove_fillvalue_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
+        
         time_variables = [var for var in list(dataset.variables.keys()) if var.startswith("TIME")]
+        
         for time_var in time_variables:
             dataset[time_var].encoding["_FillValue"] = None
 
@@ -499,8 +505,8 @@ class ncWriter:
                      file_names: str,
                      dataset_objects: xr.Dataset,
                      parameters_type: str = "spectral"):
-        file_paths = self._compose_file_paths(output_path=output_path,
-                                                 file_names=file_names)       
+        
+        file_paths = self._compose_file_paths(output_path=output_path,file_names=file_names)       
         
         if not os.path.exists(output_path):
             os.mkdir(output_path)

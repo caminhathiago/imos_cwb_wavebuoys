@@ -90,12 +90,35 @@ class csvProcess:
 
         time_col = self.get_time_column(df_lazy, suffix=suffix)
 
-        df_lazy = df_lazy.with_columns(
-                pl.from_epoch((pl.col(time_col) * 1e9)
-                .cast(pl.Int64), time_unit="ns")
-                .alias("datetime")
-            )
+        # # Pre filter garbage data e.g. 1.7392e20, instead of around 1.7e9
         
+        # valid_range = (0, 9.22e9)
+        # df_lazy = df_lazy.filter(
+        #     (pl.col(time_col) >= valid_range[0]) &
+        #     (pl.col(time_col) <= valid_range[1])
+        # )
+
+        # df_lazy = df_lazy.with_columns(
+        #         pl.from_epoch((pl.col(time_col) * 1e9)
+        #         .cast(pl.Int64), time_unit="ns")
+        #         .alias("datetime")
+        #     )
+        
+        valid_range = (0, 4e9) # realistic GPS seconds (1980–2107)
+        df_lazy = df_lazy.filter(
+            (pl.col(time_col) >= valid_range[0]) &
+            (pl.col(time_col) <= valid_range[1])   
+        )
+
+        df_lazy = df_lazy.with_columns(
+            pl.from_epoch(pl.col(time_col), time_unit="s").alias("datetime")
+        )
+
+        # df_lazy = df_lazy.filter(
+        #     (pl.col('datetime') > datetime(2010,1,1,0,0,0)) &
+        #      (pl.col('datetime') < datetime.now())
+        #      )
+
         if drop_original_column:
             return self.drop_column(df_lazy, column_name=time_col)
         else:
@@ -182,145 +205,11 @@ class csvProcess:
                 collected_results.update({suffix: collected_result})
         
         renamed_results = {
-            self.suffix_name_map.get(suffix, suffix): value  # Replace if key exists, else keep original
+            self.suffix_name_map.get(suffix, suffix): value
             for suffix, value in collected_results.items()
         }
 
         return renamed_results
-
-    # def collect_lazyframe_thread(self, suffix: str, lazy_frame: pl.LazyFrame, collected_results: dict):
-    #     # Function to collect LazyFrames in a thread
-    #     collected_result = lazy_frame.collect()
-    #     collected_results.update({suffix: collected_result})
-    
-    # def collect_results_threading(self, results: dict) -> dict:
-    #     collected_results = results.copy()
-        
-    #     # List to hold all threads
-    #     threads = []
-        
-    #     # Iterate over the results and create threads
-    #     for suffix in results:
-    #         if isinstance(results[suffix], pl.LazyFrame):
-    #             thread = threading.Thread(target=self.collect_lazyframe, args=(suffix, results[suffix], collected_results))
-    #             threads.append(thread)
-    #             thread.start()  # Start the thread
-        
-    #     # Wait for all threads to finish
-    #     for thread in threads:
-    #         thread.join()
-        
-    #     return collected_results
-
-
-    # def collect_results_threadpool(self, results: dict) -> dict:
-    #     """Uses ThreadPoolExecutor to run LazyFrame collection in parallel."""
-    #     collected_results = results.copy()
-        
-    #     def collect_lazyframe(suffix, lazy_frame):
-    #         if isinstance(lazy_frame, pl.LazyFrame):
-    #             collected_results[suffix] = lazy_frame.collect()
-
-    #     with ThreadPoolExecutor() as executor:
-    #         executor.map(collect_lazyframe, results.keys(), results.values())
-
-    #     return collected_results
-    
-    # def collect_results_threadpool2(self, results: dict) -> dict:
-    #     """Uses ThreadPoolExecutor to run LazyFrame collection in parallel."""
-    #     collected_results = {}  # Initialize an empty dictionary to avoid modifying the input
-
-    #     def collect_lazyframe(suffix, lazy_frame):
-    #         """Collects a LazyFrame and updates results."""
-    #         if isinstance(lazy_frame, pl.LazyFrame):
-    #             collected_results[suffix] = lazy_frame.collect()
-
-    #     with ThreadPoolExecutor() as executor:
-    #         futures = {executor.submit(collect_lazyframe, suffix, lazy_frame): suffix for suffix, lazy_frame in results.items()}
-
-    #         for future in futures:
-    #             future.result()  # Ensures all tasks complete before returning results
-
-    #     return collected_results
-    
-    # def collect_results_threadpool3(self, results: dict) -> dict:
-    #     """Uses ThreadPoolExecutor to run LazyFrame collection in parallel."""
-    #     collected_results = {}
-
-    #     def collect_lazyframe(suffix, lazy_frame):
-    #         """Collects a LazyFrame and updates results."""
-    #         try:
-    #             if isinstance(lazy_frame, pl.LazyFrame):
-    #                 logging.debug(f"Starting collection for {suffix}")
-    #                 collected_results[suffix] = lazy_frame.collect()
-    #                 logging.debug(f"Successfully collected LazyFrame for {suffix}")
-    #         except Exception as e:
-    #             logging.error(f"Error collecting LazyFrame for {suffix}: {e}")
-    #             raise  # Reraise the error so that the thread pool can handle it
-
-    #     with ThreadPoolExecutor() as executor:
-    #         futures = {executor.submit(collect_lazyframe, suffix, lazy_frame): suffix for suffix, lazy_frame in results.items()}
-
-    #         for future in futures:
-    #             try:
-    #                 future.result()  # Ensures all tasks complete before returning results
-    #             except Exception as e:
-    #                 logging.error(f"Error in thread {futures[future]}: {e}")
-
-    #     return collected_results
-    
-    def collect_results_threadpool4(self, results: dict) -> dict:
-        """Uses ThreadPoolExecutor to run LazyFrame collection in parallel."""
-        collected_results = {}
-
-        def collect_lazyframe(suffix, lazy_frame):
-            """Collects a LazyFrame and updates results."""
-            try:
-                if isinstance(lazy_frame, pl.LazyFrame):
-                    logging.debug(f"Starting collection for {suffix}")
-                    collected_results[suffix] = lazy_frame.collect()
-                    logging.debug(f"Successfully collected LazyFrame for {suffix}")
-            except Exception as e:
-                logging.error(f"Error collecting LazyFrame for {suffix}: {e}")
-                logging.error(f"Traceback: {traceback.format_exc()}")  # Log the full traceback for debugging
-                raise  # Optionally, re-raise the exception to propagate if needed
-
-        with ThreadPoolExecutor() as executor:
-            futures = {executor.submit(collect_lazyframe, suffix, lazy_frame): suffix for suffix, lazy_frame in results.items()}
-
-            # Iterate through the futures as they complete
-            for future in as_completed(futures):
-                suffix = futures[future]  # Get the corresponding suffix for the future
-                try:
-                    future.result()  # Ensure the task completes and handle any exceptions that occur
-                except Exception as e:
-                    logging.error(f"Thread for {suffix} encountered an error: {e}")
-                    logging.error(f"Traceback for {suffix}: {traceback.format_exc()}")
-
-        renamed_results = {
-            self.suffix_name_map.get(suffix, suffix): value  # Replace if key exists, else keep original
-            for suffix, value in collected_results.items()
-        }
-
-        return renamed_results
-    
-    # def collect_lazyframe_chunks(lazy_frame, chunk_size):
-    #     """Process a LazyFrame in parallel using Dask."""
-    #     # Determine the number of chunks
-    #     total_rows = lazy_frame.fetch_row_count()  # Fetch row count without collecting
-    #     num_chunks = (total_rows // chunk_size) + (1 if total_rows % chunk_size else 0)
-
-    #     # Create Dask tasks for slicing and collecting chunks
-    #     tasks = [
-    #         dask.delayed(lazy_frame.slice(i * chunk_size, chunk_size).collect)()
-    #         for i in range(num_chunks)
-    #     ]
-
-    #     # Trigger parallel collection
-    #     collected_chunks = dask.compute(*tasks)
-
-    #     # Combine the collected chunks into a single DataFrame
-    #     return pl.concat(collected_chunks)
 
     def filter_absurd_datetimes(self, data: pl.DataFrame) -> pl.DataFrame:
         return data.filter(
@@ -362,23 +251,20 @@ class csvProcess:
         filter_start_time = deploy_start + timedelta(hours=time_crop_start)
         filter_end_time = deploy_end + timedelta(hours=time_crop_end)
 
-        # filter deployment and recovery datetimes
         dataframe = dataframe.filter(
                 (pl.col(time_col_local) >= filter_start_time) & 
                 (pl.col(time_col_local) <= filter_end_time)
             )
-
-        # filter hours_crop hours from first/last timepoints
-        # filter_start_time = dataframe[time_col][0].item() + timedelta(hours=hours_crop_start)
-        # filter_end_time = dataframe[time_col][-1].item() - timedelta(hours=hours_crop_end)
 
         return dataframe.drop(time_col_local)
     
     def buffer_gps_times(self, disp: pl.DataFrame, gps: pl.DataFrame, time_minutes:int=2) -> pl.DataFrame:
         
         time_col = [col for col in disp.columns if "TIME" in col.upper()]
+        
         if not time_col:
             raise ValueError("No TIME column found in disp DataFrame.")
+        
         time_col = time_col[0]
 
         start_time = disp[time_col].min()
@@ -398,8 +284,6 @@ class csvProcess:
                 deployment_metadata.loc["Longitude_nominal", "metadata_wave_buoy"]
         )
 
-    # def watch_circle_from_mooring_metadata(self, )
-
     def filter_watch_circle_utm(self, 
                             dataframe:pl.DataFrame,
                             deploy_lat: float,
@@ -414,7 +298,6 @@ class csvProcess:
             easting, northing = transformer.transform(lon, lat)
             return [easting, northing]
 
-        # Add UTM coordinates for LATITUDE and LONGITUDE
         dataframe = dataframe.with_columns([
             pl.struct(["LONGITUDE", "LATITUDE"]).map_elements(
                 lambda row: transformer.transform(row["LONGITUDE"], row["LATITUDE"])[0],
@@ -439,13 +322,33 @@ class csvProcess:
                     .drop(["EASTING", "NORTHING", "DIST_TO_DEPLOY"])
         )
 
+    def calculate_watch_circle(self, site_buoys_to_process:pd.DataFrame, reprocess:bool = False):
+        
+        s = site_buoys_to_process
+
+        mainline = s.mainline_length + (s.mainline_length*s.mooring_stretch_factor)
+        catenary = s.catenary_length + (s.catenary_length*s.mooring_stretch_factor)
+        
+        if reprocess:
+            mainline = mainline + s.mainline_length_error
+            catenary = catenary + s.catenary_length_error
+
+            mainline *= (1 + s.mooring_stretch_factor)
+            catenary *= (1 + s.mooring_stretch_factor)
+
+        watch_circle = np.sqrt(mainline**2 - s.DeployDepth**2) + catenary + s.watch_circle_gps_error
+        
+        if np.isnan(watch_circle):
+            raise ValueError(f"Calculated watchcircle lead to a NaN. Please check if mainline, catenary, deploy_depth and respective error configurations are provided in buoys_to_process.csv")
+
+        return mainline, catenary, watch_circle
 
     def qc_watch_circle(self,
-                                    dataframe:pl.DataFrame,
-                                    deploy_lat:float,
-                                    deploy_lon:float,
-                                    watch_circle:float,
-                                    watch_circle_fail:float):
+                        dataframe:pl.DataFrame,
+                        deploy_lat:float,
+                        deploy_lon:float,
+                        watch_circle:float,
+                        watch_circle_fail:float):
         
         raw_records = dataframe.shape[0]
 
@@ -466,7 +369,7 @@ class csvProcess:
         dataframe = dataframe.with_columns(
             pl.when(pl.col("distance") >= watch_circle * watch_circle_fail).then(4)
             .when(pl.col("distance") >= watch_circle).then(3)
-            .otherwise(1)  # or 0 if you prefer unflagged points to be 0
+            .otherwise(1) 
             .alias(qc_flag_watch)
         )
 
@@ -484,14 +387,7 @@ class csvProcess:
             else 0
         )
 
-        # filtered_df = dataframe.filter(pl.col("distance") >= watch_circle) # flag as 3
-        # filtered_df = dataframe.filter(pl.col("distance") >= watch_circle*watch_circle_fail) # flag as 4
-        
-        # percentage_cropped = (1 - (filtered_df.shape[0]/raw_records)) * 100
-
-        return dataframe, (pct_flag_3 + pct_flag_4)
-
-
+        return dataframe, round(pct_flag_3 + pct_flag_4,2)
 
     def filter_watch_circle_geodesic(self, 
                             dataframe:pl.DataFrame,
@@ -516,6 +412,7 @@ class csvProcess:
         
         filtered_df = filtered_df.drop("distance")
         percentage_cropped = 1 - (filtered_df.shape[0]/raw_records)
+        
         if filtered_df.shape[0]/raw_records < percentage_threshold:
             
             mean_lat = dataframe.select(pl.mean("LATITUDE")).item()
@@ -535,10 +432,53 @@ class csvProcess:
             
             filtered_df = filtered_df.drop("distance")
             percentage_cropped = 1 - (filtered_df.shape[0]/raw_records)
+            
             if filtered_df.shape[0]/raw_records < percentage_threshold:
                 raise ValueError(f"Filtering watch circle removed more than 30% of records. Please revise DeployLat and DeployLon on buoys_to_process.csv")
         
         return filtered_df, percentage_cropped
+
+    def save_qc_watch_circle_csv(self, data:pl.DataFrame, output_path:str) -> None:
+        
+        columns = ['TIME', 'LATITUDE', 'LONGITUDE', 'distance']
+        watch_qc_cols = [col for col in data.columns if "WATCH_quality_control" in col]
+        columns.extend(watch_qc_cols)
+
+        data_file_name = os.path.join(output_path, "spectra_bulk_df_qc_watch.csv")
+        data[columns].to_pandas().to_csv(data_file_name, index=False)
+
+        return data_file_name
+
+    def extract_drifting_periods(self, data:pl.DataFrame, output_path:str, reprocess:bool = False)-> None:
+        
+        if reprocess:
+            col_flag = "WATCH_quality_control_secondary"
+            flag = 4
+        
+        else:
+            col_flag = "WATCH_quality_control_primary"
+            flag = 3
+
+        data = data.with_columns(
+            (pl.col(col_flag) == flag).alias("WATCH_fail")
+        )
+
+        data = data.with_columns(
+            (pl.col("WATCH_fail") != pl.col("WATCH_fail").shift(1)).cum_sum().alias("drifting_periods_id")
+        )
+
+        drifting_periods = (
+            data.filter(pl.col("WATCH_fail"))
+            .group_by("drifting_periods_id")
+            .agg([
+                pl.col("TIME").min().alias("drifting_start"),
+                pl.col("TIME").max().alias("drifting_end")
+            ])
+            .sort("drifting_start")
+        )
+
+        drifting_periods_file_name = os.path.join(output_path, "drifting_periods_qc_watch.csv")
+        drifting_periods.to_pandas().to_csv(drifting_periods_file_name, index=False)
 
     def convert_datatypes(self, dataframe: pl.DataFrame) -> pl.DataFrame:
         dtype_mapping = {
@@ -552,11 +492,10 @@ class csvProcess:
                     "B2": pl.Float32,
                     "ENERGY": pl.Float32,
                             }
+        
         return dataframe.with_columns([
-    # If it's an Array, convert each element to the correct type
-    dataframe[col].arr.eval(pl.element().cast(dtype.inner)).alias(col) if isinstance(dtype, pl.Array)  
-    # Otherwise, just cast normally
-    else dataframe[col].cast(dtype)  
-    for col, dtype in dtype_mapping.items()
-])
+                    dataframe[col].arr.eval(pl.element().cast(dtype.inner)).alias(col) if isinstance(dtype, pl.Array)  
+                    else dataframe[col].cast(dtype)  
+                    for col, dtype in dtype_mapping.items()
+            ])
         

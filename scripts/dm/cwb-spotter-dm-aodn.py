@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from datetime import datetime
+import json
 
 from multiprocessing import cpu_count
 import time
@@ -17,7 +18,7 @@ from wavebuoy_dm.processing.process import csvProcess
 from wavebuoy_dm.netcdf.process import ncSpectra, ncDisp, ncBulk, Process
 from wavebuoy_dm.netcdf.writer import ncWriter, ncAttrsComposer
 from wavebuoy_dm.wavebuoy import WaveBuoy
-from wavebuoy_dm.utils import IMOSLogging, args_aodn_processing
+from wavebuoy_dm.utils import IMOSLogging, args_aodn_processing, Plots
 from wavebuoy_dm.qc.qc import WaveBuoyQC
 
 
@@ -36,10 +37,10 @@ class MetadataArgs:
 def process_paths(site_buoys_to_process):
 
     dm_deployment_path = site_buoys_to_process.loc["datapath"]
-    dm_deployment_path = os.path.dirname(dm_deployment_path
-                                        .replace("Y:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
-                                        .replace("X:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
-                                        )
+    # dm_deployment_path = os.path.dirname(dm_deployment_path
+    #                                     .replace("Y:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
+    #                                     .replace("X:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
+    #                                     )
     output_path = os.path.join(dm_deployment_path, "processed_py")
     if not os.path.exists(output_path):
         os.mkdir(output_path)
@@ -48,15 +49,16 @@ def process_paths(site_buoys_to_process):
 
 def load_metadata(site_buoys_to_process:pd.DataFrame, dm_deployment_path) -> list[pd.DataFrame]:
 
+    raw_data_path = dm_deployment_path
     if os.path.basename(dm_deployment_path) != "log":                         
-        raw_data_path = os.path.join(dm_deployment_path, 'log')
+        raw_data_path = os.path.join(raw_data_path, 'log')
     
-    if not os.path.exists(raw_data_path):
+    if not os.path.exists(dm_deployment_path):
         raise FileNotFoundError(f"path {raw_data_path} does not exist. Check if deployment path exists, and if SD card data is in the folder log.")
 
     deploy_start, deploy_end, spot_id = WaveBuoy().extract_deploy_dates_spotid_from_path(site_buoys_to_process.datapath)
 
-    site_name, region = WaveBuoy().extract_region_site_name(path=dm_deployment_path)
+    site_name, region = WaveBuoy().extract_region_site_name(path=raw_data_path)
     buoys_metadata = WaveBuoy()._get_buoys_metadata(buoy_type='sofar', buoys_metadata_file_name="buoys_metadata.csv")
     deployment_metadata = WaveBuoy().load_latest_deployment_metadata(site_name=site_name, region=region)
     deployment_metadata.loc["instrument_burst_duration", "metadata_wave_buoy"] = site_buoys_to_process.instrument_burst_duration
@@ -75,10 +77,22 @@ def load_metadata(site_buoys_to_process:pd.DataFrame, dm_deployment_path) -> lis
             "raw_data_path": raw_data_path,
         }
 
-def process_from_SD(raw_data_path, suffixes_to_concat=["FLT", "LOC"]) -> list[pl.DataFrame]:
+def process_from_SD(raw_data_path, suffixes_to_concat=["FLT","LOC","SST","BARO"]) -> list[pl.DataFrame]:
 
-    DEP_LOGGER.info(f"Lazy concatenating csv files for {suffixes_to_concat}")
-    cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=["FLT","LOC","SST","BARO"]) #,"SENS_IND","SENS_AGG"])#, suffixes_to_concat=["HDR","SST","LOC","BARO","SPC"])
+    # DEP_LOGGER.info(f"Lazy concatenating csv files for {suffixes_to_concat}")
+    # cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat)
+    # lazy_concat_results = cc.lazy_concat_files()
+
+    # cp = csvProcess()
+    # DEP_LOGGER.info("Lazy processing cocatenated csv files")
+    # lazy_processed_results = cp.process_concat_results(lazy_concat_results)
+
+    # DEP_LOGGER.info("Collecting processed csv files")
+    # collected_results = cp.collect_results(lazy_processed_results)   
+
+    # return collected_results["displacements"], collected_results["gps"], collected_results["surface_temp"]
+    DEP_LOGGER.info(f"Lazy concatenating csv files for suffixes_to_concat")
+    cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat) 
     lazy_concat_results = cc.lazy_concat_files()
 
     cp = csvProcess()
@@ -86,28 +100,49 @@ def process_from_SD(raw_data_path, suffixes_to_concat=["FLT", "LOC"]) -> list[pl
     lazy_processed_results = cp.process_concat_results(lazy_concat_results)
 
     DEP_LOGGER.info("Collecting processed csv files")
-    collected_results = cp.collect_results(lazy_processed_results)   
+    collected_results = cp.collect_results(lazy_processed_results)
 
-    return collected_results["displacements"], collected_results["gps"], collected_results["surface_temp"]
+    if isinstance(collected_results.get("surface_temp"), pl.DataFrame) and not collected_results["surface_temp"].is_empty():
+        collected_results["surface_temp"] = collected_results["surface_temp"].rename(
+            {"temperature": "TEMP", "datetime": "TIME_TEMP"}
+        )
 
-def filter_dates(disp, gps, temp, utc_offset, deploy_start, deploy_end, time_crop_start, time_crop_end) -> list[pl.DataFrame]:
+    if isinstance(collected_results.get("barometer"), pl.DataFrame) and not collected_results["barometer"].is_empty():
+        collected_results["barometer"] = collected_results["barometer"].rename(
+            {"baro_pressure": "ATM_PRESSURE", "datetime": "TIME_ATM_PRESSURE"}
+        )
+
+    return collected_results
+
+def filter_dates(results, utc_offset, deploy_start, deploy_end, time_crop_start, time_crop_end) -> list[pl.DataFrame]:
 
     cp = csvProcess()
-    DEP_LOGGER.info(f"Filtering displacements data with passed deployment datetimes: {deploy_start} - {deploy_end}")
-    disp = cp.filter_deployment_dates(dataframe=disp, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
-                                      time_crop_start=time_crop_start, time_crop_end=time_crop_end)
+    # DEP_LOGGER.info(f"Filtering displacements data with passed deployment datetimes: {deploy_start} - {deploy_end}")
+    # disp = cp.filter_deployment_dates(dataframe=disp, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
+    #                                   time_crop_start=time_crop_start, time_crop_end=time_crop_end)
     
-    DEP_LOGGER.info(f"Filtering gps data with passed deployment datetimes: {deploy_start} - {deploy_end}")    
-    temp = cp.filter_deployment_dates(dataframe=temp, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
-                                       time_crop_start=time_crop_start, time_crop_end=time_crop_end)
+    # DEP_LOGGER.info(f"Filtering gps data with passed deployment datetimes: {deploy_start} - {deploy_end}")    
+    # temp = cp.filter_deployment_dates(dataframe=temp, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
+    #                                    time_crop_start=time_crop_start, time_crop_end=time_crop_end)
 
-    # gps = cp.filter_deployment_dates(dataframe=gps, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
-    #                                      time_crop_start=time_crop_start, time_crop_end=time_crop_end)
+    # # gps = cp.filter_deployment_dates(dataframe=gps, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
+    # #                                      time_crop_start=time_crop_start, time_crop_end=time_crop_end)
+    
+    for key, dataframe in results.items():
+        if key != 'gps' and isinstance(dataframe, pl.DataFrame):
+            DEP_LOGGER.info(f"Filtering {key} data with passed deployment datetimes: {deploy_start} - {deploy_end}")
+            result = cp.filter_deployment_dates(dataframe=dataframe, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
+                                            time_crop_start=time_crop_start, time_crop_end=time_crop_end)
+            results[key] = result 
+    
     time_minutes = 2
     DEP_LOGGER.info(f"Buffering gps times by {time_minutes} minutes")
-    gps = cp.buffer_gps_times(disp=disp, gps=gps, time_minutes=time_minutes)
+    results['gps'] = cp.buffer_gps_times(disp=results['displacements'], gps=results['gps'], time_minutes=time_minutes)
     
-    return disp, gps, temp
+    if results['gps'].is_empty():
+        raise ValueError(f"Buffering GPS based on displacements didn't work as resulting gps dataset is empty.")
+
+    return results
 
 def align_gps(spectra_bulk_df, gps) -> pl.DataFrame:
 
@@ -121,15 +156,14 @@ def align_gps(spectra_bulk_df, gps) -> pl.DataFrame:
 def qc_watch_circle(spectra_bulk_df, site_buoys_to_process:pd.DataFrame, output_path:str, deployment_metadata:pd.DataFrame):
     
     s = site_buoys_to_process
+    
+    cp = csvProcess()
 
     DEP_LOGGER.info(f"Calculating mooring setting")
-    mainline = s.mainline_length + (s.mainline_length*s.mooring_stretch_factor)
-    catenary = s.catenary_length + (s.catenary_length*s.mooring_stretch_factor)
-    watch_circle = np.sqrt(mainline**2 - s.DeployDepth**2) + catenary + s.watch_circle_gps_error
+    mainline, catenary, watch_circle = cp.calculate_watch_circle(s)
 
     DEP_LOGGER.info(f"Mainline = {mainline} | Catenary = {catenary} | Watch Circle = {round(watch_circle,2)}")
 
-    cp = csvProcess()
 
     DEP_LOGGER.info(f"Qualifying with respect to watch circle")
     spectra_bulk_df, out_of_radious_pct = cp.qc_watch_circle(
@@ -140,19 +174,18 @@ def qc_watch_circle(spectra_bulk_df, site_buoys_to_process:pd.DataFrame, output_
         watch_circle_fail=s.watch_circle_fail
     )
 
+    DEP_LOGGER.info(f"Saving watch circle qc results after reprocessing")
+    spectra_bulk_csv_path = cp.save_qc_watch_circle_csv(spectra_bulk_df, output_path)
+
+    DEP_LOGGER.info(f"Extracting drifting periods")
+    cp.extract_drifting_periods(spectra_bulk_df, output_path)
+
     if out_of_radious_pct >= s.out_of_radius_tolerance:
         
         DEP_LOGGER.info(f"First watch circle QC not satisfactory, {out_of_radious_pct}% out of radius (> tolerance = {s.out_of_radius_tolerance})")
         DEP_LOGGER.info(f"Reaplying strech factor over calculated mooring setting")
-        mainline = mainline + s.mainline_length_error
-        catenary = catenary + s.catenary_length_error
-
-        mainline *= (1 + s.mooring_stretch_factor)
-        catenary *= (1 + s.mooring_stretch_factor)
-
-        watch_circle = np.sqrt(mainline**2 - s.DeployDepth**2) + catenary + s.watch_circle_gps_error
         
-        DEP_LOGGER.info(f"Mainline = {mainline} | Catenary = {catenary} | Watch Circle = {round(watch_circle,2)}")
+        mainline, catenary, watch_circle = cp.calculate_watch_circle(s, reprocess=True)
 
         DEP_LOGGER.info(f"Requalifying with respect to watch circle (={watch_circle})")
         spectra_bulk_df, out_of_radious_pct = cp.qc_watch_circle(
@@ -163,17 +196,27 @@ def qc_watch_circle(spectra_bulk_df, site_buoys_to_process:pd.DataFrame, output_
                                                     watch_circle_fail=s.watch_circle_fail
                                                 )
 
-        spectra_bulk_df_file_name = os.path.join(output_path, "spectra_bulk_df_qc_watch.csv")
-        (spectra_bulk_df[['TIME', 'LATITUDE', 'LONGITUDE', 'distance', 'WATCH_quality_control_primary', 'WATCH_quality_control_secondary']]
-         .to_pandas()
-         .to_csv(spectra_bulk_df_file_name)
-            )
+        DEP_LOGGER.info(f"Saving watch circle qc results after reprocessing")
+        spectra_bulk_csv_path = cp.save_qc_watch_circle_csv(spectra_bulk_df, output_path)
         
-        if out_of_radious_pct >= s.out_of_radius_tolerance:
-            raise ValueError(f"{out_of_radious_pct}% out of radius (watchcircle = {round(watch_circle,2)}), greater then tolerance ({s.out_of_radius_tolerance}%). CSV with qc_flag_watch saved as {spectra_bulk_df_file_name}")
+        DEP_LOGGER.info(f"Extracting drifting periods after reprocessing")
+        cp.extract_drifting_periods(spectra_bulk_df, output_path, reprocess=True)
 
         DEP_LOGGER.info(f"Requalification successful, {out_of_radious_pct}% out of radius (< tolerance = {s.out_of_radius_tolerance}")
-    
+        
+
+    p = Plots(site_name=site_buoys_to_process.loc['name'],
+                  deployment_folder=site_buoys_to_process.loc["datapath"],
+                  output_path=output_path)
+    p.map_positions_shapefiles(data=spectra_bulk_df.to_pandas(),
+                               deployment_center=(s.DeployLat,s.DeployLon),
+                               watch_circle=watch_circle,
+                               map_coverage=(800,40,10,5,1,.3),
+                               figsize=(15,5))
+
+    if out_of_radious_pct >= s.out_of_radius_tolerance: 
+        raise ValueError(f"{out_of_radious_pct}% out of radius (watchcircle = {round(watch_circle,2)}), greater then tolerance ({s.out_of_radius_tolerance}%). CSV with qc_flag_watch saved as {spectra_bulk_csv_path}")
+
     DEP_LOGGER.info(f"Storing watch_circle in deployment metadata")
     deployment_metadata.loc["watch_circle", "metadata_wave_buoy"] = round(watch_circle,2)
 
@@ -334,21 +377,19 @@ def generate_bulk_NC_file(spectra_bulk_df,
                         deploy_start,
                         deploy_end,
                         raw_data_path,
-                        output_path) -> None:
+                        output_path,
+                        generate_plots:bool = True,
+                        report_qc:bool = True) -> None:
 
     bulk = Spectra().select_parameters(spectra_bulk_df, dataset_type="bulk")  
-
-    if temp is not None:
-        DEP_LOGGER.info(f"Renaming temperature dimensions")
-        temp = temp.rename({"temperature":"TEMP", "datetime":"TIME_TEMP"})
 
     DEP_LOGGER.info(f"Starting Bulk parameters qualification")
     
     DEP_LOGGER.info(f"Converting to pandas dataframe")
     bulk_df = bulk.to_pandas()
-    
-    DEP_LOGGER.info(f"Loading QC (config_id = {1})")
-    qc = WaveBuoyQC(config_id=1)
+
+    DEP_LOGGER.info(f"Loading QC (config_id = {site_buoys_to_process.qc_config})")
+    qc = WaveBuoyQC(config_id=site_buoys_to_process.qc_config)
             
     DEP_LOGGER.info(f"Creating global qc column")
     bulk_df = qc.create_global_qc_columns(data=bulk_df)
@@ -365,37 +406,30 @@ def generate_bulk_NC_file(spectra_bulk_df,
                                 rate_of_change_test=True,
                                 flat_line_test=True,
                                 mean_std_test=True,
-                                spike_test=False)
+                                spike_test=True)
    
     DEP_LOGGER.info(f"Saving QC results as csvs")
     bulk_df.to_csv(os.path.join(output_path, "bulk_qc_subflags.csv"))
     bulk_qualified.to_csv(os.path.join(output_path, "bulk_qc.csv"))
     DEP_LOGGER.info("Bulk parameters qualification successfull")
     
-    # Temp ----
-    # # TEMPRARY SETUP
-    # temp = None
-    # # TEMPRARY SETUP
-    
-    if temp is not None:
+    if isinstance(temp, pl.DataFrame) and not temp.is_empty():
         DEP_LOGGER.info(f"Starting temperature qualification")
 
         DEP_LOGGER.info(f"Converting to pandas dataframe")
         temp_df = temp.to_pandas()
-        
-        DEP_LOGGER.info(f"Loading QC (config_id = {1})")
-        qc = WaveBuoyQC(config_id=1)
-                
+
+                     
         DEP_LOGGER.info(f"Creating global qc column")
         temp_df = qc.create_global_qc_columns(data=temp_df)
         
-        qc.load_data(data=bulk_df)
+        qc.load_data(data=temp_df)
         DEP_LOGGER.info(f"Extracting parameters to QC")
-        parameters_to_qc = qc.get_parameters_to_qc(data=temp_df, qc_config=qc.qc_config)
+        parameters_to_qc_temp = qc.get_parameters_to_qc(data=temp_df, qc_config=qc.qc_config)
         
         DEP_LOGGER.info(f"Performing qualification")
         temp_qualified = qc.qualify(data=temp_df,
-                                    parameters=parameters_to_qc,
+                                    parameters=parameters_to_qc_temp,
                                     parameter_type="temp",
                                     gross_range_test=True,
                                     rate_of_change_test=True,
@@ -412,6 +446,7 @@ def generate_bulk_NC_file(spectra_bulk_df,
     else:
         DEP_LOGGER.info(f"No temp data")
         temp_qualified = None
+        temp_df = None
         
 
     DEP_LOGGER.info(f"Composing dataset")
@@ -458,6 +493,21 @@ def generate_bulk_NC_file(spectra_bulk_df,
 
     DEP_LOGGER.info(f"WAVE-PARAMETERS netCDFs successfully generated")
 
+    if generate_plots:
+        p = Plots(site_name=site_name,
+                  deployment_folder=site_buoys_to_process.loc["datapath"],
+                  output_path=output_path)
+
+        DEP_LOGGER.info(f"Generating subflags plots for each variable")
+        p.qc_subflags_each_variable(dataset=bulk_ds,
+                                    waves_subflags=bulk_df, 
+                                    temp_subflags=temp_df,
+                                            )
+
+    if report_qc:
+        DEP_LOGGER.info(f"Generating QC report for wave parameters")
+        qc.report_qc([bulk_df, temp_df], parameters_to_qc, output_path)
+
 def generate_raw_displacements_NC_files(disp,
                                         gps,
                                         site_name,
@@ -495,7 +545,7 @@ def generate_raw_displacements_NC_files(disp,
     fortnight_periods = ncDisp().extract_fortnightly_periods_dataset(dataset=disp_ds)
 
     DEP_LOGGER.info(f"Splitting global dataset into fortnightly datasets")
-    disp_ds_objects = ncDisp().split_dataset_fortnightly(dataset=disp_ds, periods=fortnight_periods)
+    disp_ds_objects, fortnight_periods = ncDisp().split_dataset_fortnightly(dataset=disp_ds, periods=fortnight_periods)
     
     DEP_LOGGER.info(f"Converting time to CF conventions")
     disp_ds_objects = ncSpectra().convert_time_to_CF_convention_ds_list(disp_ds_objects)
@@ -527,10 +577,13 @@ if __name__ == "__main__":
   
     imos_logging = IMOSLogging()
     
-    GENERAL_LOGGER = IMOSLogging().logging_start(logger_name="general_logger.log",
+    GENERAL_LOGGER = IMOSLogging().logging_start(logger_name=f"{datetime.now().strftime("%Y%m%dT%H%M%S")}_{vargs.region}_general_logger.log",
                                                 logging_filepath=os.getenv("GENERAL_LOGGER_PATH"))
 
-    buoys_to_process = WaveBuoy().load_buoys_to_process(vargs.region)
+    buoys_to_process = WaveBuoy().load_buoys_to_process()
+
+    log_dep_ids = buoys_to_process[['dep_id', 'name', 'datapath']].to_dict(orient='records')
+    GENERAL_LOGGER.info(f"Deployments being processed: {json.dumps(log_dep_ids, indent=6)}")
 
     for idx, site in buoys_to_process.iterrows():
         start_exec_time = time.time()
@@ -564,32 +617,32 @@ if __name__ == "__main__":
                             )
 
             DEP_LOGGER.info(f"SD card data processing ".upper() + "="*50)
-            disp, gps, temp = process_from_SD(metadata['raw_data_path'])
+            results = process_from_SD(metadata['raw_data_path'])
             
-            disp, gps, temp = filter_dates(disp, gps, temp, 
-                                           metadata_args.site_buoys_to_process.utc_offset, 
-                                           metadata_args.deploy_start,
-                                           metadata_args.deploy_end,
-                                           metadata_args.site_buoys_to_process.time_crop_start,
-                                           metadata_args.site_buoys_to_process.time_crop_end)
+            results = filter_dates(results, 
+                                    metadata_args.site_buoys_to_process.utc_offset, 
+                                    metadata_args.deploy_start,
+                                    metadata_args.deploy_end,
+                                    metadata_args.site_buoys_to_process.time_crop_start,
+                                    metadata_args.site_buoys_to_process.time_crop_end)
             
             DEP_LOGGER.info(f"Spectra Calculation ".upper() + "="*50)
-            spectra_bulk_df = calculate_spectra_from_displacements(disp, vargs.enable_dask)
+            spectra_bulk_df = calculate_spectra_from_displacements(results['displacements'], vargs.enable_dask)
 
             DEP_LOGGER.info(f"Spectra results processing ".upper() + "="*50)
-            spectra_bulk_df = align_gps(spectra_bulk_df, gps)
+            spectra_bulk_df = align_gps(spectra_bulk_df, results['gps'])
 
             DEP_LOGGER.info(f"Spectra results watch circle qualification ".upper() + "="*50)
             spectra_bulk_df, metadata['deployment_metadata'] = qc_watch_circle(spectra_bulk_df, site, output_path, metadata['deployment_metadata'])
 
             DEP_LOGGER.info(f"WAVE-SPECTRA AODN compliant file generation step ".upper() + "="*50)
-            generate_spectra_NC_file(spectra_bulk_df, gps, **vars(metadata_args))
+            generate_spectra_NC_file(spectra_bulk_df, results['gps'], **vars(metadata_args))
 
             DEP_LOGGER.info(f"WAVE-PARAMETERS AODN compliant file generation step ".upper() + "="*50)
-            generate_bulk_NC_file(spectra_bulk_df, gps, temp, **vars(metadata_args))
+            generate_bulk_NC_file(spectra_bulk_df, results['gps'], results['surface_temp'], **vars(metadata_args))
 
             DEP_LOGGER.info(f"RAW-DISPLACEMENTS AODN compliant file generation step ".upper() + "="*50)
-            generate_raw_displacements_NC_files(disp, gps, **vars(metadata_args))
+            generate_raw_displacements_NC_files(results['displacements'], results['gps'], **vars(metadata_args))
 
             GENERAL_LOGGER.info(f"Processsing finished in {round((time.time() - start_exec_time)/60, 2)} min")
             DEP_LOGGER.info(f"Processsing finished in {round((time.time() - start_exec_time)/60, 2)} min")
@@ -599,8 +652,7 @@ if __name__ == "__main__":
             DEP_LOGGER.error(str(e), exc_info=True)
             GENERAL_LOGGER.error(str(e), exc_info=True)
             
-            # Closing current site logging
-            DEP_LOGGER_file_path = imos_logging.get_log_file_path(DEP_LOGGER=DEP_LOGGER)
+            DEP_LOGGER_file_path = imos_logging.get_log_file_path(logger=DEP_LOGGER)
             DEP_LOGGER_file_path = DEP_LOGGER.handlers[0].baseFilename
             imos_logging.logging_stop(logger=DEP_LOGGER)
             error_DEP_LOGGER_file_path = imos_logging.rename_log_file_if_error(site_name=site.loc['name'],

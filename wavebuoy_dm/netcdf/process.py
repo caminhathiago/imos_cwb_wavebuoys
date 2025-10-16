@@ -130,8 +130,6 @@ class Process:
 
         return dataset_objects
 
-
-
 class ncSpectra(Process):
     def __init__(self):
         super().__init__()
@@ -153,7 +151,6 @@ class ncSpectra(Process):
             }
         )
     
-
 class ncDisp(Process):
     def __init__(self):
         super().__init__()
@@ -201,44 +198,28 @@ class ncDisp(Process):
 
         return tuple(datasets)
 
-    # @staticmethod
-    # def split_dataset_fortnightly(dataset: xr.Dataset, time_ranges: pl.DataFrame) -> Tuple[xr.Dataset, ...]:
-    #     dataset_objects = []
-    #     for row in time_ranges.iter_rows(named=True):
-    #         dataset_fortnight = dataset.where((dataset["TIME"] >= np.datetime64(row['start_datetime'])) & 
-    #                                            (dataset["TIME"] < np.datetime64(row['end_datetime'])), drop=True)
-    #         dataset_objects.append(dataset_fortnight)
-    #     return tuple(dataset_objects)
     
     def extract_fortnightly_periods_dataset(self, dataset: xr.Dataset) -> pd.PeriodIndex:
-    # Convert the TIME variable to a DatetimeIndex (removing timezone if present)
-        times = pd.to_datetime(dataset["TIME"].data)  # Convert to pandas DatetimeIndex
-        naive_times = times.tz_localize(None)  # Remove timezone if present (make it naive)
 
-        # Create fortnightly periods manually by using the 14-day frequency from the first date
-        start_date = naive_times.min().floor('D')  # Get the first date (earliest time)
+        times = pd.to_datetime(dataset["TIME"].data)  
+        naive_times = times.tz_localize(None) 
+
+        start_date = naive_times.min().floor('D')  
         end_date = (naive_times.max() + pd.Timedelta(days=1)).normalize()
         periods = pd.date_range(start=start_date, end=end_date, freq='14D')
 
-        # Convert to periods and return unique periods
         unique = periods.to_period('D').unique()
 
         if str(unique[-1]) != str(naive_times.max().date()):
             unique = unique.append(pd.PeriodIndex([str(naive_times.max().date())], freq="D"))
 
         fortnight_periods = []
-        # for i in range(len(unique) - 1):
-        #     start = unique[i] if i == 0 else fortnight_periods[-1][1] + 1
-        #     end = unique[i + 1] - pd.Timedelta(days=1) if i != len(unique) else unique[i + 1]
-        #     fortnight_periods.append((start, end))
         for i, period in enumerate(unique):
             if period != unique[-1]:
                 start = period
                 end = unique[i + 1] - pd.Timedelta(days=1) if period != unique[-2] else unique[i + 1]
                 fortnight_periods.append((start, end))
                 
-
-        # Display the result
         for pair in fortnight_periods:
             print((str(pair[0]), str(pair[1])))
         
@@ -249,11 +230,16 @@ class ncDisp(Process):
         for period in periods:
             print(period)
             start = str(period[0])
-            end = str(period[1]) #str(period[1] - timedelta(days=1)) if period != periods[-1] else str(period[1])
-            fortnightly_dataset = dataset.sel(TIME=slice(start, end),
-                                              TIME_LOCATION=slice(start, end))
+            end = str(period[1]) 
+            fortnightly_dataset = dataset.sel(TIME=slice(start, end), TIME_LOCATION=slice(start, end))
+            
+            if fortnightly_dataset.TIME.size == 0:
+               periods.remove(period)
+               continue
+
             dataset_objects.append(fortnightly_dataset)
-        return tuple(dataset_objects)
+        
+        return tuple(dataset_objects), periods
     
 
 class ncBulk(Process):
@@ -292,9 +278,12 @@ class ncBulk(Process):
 
 
         for var in vars_to_include:
+            
             if parameters_type == "bulk":
                 if var in ("TEMP","TEMP_quality_control"):
-                    data_vars.update({var:(("TIME_TEMP"), temp[var])})
+                    if var in temp:
+                        data_vars.update({var:(("TIME_TEMP"), temp[var])})
+                
                 else:
                     data_vars.update({var:(tuple(dimensions), waves[var])})
 
@@ -309,23 +298,5 @@ class ncBulk(Process):
         data_vars = self._compose_data_vars(waves=waves, temp=temp, parameters_type=parameters_type)
         
         return xr.Dataset(coords=coords, data_vars=data_vars)
-
-        # return xr.Dataset(
-        #     {
-        #         "WSSH": ("TIME", waves['WSSH'].to_numpy()),
-        #         "WPFM": ("TIME", waves["WPFM"].to_numpy()),
-        #         "WPPE": ("TIME", waves["WPPE"].to_numpy()),
-        #         "SSWMD": ("TIME", waves["SSWMD"].to_numpy()),
-        #         "WPDI": ("TIME", waves["WPDI"].to_numpy()),
-        #         "WMDS": ("TIME", waves["WMDS"].to_numpy()),
-        #         "WPDS": ("TIME", waves["WPDS"].to_numpy()),
-
-        #     },
-        #     coords={
-        #         "TIME": waves["TIME"].to_numpy(),
-        #         "LATITUDE": ("TIME", waves["LATITUDE"].to_numpy()),
-        #         "LONGITUDE": ("TIME", waves["LONGITUDE"].to_numpy())
-        #     }
-        # )
 
 
