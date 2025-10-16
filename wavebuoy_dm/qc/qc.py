@@ -19,6 +19,14 @@ class WaveBuoyQC():
         self.qc_configs = self.get_qc_configs()
         self.qc_config = self.select_qc_config(qc_configs=self.qc_configs, config_id=config_id)
         self.qc_config_dict = self.convert_qc_config_to_dict(qc_config=self.qc_config )
+    
+    @property
+    def data(self) -> pd.DataFrame:
+        return self._data
+    
+    @data.setter
+    def data(self, data: pd.DataFrame) -> None:
+        self._data = data
 
     def get_qc_configs(self, file_name: str = "qc_config.csv"):
         

@@ -394,7 +394,7 @@ def generate_bulk_NC_file(spectra_bulk_df,
     DEP_LOGGER.info(f"Creating global qc column")
     bulk_df = qc.create_global_qc_columns(data=bulk_df)
     
-    qc.load_data(data=bulk_df)
+    qc.data = bulk_df
     DEP_LOGGER.info(f"Extracting parameters to QC")
     parameters_to_qc = qc.get_parameters_to_qc(data=bulk_df, qc_config=qc.qc_config)           
     
