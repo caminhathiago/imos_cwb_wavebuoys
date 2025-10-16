@@ -421,8 +421,12 @@ class ncWriter:
     def _format_periods(self, periods: PeriodIndex) -> list:
         return [(period[0].strftime("%Y%m%d"), period[1].strftime("%Y%m%d")) for period in periods]
 
-    def _format_site_id_to_filename(self, site_id:str) -> str:
-        return re.sub(r'(?<!^)(?=[A-Z0-9])', '-', site_id)
+    def _format_site_id_to_filename(self, site_id: str) -> str:
+        
+        site_id = re.sub(r'([a-z])([A-Z])', r'\1-\2', site_id)   # lower→UPPER boundary
+        site_id = re.sub(r'([A-Za-z])(\d+)', r'\1-\2', site_id)
+        
+        return site_id.upper()
 
     def compose_file_names(self,
                             site_id: str,
