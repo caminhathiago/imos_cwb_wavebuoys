@@ -11,38 +11,42 @@ from dotenv import load_dotenv
 load_dotenv()
 SITE_LOGGER = logging.getLogger("DM_processing")
 
-# path = Path(r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves\Data\wawaves\OceanBeach\delayedmode\OceanBeach_deploy20240701_retrieve20241205_SPOT31395C\log")
 
 class WaveBuoy():
 
     def extract_region_site_name(self, path: str) -> str:
+        
         parts = Path(path).parts 
         regions = {"wawaves", "sawaves", "qldwaves", "vicwaves", "nswwaves", "taswaves", "ntwaves"}
+        
         for i, part in enumerate(parts):
             if part in regions:
+                
                 if i + 1 < len(parts):
                     return parts[-2].split("_")[0], part#return parts[i + 1], part
+                
                 else:
                     raise Exception("Invalid path structure: no folder after region name")
 
         raise Exception("Invalid path: no recognized region found")
 
     def _get_buoys_metadata(self, buoy_type:str, buoys_metadata_file_name:str):
+        
         try:
             file_path = os.path.normpath(os.path.join(os.getenv('IRDS_PATH'), "Data", "website", "auswaves"))
+            
             if not os.path.exists(file_path):
                 raise FileNotFoundError("No such directory for buoys metadata: {}")
+            
             buoys_metadata_path = os.path.join(file_path, buoys_metadata_file_name)
             buoys_metadata = pd.read_csv(buoys_metadata_path)
             buoys_metadata = buoys_metadata.loc[buoys_metadata.type == buoy_type]
-            # buoys_metadata["region"] = self._get_regions(buoys_metadata=buoys_metadata)
             buoys_metadata = buoys_metadata.set_index('name')
-            # GENERAL_LOGGER.info("Buoys metadata grabbed successfully")
+            
             return buoys_metadata
 
         except:
             raise TypeError("Loading and processing buoys_metadata.csv unsuccessful. Check if the file is corrupted or if its structure has been changed")
-            # GENERAL_LOGGER.error(error_message, exc_info=True)
 
     def _get_deployment_metadata_files(self, site_name: str, region: str, file_extension: str = "*.xlsx") -> pd.DataFrame:
         
@@ -52,11 +56,14 @@ class WaveBuoy():
             
             if os.path.exists(os.path.join(files_path, "metadata")):
                 metadata_folder = "metadata"
+            
             elif os.path.exists(os.path.join(files_path, "AODN_metadata")):
                 SITE_LOGGER.warning(f"deployment metadata path for {site_name} is currently named as /AODN_metadata; rename it to /metadata")
                 metadata_folder = "AODN_metadata"
+            
             else:
                 SITE_LOGGER.error(f"metadata folder for {site_name} not found. Please make sure it exists named as metadata and that it contains the relevant deployment metadata files.")
+        
         else:
             SITE_LOGGER.error(f"folder for {site_name} not found. Please make sure it exists and has the same name as in buoys_metadata.")
         
@@ -66,6 +73,7 @@ class WaveBuoy():
 
         if files:
             return files
+        
         else:
             error_message = f"No deployment metadata files provided for {site_name}. Please make sure at least the most recent one exists and matches the correct file naming standar."
             SITE_LOGGER.error(error_message)
@@ -81,10 +89,11 @@ class WaveBuoy():
             filename = os.path.basename(file)
             if filename.startswith("~$"):
                 temp_files.append(file)
-                continue  # Skip lock files entirely
+                continue
 
             if template.search(filename):
                 matches.append(file)
+            
             else:
                 not_matches.append(file)
 
@@ -121,6 +130,7 @@ class WaveBuoy():
         try:
             date_pattern = re.compile(r"(\d{8}).xlsx")
             latest_date_file = max(file_paths, key=lambda x: int(date_pattern.search(x).group(1)))
+        
         except:
             SITE_LOGGER.warning("deployment metadata file date is set as YYYYmm. Try to include day of deployment.")
             date_pattern = re.compile(r"(\d{6}).xlsx")
@@ -132,6 +142,7 @@ class WaveBuoy():
         return latest_date_file
 
     def load_latest_deployment_metadata(self, site_name:str, region:str) -> pd.DataFrame:
+        
         file_paths = self._get_deployment_metadata_files(site_name=site_name, region=region)
         file_path = self._get_latest_deployment_metadata(file_paths=file_paths)
         
@@ -144,31 +155,37 @@ class WaveBuoy():
         return deployment_metadata
 
     def load_regional_metadata(self) -> pd.DataFrame:
+        
         metadata_path = os.path.normpath(os.getenv("METADATA_PATH"))
         regional_metadata_path = os.path.join(metadata_path, "regional_metadata.csv")
+        
         return pd.read_csv(regional_metadata_path)
     
     def load_buoys_to_process_by_region(self, region:str) -> pd.DataFrame:
-        'waves'
+        
         region_path = os.path.join(os.getenv('IRDS_PATH'), 'Data', region + 'waves')
         pattern = f"{region}_delayed_mode_buoys_to_process.csv"
         file_path = glob.glob(os.path.join(region_path, pattern))[0]
+        
         if os.path.exists(file_path):
             buoys_to_process = pd.read_csv(file_path)
             buoys_to_process = buoys_to_process.loc[buoys_to_process['process']==1]
             return buoys_to_process
+        
         else:
             raise NotADirectoryError(f"{file_path} does not exist")
 
     def load_buoys_to_process(self) -> pd.DataFrame:
-        'waves'
+        
         region_path = os.path.join(os.getenv('IRDS_PATH'), 'Data', 'aodn_dm_python')
         pattern = f"delayed_mode_buoys_to_process.csv"
         file_path = glob.glob(os.path.join(region_path, pattern))[0]
+        
         if os.path.exists(file_path):
             buoys_to_process = pd.read_csv(file_path, dtype={'dep_id': str})
             buoys_to_process = buoys_to_process.loc[buoys_to_process['process']==1]
             return buoys_to_process
+        
         else:
             raise NotADirectoryError(f"{file_path} does not exist")
 
@@ -182,5 +199,6 @@ class WaveBuoy():
             deploy_date = datetime.strptime(deploy_str, '%Y%m%d')
             retrieve_date = datetime.strptime(retrieve_str, '%Y%m%d')
             return deploy_date, retrieve_date, spot_id
+        
         else:
             raise ValueError(f"Unable to extract deploy and retrieve dates, and spot id from dm deployment folder")
