@@ -168,7 +168,7 @@ class DMSpotterProcessor:
         cp = csvProcess()
 
         results_filtered = []
-        for result in results:
+        for key, result in results.items():
             self.LOGGER.info(f"Filtering displacements data with passed deployment datetimes: {deploy_start} - {deploy_end}")
             result = cp.filter_deployment_dates(dataframe=result, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
                                             time_crop_start=0, time_crop_end=0)
