@@ -545,7 +545,7 @@ def generate_raw_displacements_NC_files(disp,
     fortnight_periods = ncDisp().extract_fortnightly_periods_dataset(dataset=disp_ds)
 
     DEP_LOGGER.info(f"Splitting global dataset into fortnightly datasets")
-    disp_ds_objects = ncDisp().split_dataset_fortnightly(dataset=disp_ds, periods=fortnight_periods)
+    disp_ds_objects, fortnight_periods = ncDisp().split_dataset_fortnightly(dataset=disp_ds, periods=fortnight_periods)
     
     DEP_LOGGER.info(f"Converting time to CF conventions")
     disp_ds_objects = ncSpectra().convert_time_to_CF_convention_ds_list(disp_ds_objects)

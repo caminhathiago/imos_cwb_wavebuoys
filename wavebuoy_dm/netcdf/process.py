@@ -250,8 +250,12 @@ class ncDisp(Process):
             print(period)
             start = str(period[0])
             end = str(period[1]) #str(period[1] - timedelta(days=1)) if period != periods[-1] else str(period[1])
-            fortnightly_dataset = dataset.sel(TIME=slice(start, end),
-                                              TIME_LOCATION=slice(start, end))
+            fortnightly_dataset = dataset.sel(TIME=slice(start, end), TIME_LOCATION=slice(start, end))
+            
+            if fortnightly_dataset.TIME.size == 0:
+               periods.remove(period)
+               continue
+
             dataset_objects.append(fortnightly_dataset)
         return tuple(dataset_objects)
     
