@@ -387,14 +387,7 @@ class csvProcess:
             else 0
         )
 
-        # filtered_df = dataframe.filter(pl.col("distance") >= watch_circle) # flag as 3
-        # filtered_df = dataframe.filter(pl.col("distance") >= watch_circle*watch_circle_fail) # flag as 4
-        
-        # percentage_cropped = (1 - (filtered_df.shape[0]/raw_records)) * 100
-
-        return dataframe, (pct_flag_3 + pct_flag_4)
-
-
+        return dataframe, round(pct_flag_3 + pct_flag_4,2)
 
     def filter_watch_circle_geodesic(self, 
                             dataframe:pl.DataFrame,
@@ -499,9 +492,10 @@ class csvProcess:
                     "B2": pl.Float32,
                     "ENERGY": pl.Float32,
                             }
+        
+        return dataframe.with_columns([
                     dataframe[col].arr.eval(pl.element().cast(dtype.inner)).alias(col) if isinstance(dtype, pl.Array)  
                     else dataframe[col].cast(dtype)  
                     for col, dtype in dtype_mapping.items()
             ])
-])
         
