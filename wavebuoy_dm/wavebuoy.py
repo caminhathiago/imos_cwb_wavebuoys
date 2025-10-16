@@ -72,36 +72,48 @@ class WaveBuoy():
             raise FileNotFoundError(error_message)
 
     def _validate_deployment_metadata_file_name(self, file_paths: list):
+       
         template = re.compile(r"metadata_[A-Za-z0-9]+_deploy(\d+).xlsx")
 
         matches, not_matches, temp_files = [], [], []
+
         for file in file_paths:
-            if template.search(file):
+            filename = os.path.basename(file)
+            if filename.startswith("~$"):
+                temp_files.append(file)
+                continue  # Skip lock files entirely
+
+            if template.search(filename):
                 matches.append(file)
             else:
-                if os.path.basename(file).startswith("~$"):
-                    temp_files.append(file)
-                else:
-                    not_matches.append(file)
+                not_matches.append(file)
 
         if not matches:
             error_message = "No deployment metadata files found."
             SITE_LOGGER.error(error_message)
             raise FileNotFoundError(error_message)
 
-        elif temp_files and not not_matches:
-            SITE_LOGGER.warning(f"the following deployment metadata sheets weren't closed properly: {temp_files}")
+        if temp_files:
+            SITE_LOGGER.warning(
+                f"The following deployment metadata sheets weren't closed properly and were ignored: {temp_files}"
+            )
 
-        elif not_matches:
-            SITE_LOGGER.warning(file_paths)
-            SITE_LOGGER.warning(matches)
-            error_message = "At least one of the deployment metadata files name is not conforming with the expected template (metadata_{site_name}_deploy{YYYYmmdd}.xlsx). Make sure all of them are conforming."
+        if not_matches:
+            SITE_LOGGER.warning(f"Files provided: {file_paths}")
+            SITE_LOGGER.warning(f"Valid matches: {matches}")
+            error_message = (
+                "At least one of the deployment metadata file names does not conform "
+                "to the expected template (metadata_{site_name}_deploy{YYYYmmdd}.xlsx). "
+                "Make sure all of them conform."
+            )
             SITE_LOGGER.error(error_message)
             raise NameError(error_message)
 
+        return matches
+
     def _get_latest_deployment_metadata(self, file_paths: list) -> list:
         
-        self._validate_deployment_metadata_file_name(file_paths=file_paths)
+        file_paths = self._validate_deployment_metadata_file_name(file_paths=file_paths)
         
         file_paths.sort(key=os.path.getctime)
         latest_created_file = file_paths[-1]
@@ -154,7 +166,7 @@ class WaveBuoy():
         pattern = f"delayed_mode_buoys_to_process.csv"
         file_path = glob.glob(os.path.join(region_path, pattern))[0]
         if os.path.exists(file_path):
-            buoys_to_process = pd.read_csv(file_path)
+            buoys_to_process = pd.read_csv(file_path, dtype={'dep_id': str})
             buoys_to_process = buoys_to_process.loc[buoys_to_process['process']==1]
             return buoys_to_process
         else:
