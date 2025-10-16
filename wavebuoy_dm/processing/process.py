@@ -111,11 +111,14 @@ class csvProcess:
         )
 
         df_lazy = df_lazy.with_columns(
-                pl.from_epoch((pl.col(time_col) * 1e9)
-                .cast(pl.Int64), time_unit="ns")
-                .alias("datetime")
-            )
-        
+            pl.from_epoch(pl.col(time_col), time_unit="s").alias("datetime")
+        )
+
+        # df_lazy = df_lazy.filter(
+        #     (pl.col('datetime') > datetime(2010,1,1,0,0,0)) &
+        #      (pl.col('datetime') < datetime.now())
+        #      )
+
         if drop_original_column:
             return self.drop_column(df_lazy, column_name=time_col)
         else:
