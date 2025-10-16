@@ -493,11 +493,10 @@ def generate_bulk_NC_file(spectra_bulk_df,
     DEP_LOGGER.info(f"WAVE-PARAMETERS netCDFs successfully generated")
 
     if generate_plots:
-        
         p = Plots(site_name=site_name,
                   deployment_folder=site_buoys_to_process.loc["datapath"],
                   output_path=output_path)
-        # p.map_positions(data=bulk_df, map_coverage=(40,20,5,1,.3), figsize=(10,10))
+
         DEP_LOGGER.info(f"Generating subflags plots for each variable")
         p.qc_subflags_each_variable(dataset=bulk_ds,
                                     waves_subflags=bulk_df, 

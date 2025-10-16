@@ -247,17 +247,6 @@ class csvConcat:
         return suffixes_schemas
 
     def load_csv(self, file: str, truncate_ragged_lines: bool = True) -> pl.LazyFrame:
-        """
-        Load a CSV file into a Polars lazy dataframe.
-
-        Args:
-            file (str): The file path to the CSV file.
-            truncate_ragged_lines (bool): IF polars should truncated ragged lines.
-                This is useful when working with spotters because sometimes CSV files contain rows
-                with more fields than columns, so this argument makes sure those are ignored.
-        Returns:
-            pl.LazyFrame: A lazy dataframe containing the CSV data.
-        """
         return pl.scan_csv(file,
                            truncate_ragged_lines=truncate_ragged_lines,
                            infer_schema_length=1000,
@@ -281,52 +270,22 @@ class csvConcat:
     def map_concat_results(self) -> dict:
         return {suffix: [] for suffix in self.suffixes_to_concat} 
 
-    # def get_displacement_columns(self, df_lazy: pl.LazyFrame) -> list:
-    #     columns_ignore = ["GPS_Epoch_Time(s)", "millis"]
-    #     return [col for col in df_lazy.collect_schema().keys() if "out" in col]
-
     def lazy_concat_files(self) -> pl.LazyFrame:
-        """
-        Process all CSV files in the list by loading them, adding a datetime column,
-        and concatenating them into a single lazy dataframe.
-
-        Returns:
-            pl.LazyFrame: A single lazy dataframe containing all processed data.
-        """
-
+      
         results = self.map_concat_results()
 
         for suffix in self.files_suffixes.keys():
-            # print(suffix)
             data_list = []
             
             for file in self.files_suffixes[suffix]:
                 if self.ignore_files(file=file) and self.validate_schema(file, suffix):
                     df_lazy = self.load_csv(file)
-                    # print(list(df_lazy.collect_schema()))
                     data_list.append(df_lazy)
 
             if not data_list:
                 continue
 
             
-
-            concat_df_lazy = pl.concat(data_list, how="vertical")    
             results.update({suffix:concat_df_lazy})
 
-            # print("="*60)
-
         return results
-
-    
-
-
-
-# # Usage Example
-# if __name__ == "__main__":
-#     files = ['file1.csv', 'file2.csv', 'file3.csv']  # Replace with actual file paths
-#     processor = csvConcatenator(files)
-#     final_df_lazy = processor.process_files()
-
-#     # Show schema of the final dataframe
-#     print(final_df_lazy.collect_schema())

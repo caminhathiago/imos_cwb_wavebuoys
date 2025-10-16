@@ -21,38 +21,35 @@ class WaveBuoyQC():
         self.qc_config_dict = self.convert_qc_config_to_dict(qc_config=self.qc_config )
 
     def get_qc_configs(self, file_name: str = "qc_config.csv"):
+        
         file_path = os.path.join(os.getenv('METADATA_PATH'), file_name)
-        # file_path = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves\Data\aodn_nrt_python\qc_config_TC.csv"
+        
         if os.path.exists(file_path):
             return pd.read_csv(file_path)
+        
         else:
             error_message = "qc limits file not found, make sure it is in the relevant path."
             SITE_LOGGER.error(error_message)
             raise FileNotFoundError(error_message)
         
     def select_qc_config(self, qc_configs: pd.DataFrame, config_id: int) -> pd.DataFrame:
+        
         if not (isinstance(config_id, int) or isinstance(config_id, float)):
             raise ValueError(f"config id passed ({config_id}) is not valid. Check buoys_to_process.csv")
+        
         return qc_configs.loc[qc_configs["config_id"] == config_id]
     
     def convert_qc_config_to_dict(self, qc_config: pd.DataFrame) -> dict:
+        
         return (qc_config
                 .set_index("parameter")
                 .drop(columns=["id","config_id"])
                 .to_dict(orient="index")
             )
-    
-    def load_data(self, data: pd.DataFrame) -> pd.DataFrame:
-        self.data = data
 
     def drop_unwanted_variables(self, data: pd.DataFrame) -> pd.DataFrame:
         
         variables_to_drop = ['TIME', 'TIME_TEMP', 'timeSeries', 'LATITUDE', 'LONGITUDE', 'processing_source']
-
-        # if "qc_flag_watch" in data.columns:
-        #     variables_to_drop.append('qc_flag_watch')
-        # if "distance" in data.columns:
-        #     variables_to_drop.append("distance")
 
         columns_to_drop = [col for col in variables_to_drop if col in data.columns]
 
@@ -75,19 +72,7 @@ class WaveBuoyQC():
         
         qc_config_parameters = qc_config.loc[qc_config["enable_checks"] == 1,"parameter"].values
 
-        # check = [param in qc_config_parameters for param in data_variables]
         return [param for param in qc_config_parameters if param in data_variables]
-
-        if all(check):
-            return params_to_qc
-        
-        if any(check) or not all(check):
-            print("not all parameters are present")
-            
-            params_missing = [param for param in data_variables if param not in qc_config_parameters]
-            error_message = f"{params_missing} not set in the desired qc_config. Please check qc_config file"
-            SITE_LOGGER.error(error_message)
-            raise KeyError(error_message)
 
     def check_qc_limits(self, qc_config: pd.DataFrame):
         
@@ -97,26 +82,20 @@ class WaveBuoyQC():
                         .rename(columns={"level_1":"threshold"})
                         .drop(columns=0)
                         .set_index("parameter")
-                        # .to_dict(orient="records")
                     )
         
         if not nan_locs.empty:
             error_message = f"tresholds not provided for some parameters and tests:\n{nan_locs}"
-            # SITE_LOGGER.error(error_message)
             raise ValueError(error_message)    
 
     def _create_parameters_qc_column(self, data: pd.DataFrame, parameter: str, test: str) -> pd.DataFrame:
         
         not_eval_flag = 2.0
-        # wave_qc_column = "WAVE_quality_control"
-        
-        # if parameter in self.waves_parameters:
-        #     if not wave_qc_column in data.columns:
-        #         data[wave_qc_column] = not_eval_flag
-        # else:
         param_qc_column =  parameter + f"_{test}"
+        
         if parameter in self.waves_parameters:
             param_qc_column = "WAVE_QC_" + param_qc_column
+        
         else:
             param_qc_column = "TEMP_QC_" + param_qc_column
         
@@ -201,11 +180,6 @@ class WaveBuoyQC():
             max_threshold=qc_config[parameter]["gross_range_fail_max"],
             min_threshold=qc_config[parameter]["gross_range_fail_min"]
             )
-        #     suspect_span=[qc_config[parameter]["gross_range_suspect_min"],
-        #                 qc_config[parameter]["gross_range_suspect_max"]],
-        #     fail_span=[qc_config[parameter]["gross_range_fail_min"],
-        #             qc_config[parameter]["gross_range_fail_max"]]
-        # )
 
         test_name = "gross_range_test"
         param_qc_column, data = self._create_parameters_qc_column(data=data, parameter=parameter, test=test_name)
@@ -258,182 +232,9 @@ class WaveBuoyQC():
         param_qc_column, data = self._create_parameters_qc_column(data=data, parameter=parameter, test=test_name)
 
         data[param_qc_column] = results
-
-        qc_basic_report = self.flags_counter(results=results)
         
-        SITE_LOGGER.info(f"{parameter} | rate of change test completed") #| {qc_basic_report}")
+        SITE_LOGGER.info(f"{parameter} | rate of change test completed")
         return data
-
-    # def flat_line(self,
-    #               data: pd.Series,
-    #               time: pd.Series,
-    #               suspect_threshold: int,
-    #               fail_threshold:int,
-    #               tolerance: int):
-    
-    #     def check_suspect(diff_vals, lim):
-    #         return 3 if np.all(np.abs(diff_vals) < lim) else 1
-
-    #     def check_fail(diff_vals, lim):
-    #         return 4 if np.all(np.abs(diff_vals) < lim) else 1
-
-    #     def compare_qcflag(qc_sus, qc_fail):
-    #         if qc_sus == 2 and qc_fail == 2:
-    #             return 2
-    #         elif qc_sus == 1 and qc_fail == 1:
-    #             return 1
-    #         else:
-    #             return max(qc_sus, qc_fail)
-
-    #     data = data.values
-    #     n = len(data)
-        
-    #     if n < suspect_threshold:
-    #         print("Dataset not long enough for FLATLINE TEST")
-    #         return np.full(n, 2)
-
-    #     QCFlag_suspect = np.zeros(n, dtype=int)
-    #     for i in range(n):
-    #         if i < suspect_threshold:
-    #             QCFlag_suspect[i] = 2  # not assessed
-    #         else:
-    #             check = np.diff(data[i - suspect_threshold: i + 1])
-    #             QCFlag_suspect[i] = check_suspect(check, tolerance)
-
-    #     QCFlag_fail = np.zeros(n, dtype=int)
-    #     for i in range(n):
-    #         if i < fail_threshold:
-    #             QCFlag_fail[i] = 2  # not assessed
-    #         else:
-    #             check = np.diff(data[i - fail_threshold: i + 1])
-    #             QCFlag_fail[i] = check_fail(check, tolerance)
-
-    #     QCFlag = np.zeros(n, dtype=int)
-    #     for i in range(n):
-    #         QCFlag[i] = compare_qcflag(QCFlag_suspect[i], QCFlag_fail[i])
-
-    #     return QCFlag
-    
-    def flat_line_deprecated2(self,
-              data: pd.Series,
-              time: pd.Series,
-              suspect_threshold: int,  # in hours
-              fail_threshold: int,     # in hours
-              tolerance: float) -> pd.Series:
-        """
-        QARTOD flat line test translated from MATLAB version.
-
-        Returns:
-            QCFlag: pd.Series of QC flags (1: good, 2: not assessed, 3: suspect, 4: fail)
-        """
-        
-        # Subfunctions (same logic as MATLAB)
-        def check_suspect(diffs: np.ndarray, tolerance: float) -> int:
-            if np.all(np.abs(diffs) < tolerance):
-                return 3  # suspect
-            else:
-                return 1  # good
-
-        def check_fail(diffs: np.ndarray, tolerance: float) -> int:
-            if np.all(np.abs(diffs) < tolerance):
-                return 4  # fail
-            else:
-                return 1  # good
-
-        def compare_qcflag(qc_sus: int, qc_fail: int) -> int:
-            if qc_sus == 2 and qc_fail == 2:
-                return 2
-            elif qc_sus == 1 and qc_fail == 1:
-                return 1
-            elif qc_sus < qc_fail:
-                return qc_fail
-            else:
-                return qc_sus
-        
-        # Check data is long enough
-        if len(data) < suspect_threshold:
-            print("Dataset not long enough for FLATLINE TEST")
-            return pd.Series([2] * len(data), index=data.index)
-
-        # Initialize QC flags
-        QCFlag_suspect = pd.Series(0, index=data.index)
-        QCFlag_fail = pd.Series(0, index=data.index)
-        QCFlag = pd.Series(0, index=data.index)
-
-        # Loop for suspect flags
-        for ii in range(len(data)):
-            if ii < suspect_threshold:
-                QCFlag_suspect.iloc[ii] = 2  # not assessed
-            else:
-                check_data = np.diff(data.iloc[ii - suspect_threshold:ii + 1])
-                QCFlag_suspect.iloc[ii] = check_suspect(check_data, tolerance)
-
-        # Loop for fail flags
-        for ii in range(len(data)):
-            if ii < fail_threshold:
-                QCFlag_fail.iloc[ii] = 2  # not assessed
-            else:
-                check_data = np.diff(data.iloc[ii - fail_threshold:ii + 1])
-                QCFlag_fail.iloc[ii] = check_fail(check_data, tolerance)
-
-        # Final comparison
-        for ii in range(len(data)):
-            QCFlag.iloc[ii] = compare_qcflag(QCFlag_suspect.iloc[ii], QCFlag_fail.iloc[ii])
-
-        return QCFlag
-
-    def flat_line_deprecated(self,
-              data: pd.Series,
-              time: pd.Series,
-              suspect_threshold: int,  # in hours
-              fail_threshold: int,     # in hours
-              tolerance: int):
-
-        # Ensure time is datetime and data has it as index
-        data = data.copy()
-        data.index = pd.to_datetime(time)
-
-        if data.shape[0] < suspect_threshold:
-            print("Dataset not long enough for FLATLINE TEST")
-            return pd.Series([2] * len(data), index=data.index)
-
-        # Define subfunctions
-        def make_check(threshold_val, window_hours):
-            def check(vals):
-                if vals.isna().any():
-                    return 2  # not assessed
-               
-                diffs = vals.diff().dropna().abs()
-                if (diffs < tolerance).all():
-                    return threshold_val
-                return 1
-            return check
-
-        check_suspect_fn = make_check(3, suspect_threshold)  # suspect = 3
-        check_fail_fn = make_check(4, fail_threshold)     # fail = 4
-
-        # Apply rolling checks
-        print("checking suspect")
-        rolling_suspect = data.rolling(f"{suspect_threshold}h").apply(check_suspect_fn, raw=False)
-        print("checking fail")
-        rolling_fail = data.rolling(f"{fail_threshold}h").apply(check_fail_fn, raw=False)
-        print("checks done")
-        # Fill leading unassessed values
-        rolling_suspect.iloc[:suspect_threshold] = 2
-        rolling_fail.iloc[:fail_threshold] = 2
-
-        # Compare flags
-        def compare_qcflag(row):
-            qc_sus, qc_fail = row
-            if qc_sus == 2 and qc_fail == 2:
-                return 2
-            elif qc_sus == 1 and qc_fail == 1:
-                return 1
-            else:
-                return max(qc_sus, qc_fail)
-
-        combined_qc = pd.concat([rolling_suspect, rolling_fail], axis=1).apply(compare_qcflag, axis=1)
-        return combined_qc.astype(int)
 
     def flat_line(self,
               data: pd.Series,
@@ -508,15 +309,13 @@ class WaveBuoyQC():
             tolerance=qc_config[parameter]["flat_line_tol_dm"]
         )
         
-        
         test_name = "flat_line_test"
         param_qc_column, data = self._create_parameters_qc_column(data=data, parameter=parameter, test=test_name)
 
         data[param_qc_column] = results
 
-        # qc_basic_report = self.flags_counter(results=results)
         
-        SITE_LOGGER.info(f"{parameter} | flat line test completed") #| {qc_basic_report}")
+        SITE_LOGGER.info(f"{parameter} | flat line test completed")
         return data
 
     def mean_std(self, data: pd.Series, time: pd.Series, time_window: int, std: float) -> list[int]:
@@ -531,14 +330,6 @@ class WaveBuoyQC():
 
                 idx = (time >= tstart) & (time <= tend)
                 ddata = data[idx].to_numpy()
-                
-                # idx = np.where((time >= tstart) & (time <= tend))[0]
-                # ddata = data.iloc[idx].to_numpy()
-                # ddata = ddata[~np.isnan(ddata)]  # remove NaNs
-
-                # if len(ddata) == 0:
-                #     qc_flags.append(2)  # Not enough data to assess
-                #     continue
 
                 mean = np.nanmean(ddata)
                 Mhi = mean + (std * np.nanstd(ddata, ddof=1))
@@ -552,40 +343,6 @@ class WaveBuoyQC():
                 qc_flags.append(2) 
 
         return qc_flags
-
-    def mean_std_deprecated(self, time:pd.DatetimeIndex, time_window:int, std:float, data: pd.Series):
-       
-         # Make sure the DataFrame index matches the given time
-        data = data.copy()
-        data.index = time
-        # Apply rolling window based on time
-        print("test2")
-        rolling_obj = data.rolling(window=f"{2 * int(time_window)}h", center=True, min_periods=1)
-        
-
-        # Calculate rolling mean and std
-        rolling_mean = rolling_obj.mean()
-        rolling_std = rolling_obj.std()
-
-        # Calculate high and low thresholds
-        Mhi = rolling_mean + std * rolling_std
-        Mlow = rolling_mean - std * rolling_std
-        
-        # Initialize QC flags: 2 (NOT ASSESSED)
-        QCFlag = pd.Series(2, index=data.index, dtype=int)
-
-        # Assign flags based on comparison
-        # If data > Mhi or data < Mlow => SUSPECT (3)
-        suspect = (data > Mhi) | (data < Mlow)
-        QCFlag[suspect] = 3
-
-        # If data within thresholds => GOOD (1)
-        good = (~suspect) & (~data.isna())
-        QCFlag[good] = 1
-
-        # NaNs stay as NOT ASSESSED (2)
-
-        return QCFlag.values
 
     def mean_std_test(self, data: pd.DataFrame, parameter:str, qc_config: dict):
         
@@ -603,76 +360,6 @@ class WaveBuoyQC():
 
         SITE_LOGGER.info(f"{parameter} | mean std test completed")
         return data
-
-    def spike_deprecated2(self, time: pd.DatetimeIndex, data: pd.Series, roc: float) -> pd.Series:
-        """
-        Apply UWA spike quality control.
-
-        Args:
-            time (pd.DatetimeIndex): Time index for the data.
-            data (pd.Series): Time series data.
-            roc (float): Spike detection threshold (rate of change).
-
-        Returns:
-            pd.Series: QC flags (1 = Pass, 2 = Not assessed, 4 = Fail).
-        """
-        qc_flags = []
-
-        for i in range(len(data)):
-            if i == 0 or i == len(data) - 1:
-                qc_flags.append(2)  # Not assessed
-            else:
-                diff1 = data.iloc[i] - data.iloc[i - 1]
-                diff2 = data.iloc[i + 1] - data.iloc[i]
-                if (
-                    diff1 > 0 and diff2 < 0 and abs(diff1) > roc and abs(diff2) > roc
-                ) or (
-                    diff1 < 0 and diff2 > 0 and abs(diff1) > roc and abs(diff2) > roc
-                ):
-                    qc_flags.append(4)  # Spike detected
-                else:
-                    qc_flags.append(1)  # Pass
-
-        return qc_flags
-
-    def spike_deprecated(self, time: pd.DatetimeIndex, data: pd.Series, roc: float) -> pd.Series:
-        """
-        Spike test using a rolling window approach (centered on current point).
-        
-        Parameters:
-        - time: pd.DatetimeIndex of the data
-        - data: pd.Series with the data values
-        - roc: rate of change threshold to flag spikes
-        
-        Returns:
-        - pd.Series of QC flags (1=GOOD, 2=NOT ASSESSED, 4=SPIKE)
-        """
-        # Ensure data has proper index
-        data = data.copy()
-        data.index = time
-        
-        # Initialize QC flags to NOT ASSESSED (2)
-        QCFlag = pd.Series(2, index=data.index, dtype=int)
-
-        # Shifted differences
-        diff_prev = data.diff()
-        diff_next = data[::-1].diff()[::-1]  # equivalent to forward diff
-
-        # Spike detection: central point much higher/lower than neighbors
-        spike = (
-            ((diff_prev > 0) & (diff_next < 0) & (diff_prev.abs() > roc) & (diff_next.abs() > roc)) |
-            ((diff_prev < 0) & (diff_next > 0) & (diff_prev.abs() > roc) & (diff_next.abs() > roc))
-        )
-
-        QCFlag[spike] = 4  # SPIKE
-        QCFlag[~spike & ~data.isna()] = 1  # GOOD
-        # NaN values remain 2 (NOT ASSESSED)
-
-        # First and last points: not enough context to assess
-        QCFlag.iloc[0] = 2
-        QCFlag.iloc[-1] = 2
-
-        return QCFlag.values
     
     def spike(self, time: pd.DatetimeIndex, data: pd.Series, roc: float, directional:bool = False) -> pd.Series:
         
@@ -723,13 +410,11 @@ class WaveBuoyQC():
                         data: pd.DataFrame,
                         parameter_type: str = "waves",
                         drop_parameters_qc_columns: bool = True) -> pd.DataFrame:
-        
         """
         the main idea is to summarize qc flags for each parameter in one flag to be stored in WAVES_quality_control
         - select only qc related columns with filter(regex)
         - choose the highest value of the parameters (except for 9)
         - if Peak Period fails, everything fails
-        - 
         
         """
         
@@ -745,10 +430,6 @@ class WaveBuoyQC():
         
         if parameter_type_qc_columns.empty:
             return data
-
-        # for idx, row in data[parameter_type_qc_columns].iterrows():
-        #     data.loc[idx, global_qc_column] = row.max()
-        # data[global_qc_column] = data[parameter_type_qc_columns].max(axis=1)
 
         temp_flags = data[parameter_type_qc_columns].replace(2, 1)
         max_flags = temp_flags.max(axis=1)
@@ -819,47 +500,3 @@ class WaveBuoyQC():
         file_path = os.path.join(output_path, file_name)
         qc_report.to_csv(file_path)
 
-
-   # def compose_config(self,
-    #                    data: pd.DataFrame,
-    #                     parameters: list,
-    #                     start_date: datetime,
-    #                     end_date: datetime):
-
-    #     return
-    
-    # def compose_variable_stream_block(self, parameter: str) -> str:
-    #     config_stream_base = """streams:
-    #                             {parameter}:
-    #                                 qartod:
-    #                                 aggregate:
-    #                                 {test_block}
-    #                                 """
-        
-    # def compose_test_block(self, test: str, qc_limits: list) -> str:
-    #     if not "rate_of_change_test":
-    #         config_test_base = """{test}:
-    #                             suspect_span: [{qc_limit_suspect_min}, {qc_limit_suspect_max}]
-    #                             fail_span: [{qc_limit_fail_min}, {qc_limit_fail_max}]
-    #                             """
-    #     else:
-    #         config_test_base = """{test}:
-    #                             suspect_span: [{qc_limit_suspect_min}, {qc_limit_suspect_max}]
-    #                             fail_span: [{qc_limit_fail_min}, {qc_limit_fail_max}]
-    #                             """
-
-
-    # def create_flags_columns(self, data: pd.DataFrame, parameters: list) -> pd.DataFrame:
-        
-    #     not_eval_flag = 2.0
-    #     wave_qc_column = "WAVE_quality_control"
-        
-    #     for param in parameters:
-    #         if param in self.waves_parameters:
-    #             if not wave_qc_column in data.columns:
-    #                 data[wave_qc_column] = not_eval_flag
-    #         else:
-    #             param_qc_column = param + "_quality_control"
-    #             data[param_qc_column] = not_eval_flag 
-        
-    #     return data
