@@ -409,8 +409,8 @@ def generate_bulk_NC_file(spectra_bulk_df,
                                 spike_test=True)
    
     DEP_LOGGER.info(f"Saving QC results as csvs")
-    bulk_df.to_csv(os.path.join(output_path, "bulk_qc_subflags.csv"))
-    bulk_qualified.to_csv(os.path.join(output_path, "bulk_qc.csv"))
+    bulk_df.to_csv(os.path.join(output_path, "bulk_qc_subflags.csv"), index=False)
+    bulk_qualified.to_csv(os.path.join(output_path, "bulk_qc.csv"), index=False)
     DEP_LOGGER.info("Bulk parameters qualification successfull")
     
     if isinstance(temp, pl.DataFrame) and not temp.is_empty():
@@ -438,8 +438,8 @@ def generate_bulk_NC_file(spectra_bulk_df,
                                     spike_test=True)
         
         DEP_LOGGER.info(f"Saving QC results as csvs")
-        temp_qualified.to_csv(os.path.join(output_path, "temp_qc.csv"))
-        temp_df.to_csv(os.path.join(output_path, "temp_qc_subflags.csv"))
+        temp_qualified.to_csv(os.path.join(output_path, "temp_qc.csv"), index=False)
+        temp_df.to_csv(os.path.join(output_path, "temp_qc_subflags.csv"), index=False)
         
         DEP_LOGGER.info("Temp qualification successfull")
 
