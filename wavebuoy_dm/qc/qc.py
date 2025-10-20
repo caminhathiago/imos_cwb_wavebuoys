@@ -170,7 +170,7 @@ class WaveBuoyQC():
 
         for i in range(len(inp)):
             if inp[i] > max_threshold or inp[i] < min_threshold:
-                if parameter == "WSSH":
+                if parameter == "WSSH" or parameter == "WPPE":
                     QCFlag[i] = 4
                 else:
                     QCFlag[i] = 3
