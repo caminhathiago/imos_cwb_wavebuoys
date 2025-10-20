@@ -53,7 +53,7 @@ class ncAttrsExtractor:
 
     def _extract_data_geospatial_lon_units(dataset: xr.Dataset) -> str:
         return "degrees_east"
-    
+
     def _extract_data_date_created(dataset: xr.Dataset) -> str:
         return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -72,21 +72,21 @@ class ncAttrsExtractor:
     def _extract_deployment_metadata_hull_serial_number(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Hull serial number", "metadata_wave_buoy"]
     
-    def _extract_deployment_metadata_institution(deployment_metadata: pd.DataFrame) -> str:
-        op_inst_code = {"UWA":"The University of Western Australia",
-                          "Deakin":"Deakin University",
-                          "NSW-DCCEEW" : "New South Wales Department of Climate Change, Energy, the Environment and Water",
-                          "IMOS":"IMOS Coastal Wave Buoys",
-                          "SARDI": "South Australian Research and Development Institute"
-                          }
+    # def _extract_deployment_metadata_institution(deployment_metadata: pd.DataFrame) -> str:
+    #     op_inst_code = {"UWA":"The University of Western Australia",
+    #                       "Deakin":"Deakin University",
+    #                       "NSW-DCCEEW" : "New South Wales Department of Climate Change, Energy, the Environment and Water",
+    #                       "IMOS":"IMOS Coastal Wave Buoys Facility",
+    #                       "SARDI": "South Australian Research and Development Institute"
+    #                       }
         
-        operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
+    #     operating_institution = deployment_metadata.loc["Operating institution","metadata_wave_buoy"]
         
-        if "IMOS" in operating_institution:
-            return op_inst_code["IMOS"]
+    #     if "IMOS" in operating_institution:
+    #         return op_inst_code["IMOS"]
        
-        else:
-            return op_inst_code[operating_institution]
+    #     else:
+    #         return op_inst_code[operating_institution]
     
     def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Water depth", "metadata_wave_buoy"]
@@ -112,19 +112,28 @@ class ncAttrsExtractor:
     def _extract_deployment_metadata_wave_sensor_serial_number(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Wave sensor serial number", "metadata_wave_buoy"]
 
-    def _extract_deployment_metadata_title(deployment_metadata: pd.DataFrame) -> str:
+    # def _extract_deployment_metadata_title(deployment_metadata: pd.DataFrame) -> str:
         
-        base_title = """Near real time integral wave parameters from wave buoys collected by {operating_institution} using a {instrument} at {site_name}"""
-        operating_institution = ncAttrsExtractor._extract_deployment_metadata_institution(deployment_metadata=deployment_metadata)
+    #     base_title = """Delayed mode integral wave parameters from wave buoys collected by {operating_institution} using a {instrument} at {site_name}"""
+    #     operating_institution = ncAttrsExtractor._extract_deployment_metadata_institution(deployment_metadata=deployment_metadata)
+    #     instrument = ncAttrsExtractor._extract_deployment_metadata_instrument(deployment_metadata=deployment_metadata)
+    #     site_name = ncAttrsExtractor._extract_deployment_metadata_site_name(deployment_metadata=deployment_metadata)
+        
+    #     return base_title.format(operating_institution=operating_institution,
+    #                             instrument=instrument,
+    #                             site_name=site_name)
+
+    def _extract_deployment_metadata_title(deployment_metadata: pd.DataFrame, regional_metadata: pd.DataFrame) -> str:
+        base_title = """Delayed mode integral wave parameters from wave buoys collected by {operating_institution} using a {instrument} at {site_name}"""
+        operating_institution = ncAttrsExtractor._extract_regional_metadata_institution(deployment_metadata=deployment_metadata, regional_metadata=regional_metadata)
         instrument = ncAttrsExtractor._extract_deployment_metadata_instrument(deployment_metadata=deployment_metadata)
         site_name = ncAttrsExtractor._extract_deployment_metadata_site_name(deployment_metadata=deployment_metadata)
-        
         return base_title.format(operating_institution=operating_institution,
                                 instrument=instrument,
                                 site_name=site_name)
 
-    def _extract_deployment_metadata_abstract(deployment_metadata: pd.DataFrame) -> str:
-        return ncAttrsExtractor._extract_deployment_metadata_title(deployment_metadata=deployment_metadata)
+    def _extract_deployment_metadata_abstract(deployment_metadata: pd.DataFrame, regional_metadata:pd.DataFrame) -> str:
+        return ncAttrsExtractor._extract_deployment_metadata_title(deployment_metadata=deployment_metadata, regional_metadata=regional_metadata)
 
     # from regional metadata -------------
     def _process_operating_institution(deployment_metadata: pd.DataFrame) -> str:
@@ -159,6 +168,10 @@ class ncAttrsExtractor:
     def _extract_regional_metadata_project(regional_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame) -> str:
         operating_institution_code = ncAttrsExtractor._process_operating_institution(deployment_metadata=deployment_metadata)
         return regional_metadata.loc[regional_metadata["operating_institution"]==operating_institution_code, "project"].values[0]
+
+    def  _extract_regional_metadata_institution(regional_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame) -> str:
+        operating_institution_code = ncAttrsExtractor._process_operating_institution(deployment_metadata=deployment_metadata)
+        return regional_metadata.loc[regional_metadata["operating_institution"]==operating_institution_code, "operating_institution_long_name"].values[0]
 
     # generally pre-defined --------------------
     def _extract_data_history(dataset: xr.Dataset) -> str:
@@ -251,7 +264,7 @@ class ncAttrsComposer:
                 if "quality_control" in variable:
                     variables_attributes["flag_values"] = np.int8(variables_attributes["flag_values"])
                 
-                if "valid_min" in variables_attributes or variable not in ("TIME","timeSeries", "FREQUENCY"):
+                if "valid_min" in variables_attributes or variable not in ("TIME", "TIME_TEMP", "timeSeries", "FREQUENCY"):
                     variables_attributes["valid_min"], variables_attributes["valid_max"] = self._match_valid_min_max_dtype(
                                                                                 variable=variable,
                                                                                 dataset=dataset,
@@ -307,6 +320,8 @@ class ncAttrsComposer:
                     elif name.startswith("_extract_deployment_metadata_"):
                         key = name.removeprefix("_extract_deployment_metadata_") 
                         kwargs = {"deployment_metadata":self.deployment_metadata}
+                        if name.endswith("_title") or name.endswith("_abstract"):
+                            kwargs.update({"regional_metadata":self.regional_metadata})
                     
                     elif name.startswith("_extract_general_"):
                         key = name.removeprefix("_extract_general_") 
