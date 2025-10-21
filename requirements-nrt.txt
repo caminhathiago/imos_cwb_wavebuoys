@@ -1,0 +1,4 @@
+pysofar
+requests
+boto3
+awscli

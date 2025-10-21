@@ -270,30 +270,82 @@ def calculate_spectra_from_displacements(disp: pl.DataFrame, enable_dask:bool):
     merge = s.define_merging(nfft=nfft)
     nover = 0.5
 
+    # if enable_dask:
+    #     DEP_LOGGER.info(f"Processing dask chunks for spectra calculation")
+    #     disp_chunks_30m = s.generate_time_chunks(disp, time_chunk='30m')
+    #     disp_chunks_30m = s.filter_insufficient_samples(disp_chunks_30m, min_samples)
+        
+    #     DEP_LOGGER.info(f"Splitting dask chunks by the number of workers (= {num_workers})")
+    #     disp_dask_chunks = s.generate_dask_chunks(disp_chunks_30m, num_workers)
+
+    #     DEP_LOGGER.info(f"Creating dask tasks")
+    #     disp_tasks = [dask.delayed(s.process_dask_chunk)
+    #             (dask_chunk, nfft, nover, fs, merge, 'xyz', info) 
+    #             for dask_chunk in disp_dask_chunks]
+
+    #     DEP_LOGGER.info(f"Computing dask tasks")
+    #     spectra_bulk_results = dask.compute(*disp_tasks)
+
+    #     DEP_LOGGER.info(f"Concatenating dask computed results")
+    #     spectra_bulk_df = pl.concat(spectra_bulk_results)
+
+    #     return spectra_bulk_df
+    
+    # else:
+    #     DEP_LOGGER.info(f"Calculating spectra with whole displacements data")
+    #     return s.spectra_from_dataframe(disp, nfft, nover, fs, merge, 'xyz', min_samples, info)
     if enable_dask:
-        DEP_LOGGER.info(f"Processing dask chunks for spectra calculation")
+        DEP_LOGGER.info("Processing Dask chunks for spectra calculation")
+
         disp_chunks_30m = s.generate_time_chunks(disp, time_chunk='30m')
         disp_chunks_30m = s.filter_insufficient_samples(disp_chunks_30m, min_samples)
-        
-        DEP_LOGGER.info(f"Splitting dask chunks by the number of workers (= {num_workers})")
+
+        DEP_LOGGER.info(f"Splitting Dask chunks by the number of workers (= {num_workers})")
         disp_dask_chunks = s.generate_dask_chunks(disp_chunks_30m, num_workers)
 
-        DEP_LOGGER.info(f"Creating dask tasks")
-        disp_tasks = [dask.delayed(s.process_dask_chunk)
-                (dask_chunk, nfft, nover, fs, merge, 'xyz', info) 
-                for dask_chunk in disp_dask_chunks]
+        # --- Distributed workflow starts here ---
+        DEP_LOGGER.info("Initializing Dask client")
+        client = Client()  # You can customize (e.g. Client(processes=False)) if needed
 
-        DEP_LOGGER.info(f"Computing dask tasks")
-        spectra_bulk_results = dask.compute(*disp_tasks)
+        DEP_LOGGER.info("Scattering chunks to workers")
+        scattered_chunks = client.scatter(disp_dask_chunks)
 
-        DEP_LOGGER.info(f"Concatenating dask computed results")
+        DEP_LOGGER.info("Submitting Dask tasks")
+        futures = [
+            client.submit(
+                s.process_dask_chunk,
+                chunk,
+                nfft,
+                nover,
+                fs,
+                merge,
+                'xyz',
+                info
+            )
+            for chunk in scattered_chunks
+        ]
+
+        DEP_LOGGER.info("Gathering computed results from workers")
+        spectra_bulk_results = client.gather(futures)
+
+        DEP_LOGGER.info("Concatenating Dask computed results")
         spectra_bulk_df = pl.concat(spectra_bulk_results)
 
+        client.close()
         return spectra_bulk_df
-    
+
     else:
-        DEP_LOGGER.info(f"Calculating spectra with whole displacements data")
-        return s.spectra_from_dataframe(disp, nfft, nover, fs, merge, 'xyz', min_samples, info)
+        DEP_LOGGER.info("Calculating spectra with whole displacements data")
+        return s.spectra_from_dataframe(
+            disp,
+            nfft,
+            nover,
+            fs,
+            merge,
+            'xyz',
+            min_samples,
+            info
+        )
 
 def generate_spectra_NC_file(spectra_bulk_df,
                             gps,
@@ -409,8 +461,8 @@ def generate_bulk_NC_file(spectra_bulk_df,
                                 spike_test=True)
    
     DEP_LOGGER.info(f"Saving QC results as csvs")
-    bulk_df.to_csv(os.path.join(output_path, "bulk_qc_subflags.csv"))
-    bulk_qualified.to_csv(os.path.join(output_path, "bulk_qc.csv"))
+    bulk_df.to_csv(os.path.join(output_path, "bulk_qc_subflags.csv"), index=False)
+    bulk_qualified.to_csv(os.path.join(output_path, "bulk_qc.csv"), index=False)
     DEP_LOGGER.info("Bulk parameters qualification successfull")
     
     if isinstance(temp, pl.DataFrame) and not temp.is_empty():
@@ -438,8 +490,8 @@ def generate_bulk_NC_file(spectra_bulk_df,
                                     spike_test=True)
         
         DEP_LOGGER.info(f"Saving QC results as csvs")
-        temp_qualified.to_csv(os.path.join(output_path, "temp_qc.csv"))
-        temp_df.to_csv(os.path.join(output_path, "temp_qc_subflags.csv"))
+        temp_qualified.to_csv(os.path.join(output_path, "temp_qc.csv"), index=False)
+        temp_df.to_csv(os.path.join(output_path, "temp_qc_subflags.csv"), index=False)
         
         DEP_LOGGER.info("Temp qualification successfull")
 

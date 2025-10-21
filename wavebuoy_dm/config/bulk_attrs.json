@@ -18,9 +18,8 @@
         "calendar": "gregorian",
         "standard_name": "time",
         "long_name": "temperature measurement time",
+        "sampling_period_timestamp_location": "start",
         "axis": "T",
-        "valid_min": 0.0,
-        "valid_max": 90000.0,
         "comment": "This is the time at which temperature information is sampled"
         },
         "LATITUDE": {
@@ -49,9 +48,10 @@
         "units": "s",
         "_FillValue": -9999.0,
         "valid_min": 0.0,
-        "valid_max": 50.0,
+        "valid_max": 30.0,
         "method": "Spectral analysis method",
         "ancillary_variables": "WAVE_quality_control",
+        "comment": "The first wave period is calculated as m0/m1 where m0 and m1 are the zeroth order and first order moments of the wave spectrum",
         "coordinates": "TIME LATITUDE LONGITUDE"
         },
         "WPPE": {
@@ -60,9 +60,10 @@
         "units": "s",
         "_FillValue": -9999.0,
         "valid_min": 0.0,
-        "valid_max": 50.0,
+        "valid_max": 30.0,
         "method": "Spectral analysis method",
         "coordinates": "TIME LATITUDE LONGITUDE",
+        "comment": "Period of the peak of the energy spectrum",
         "ancillary_variables": "WAVE_quality_control"
         },
         "SSWMD": {
@@ -75,6 +76,7 @@
         "_FillValue": -9999.0,
         "valid_min": 0.0,
         "valid_max": 360.0,
+        "comment": "Direction (related to the true north direct from instrument) from which the mean period waves are coming from",
         "ancillary_variables": "WAVE_quality_control",
         "coordinates": "TIME LATITUDE LONGITUDE"
         },
@@ -88,6 +90,7 @@
         "valid_min": 0.0,
         "valid_max": 360.0,
         "method": "Spectral analysis method",
+        "comment": "Direction (related to the true north direct from instrument) from which the peak period waves are coming from",
         "ancillary_variables": "WAVE_quality_control",
         "coordinates": "TIME LATITUDE LONGITUDE"
         },
@@ -123,7 +126,7 @@
         "units": "m",
         "_FillValue": -9999.0,
         "valid_min": 0.0,
-        "valid_max": 100.0,
+        "valid_max": 20.0,
         "method": "Spectral analysis method",
         "ancillary_variables": "WAVE_quality_control",
         "coordinates": "TIME LATITUDE LONGITUDE"

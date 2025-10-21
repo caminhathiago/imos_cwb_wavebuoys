@@ -7,7 +7,9 @@ def read_requirements(filename):
     with open(filename, encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip() and not line.startswith("#")]
 
-PACKAGE_NAME = 'imos-coastal-wavebuoys'
+common_reqs = read_requirements("requirements.txt")
+nrt_reqs = common_reqs + read_requirements("requirements-nrt.txt")
+dm_reqs = common_reqs + read_requirements("requirements-dm.txt")
 
 PACKAGE_EXCLUDES = [
     "config",
@@ -30,15 +32,15 @@ PACKAGE_DATA = {
 }
 
 setup(
-    name=PACKAGE_NAME,
+    name='imos-cwb-wavebuoys',
     version='0.1.0',
     description='Toolboxes for near real-time and delayed-mode wave buoy data processing',
     author='Thiago Caminha, Michael Cuttler',
     author_email='thiago.caminha@uwa.edu.au, michael.cuttler@uwa.edu.au',
     url='',
-    install_requires=read_requirements("requirements.txt"),
-    packages=find_packages(include=PACKAGE_INCLUDES,
-                           exclude=PACKAGE_EXCLUDES),
+    install_requires=common_reqs,
+    extras_require={"wavebuoy_nrt": nrt_reqs, "wavebuoy_dm": dm_reqs},
+    packages=find_packages(include=PACKAGE_INCLUDES, exclude=PACKAGE_EXCLUDES),
     package_data=PACKAGE_DATA,
     zip_safe=False,
     python_requires='>3.8'

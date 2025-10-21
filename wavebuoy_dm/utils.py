@@ -480,13 +480,17 @@ class Plots:
 
             # Map positions
             ax_left.scatter(lons, lats, color="blue", s=8, label="Positions")
+            
             if watch_circle_cols:
-                if "WATCH_quality_control_primary" in data.columns:
-                    mask = data["WATCH_quality_control_primary"] == 3
-                    ax_left.scatter(data.loc[mask, "LONGITUDE"], data.loc[mask, "LATITUDE"], color="goldenrod", ls="None", s=8, label="Out primary watch circle")
-                if "WATCH_quality_control_secondary" in data.columns:
-                    mask = data["WATCH_quality_control_secondary"] == 4
-                    ax_left.scatter(data.loc[mask, "LONGITUDE"], data.loc[mask, "LATITUDE"], color="red", ls="None", s=8, label="Out secondary watch circle")
+                
+                for watch_circle_col in watch_circle_cols:
+                    level = watch_circle_col.split("_")[-1]
+                    
+                    mask = data[watch_circle_col] == 3
+                    ax_left.scatter(data.loc[mask, "LONGITUDE"], data.loc[mask, "LATITUDE"], color="goldenrod", ls="None", s=8, label=f"Suspect {level} watch circle")
+                    
+                    mask = data[watch_circle_col] == 4
+                    ax_left.scatter(data.loc[mask, "LONGITUDE"], data.loc[mask, "LATITUDE"], color="red", ls="None", s=8, label=f"Fail {level} watch circle")
 
             ax_left.scatter(lon_mean, lat_mean, color="green", s=40, marker="x", label=f"Mean Position ({round(lat_mean,5)}, {round(lon_mean,5)})")
             ax_left.scatter(lon_center, lat_center, color="grey", s=40, marker="^", label="Watch circle center")
@@ -524,19 +528,31 @@ class Plots:
             
             watch_circle_cols = [col for col in data.columns if "WATCH_quality_control" in col]
             for col in watch_circle_cols:
-                if "primary" in col:
-                    mask = data[col] == 3
-                    color = "goldenrod"
-                    ax_top_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LATITUDE'], marker='.', color=color, ls="None")
-                    ax_middle_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LONGITUDE'], marker='.', color=color, ls="None")
-                    ax_bottom_right.plot(data.loc[mask,"TIME"], data.loc[mask,'distance'], marker='.', color=color, ls="None")
-                elif "secondary" in col:
-                    mask = data[col] == 4
-                    color = "red"
-                    ax_top_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LATITUDE'], marker='.', color=color)
-                    ax_middle_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LONGITUDE'], marker='.', color=color)
-                    ax_bottom_right.plot(data.loc[mask,"TIME"], data.loc[mask,'distance'], marker='.', color=color)
+                # if "primary" in col:
+                #     mask = data[col] == 3
+                #     color = "goldenrod"
+                #     ax_top_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LATITUDE'], marker='.', color=color, ls="None")
+                #     ax_middle_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LONGITUDE'], marker='.', color=color, ls="None")
+                #     ax_bottom_right.plot(data.loc[mask,"TIME"], data.loc[mask,'distance'], marker='.', color=color, ls="None")
+                # elif "secondary" in col:
+                #     mask = data[col] == 4
+                #     color = "red"
+                #     ax_top_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LATITUDE'], marker='.', color=color)
+                #     ax_middle_right.plot(data.loc[mask,"TIME"], data.loc[mask,'LONGITUDE'], marker='.', color=color)
+                #     ax_bottom_right.plot(data.loc[mask,"TIME"], data.loc[mask,'distance'], marker='.', color=color)
                 
+                data_suspect = data.loc[data[col] == 3]
+                color = "goldenrod"
+                ax_top_right.plot(data_suspect["TIME"], data_suspect['LATITUDE'], marker='.', color=color, ls="None")
+                ax_middle_right.plot(data_suspect["TIME"], data_suspect['LONGITUDE'], marker='.', color=color, ls="None")
+                ax_bottom_right.plot(data_suspect["TIME"], data_suspect['distance'], marker='.', color=color, ls="None")
+                
+                data_fail = data.loc[data[col] == 4]
+                color = "red"
+                ax_top_right.plot(data_fail["TIME"], data_fail['LATITUDE'], marker='.', color=color)
+                ax_middle_right.plot(data_fail["TIME"], data_fail['LONGITUDE'], marker='.', color=color)
+                ax_bottom_right.plot(data_fail["TIME"], data_fail['distance'], marker='.', color=color)
+
 
             # Plots configs
             ax_left.set_xlim(lon_min, lon_max)

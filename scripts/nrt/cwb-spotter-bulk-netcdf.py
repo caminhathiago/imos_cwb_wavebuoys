@@ -230,7 +230,10 @@ def main():
             ds_embedded = ncProcessor.convert_dtypes(dataset=ds_embedded, parameters_type="bulk")
             SITE_LOGGER.info("variables dtypes converted and now conforming to template")
 
-            ds_embedded = nc_attrs_composer.assign_general_attributes(dataset=ds_embedded, site_name=site.name)
+            ### Drifters conversion name
+            site_name, drifter = ncProcessor.convert_drifter_name(site_name=site.name)
+
+            ds_embedded = nc_attrs_composer.assign_general_attributes(dataset=ds_embedded, site_name=site_name, drifter=drifter)
             SITE_LOGGER.info("general attributes assigned to embedded dataset")
             
             ds_embedded = ncProcessor.create_timeseries_variable(dataset=ds_embedded)
@@ -247,7 +250,7 @@ def main():
             SITE_LOGGER.info("variables attributes assigned to datasets")
             
             nc_file_names_embedded = nc_writer.compose_file_names(
-                                        site_id=site.name,
+                                        site_id=site_name,
                                         periods=periods_embedded,
                                         deployment_metadata=deployment_metadata,
                                         regional_metadata=regional_metadata,

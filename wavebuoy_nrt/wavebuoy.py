@@ -18,31 +18,44 @@ SITE_LOGGER = logging.getLogger("site_logger")
 
 
 class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
-    def __init__(self, buoy_type:str, buoys_metadata_file_name:str="buoys_metadata.csv"):
+    
+    def __init__(self, buoy_type:str, buoys_metadata_file_name:str="buoys_metadata.csv", exclude_drifters:bool = False):
+        
+        self._exclude_drifters = exclude_drifters
         self.buoys_metadata = self._get_buoys_metadata(buoy_type=buoy_type, buoys_metadata_file_name=buoys_metadata_file_name)
+        
         # self.buoys_metadata_token_sorted = self._sort_sites_by_sofar_token(buoys_metadata=self.buoys_metadata)
         # self.site_ids = self._get_site_ids(buoys_metadata=self.buoys_metadata)
         # self.sites_per_region = self._get_sites_per_region(buoys_metadata=self.buoys_metadata)
 
     def _get_buoys_metadata(self, buoy_type:str, buoys_metadata_file_name:str):
-        try:
-            file_path = os.path.join(os.getenv('IRDS_PATH'), "Data", "website", "auswaves")
-            if not os.path.exists(file_path):
-                raise FileNotFoundError("No such directory for buoys metadata: {}")
-            buoys_metadata_path = self._get_file_path(file_name=buoys_metadata_file_name, file_path=file_path)
-            print(buoys_metadata_path)
-            buoys_metadata = pd.read_csv(buoys_metadata_path)
-            buoys_metadata = self._select_buoy_type(buoy_type=buoy_type, buoys_metadata=buoys_metadata)
-            buoys_metadata["region"] = self._get_regions(buoys_metadata=buoys_metadata)
-            buoys_metadata = buoys_metadata.set_index('name')
-            buoys_metadata = self._exclude_drifters(buoys_metadata=buoys_metadata)
-            buoys_metadata = self._filter_process_aodn(buoys_metadata=buoys_metadata)
-            GENERAL_LOGGER.info("Buoys metadata grabbed successfully")
-            return buoys_metadata
 
-        except:
-            error_message = "Loading and processing buoys_metadata.csv unsuccessful. Check if the file is corrupted or if its structure has been changed"
-            GENERAL_LOGGER.error(error_message, exc_info=True)
+        # try:
+        file_path = os.path.join(os.getenv('IRDS_PATH'), "Data", "website", "auswaves")
+        if not os.path.exists(file_path):
+            raise FileNotFoundError("No such directory for buoys metadata: {}")
+
+        buoys_metadata_path = self._get_file_path(file_name=buoys_metadata_file_name, file_path=file_path)
+        # buoys_metadata_path = r"C:\Users\00116827\cwb\imos_cwb_wavebuoys\tests\nrt\20251008_drifters\buoys_metadata.csv"
+        buoys_metadata = pd.read_csv(buoys_metadata_path)
+
+        buoys_metadata = self._select_buoy_type(buoy_type=buoy_type, buoys_metadata=buoys_metadata)
+
+        buoys_metadata["region"] = self._get_regions(buoys_metadata=buoys_metadata)
+
+        buoys_metadata = buoys_metadata.set_index('name')
+
+        if self._exclude_drifters:
+            buoys_metadata = self._exclude_drifters_from_buoys_metadata(buoys_metadata=buoys_metadata)
+
+        buoys_metadata = self._filter_process_aodn(buoys_metadata=buoys_metadata)
+        GENERAL_LOGGER.info("Buoys metadata grabbed successfully")
+        
+        return buoys_metadata
+
+        # except:
+        #     error_message = "Loading and processing buoys_metadata.csv unsuccessful. Check if the file is corrupted or if its structure has been changed"
+        #     GENERAL_LOGGER.error(error_message, exc_info=True)
         
     def _select_buoy_type(self, buoy_type:str, buoys_metadata:pd.DataFrame) -> pd.DataFrame:
         return buoys_metadata.loc[buoys_metadata["type"] == buoy_type]
@@ -50,7 +63,7 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
     def _filter_process_aodn(self, buoys_metadata:pd.DataFrame) -> pd.DataFrame:
         return buoys_metadata.loc[buoys_metadata["process_aodn"] == 1]
 
-    def _exclude_drifters(self, buoys_metadata: pd.DataFrame) -> pd.DataFrame:
+    def _exclude_drifters_from_buoys_metadata(self, buoys_metadata: pd.DataFrame) -> pd.DataFrame:
         name_constraint = "drift".upper()
         indexes = [index for index in buoys_metadata.index if name_constraint not in index.upper()]
         return buoys_metadata.loc[indexes]

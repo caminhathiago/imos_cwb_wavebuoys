@@ -240,7 +240,11 @@ class ncAttrsExtractor:
         return deployment_metadata.loc["Hull serial number", "metadata_wave_buoy"]
         # return NetCDFFileHandler()._get_operating_institution(deployment_metadata=deployment_metadata)
     
-    def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame) -> float:
+    def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame, drifter:bool = False) -> float:
+        
+        if drifter:
+            return np.nan
+        
         try:
             water_depth = deployment_metadata.loc["Water depth", "metadata_wave_buoy"]
         except KeyError:
@@ -259,8 +263,8 @@ class ncAttrsExtractor:
         except (TypeError, ValueError):
             raise ValueError("Invalid water depth format")
     
-    def _extract_deployment_metadata_water_depth_units(deployment_metadata: pd.DataFrame) -> str:
-        return "m"
+    def _extract_deployment_metadata_water_depth_units(deployment_metadata: pd.DataFrame, drifter:bool = False) -> str:
+        return np.nan if drifter else "m"
     
     def _extract_deployment_metadata_instrument_burst_duration(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Instrument burst duration", "metadata_wave_buoy"]
@@ -371,11 +375,11 @@ class ncAttrsExtractor:
     def _extract_general_license() -> str:
         return 'http://creativecommons.org/licenses/by/4.0/'
     
-    def _extract_general_cdm_data_type() -> str:
-        return "Station"
+    def _extract_general_cdm_data_type(drifter:bool = False) -> str:
+        return "Trajectory" if drifter else "Station"
     
-    def _extract_general_platform() -> str:
-        return 'moored surface buoy'
+    def _extract_general_platform(drifter:bool = False) -> str:
+        return 'drifter surface buoy' if drifter else 'moored surface buoy'
     
     def _extract_general_references() -> str:
         return  'http://www.imos.org.au'
@@ -440,18 +444,18 @@ class ncAttrsComposer:
 
         return dataset_objects
 
-    def assign_general_attributes(self, dataset: xr.Dataset, site_name: str) -> xr.Dataset:
+    def assign_general_attributes(self, dataset: xr.Dataset, site_name: str, drifter:bool = False) -> xr.Dataset:
         
         # general_attributes = self.template_imos
         # # del general_attributes["_dimensions"]
         # # del general_attributes["_variables"]
         
-        general_attributes  = self._compose_general_attributes(dataset=dataset, site_name=site_name)
+        general_attributes  = self._compose_general_attributes(dataset=dataset, site_name=site_name, drifter=drifter)
         dataset = dataset.assign_attrs(general_attributes)
 
         return dataset
     
-    def _compose_general_attributes(self, site_name: str, dataset: xr.Dataset) -> dict:
+    def _compose_general_attributes(self, site_name: str, dataset: xr.Dataset, drifter=False) -> dict:
         
         general_attributes = {}
 
@@ -472,12 +476,19 @@ class ncAttrsComposer:
                     elif name.startswith("_extract_deployment_metadata_"):
                         key = name.removeprefix("_extract_deployment_metadata_") 
                         kwargs = {"deployment_metadata":self.deployment_metadata}
+                        
                         if name.endswith("_title") or name.endswith("_abstract"):
                             kwargs.update({"regional_metadata":self.regional_metadata})
                     
+                        if name.endswith(("_water_depth","_water_depth_units")):
+                            kwargs.update({"drifter":drifter})
+
                     elif name.startswith("_extract_general_"):
                         key = name.removeprefix("_extract_general_") 
                         kwargs = {}
+                        
+                        if name.endswith(("_platform", "cdm_data_type")):
+                            kwargs.update({"drifter":drifter})
 
                     elif name.startswith("_extract_regional_metadata_"):
                         key = name.removeprefix("_extract_regional_metadata_") 
@@ -684,6 +695,19 @@ class ncProcessor:
             dataset = dataset.map(lambda x: x.astype(dtypes_dict[x.name]["dtype"]) if x.name in dtypes_dict else x )
             SITE_LOGGER.warning(dataset.dtypes)
         return dataset_objects
+
+    def convert_drifter_name(site_name: str) -> str:
+
+        site_lower = site_name.lower()
+        if "drift" not in site_lower:
+            return site_name, False
+
+        match = re.match(r"^TIDE_SouthAfricaDrifting(\d+)$", site_name)
+        if match:
+            number = match.group(1)
+            return f"UWA-Drifter_{number}", True
+
+        return site_name, True
 
 
 class ncWriter(WaveBuoy):
