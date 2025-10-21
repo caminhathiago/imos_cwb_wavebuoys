@@ -106,7 +106,7 @@ class NetCDFFileHandler():
         match = re.match(r"^TIDE_SouthAfricaDrifting(\d+)$", site_id)
         if match:
             number = match.group(1)
-            return f"UWA-Drifter_{number}", True
+            return f"UWA-Drifter-{number}", True
 
         return site_id, True
 
