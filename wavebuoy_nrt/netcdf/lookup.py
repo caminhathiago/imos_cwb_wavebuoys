@@ -83,17 +83,32 @@ class NetCDFFileHandler():
             SITE_LOGGER.error(error)
             raise TypeError(error)
 
+        site_name, _ = self._check_drifter(site_id)
+
         nc_file_paths_needed = []
         for month in monthly_daterange:
             nc_file_name = file_name_template.format(operating_institution=operating_institution,# Temporary data
                                                 monthly_datetime=month.strftime("%Y%m%d"),
-                                                site_id=site_id.replace("_","").upper())
+                                                site_id=site_name.replace("_","").upper())
             print(nc_file_name)
             site_id_processed = site_id.replace("_","")
             nc_file_path = os.path.join(incoming_path, "sites", site_id_processed, nc_file_name)
             nc_file_paths_needed.append(nc_file_path)
 
         return nc_file_paths_needed
+
+    def _check_drifter(self, site_id:str) -> str:
+        
+        site_lower = site_id.lower()
+        if "drift" not in site_lower:
+            return site_id, False
+
+        match = re.match(r"^TIDE_SouthAfricaDrifting(\d+)$", site_id)
+        if match:
+            number = match.group(1)
+            return f"UWA-Drifter_{number}", True
+
+        return site_id, True
 
     def generate_window_start_time(self,
                                        latest_available_datetime: datetime, 
