@@ -131,7 +131,7 @@ def filter_dates(results, utc_offset, deploy_start, deploy_end, time_crop_start,
     for key, dataframe in results.items():
         if key != 'gps' and isinstance(dataframe, pl.DataFrame):
             DEP_LOGGER.info(f"Filtering {key} data with passed deployment datetimes: {deploy_start} - {deploy_end}")
-            result = cp.filter_deployment_dates(dataframe=dataframe, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
+            result = cp.filter_deployment_dates(dataframe=dataframe, timezone=timezone, deploy_start=deploy_start, deploy_end=deploy_end,
                                             time_crop_start=time_crop_start, time_crop_end=time_crop_end)
             results[key] = result 
     

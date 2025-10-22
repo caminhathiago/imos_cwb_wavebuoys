@@ -234,27 +234,60 @@ class csvProcess:
 
     def filter_deployment_dates(self, 
                                 dataframe:pl.DataFrame,
-                                utc_offset:int,
+                                timezone:str,
                                 deploy_start:datetime, 
                                 deploy_end:datetime,
                                 time_crop_start:int = 18,
                                 time_crop_end:int = 6) -> pl.DataFrame:
         
-        time_col = [col for col in dataframe.columns if "TIME" in col.upper()]
-        time_col_local = time_col.copy()
-        time_col_local[0] += "_local"
+    #     time_col = [col for col in dataframe.columns if "TIME" in col.upper()]
+    #     time_col_local = time_col.copy()
+    #     time_col_local[0] += "_local"
+
+    #     dataframe = dataframe.with_columns(
+    #     (pl.col(time_col) + timedelta(hours=utc_offset)).alias(time_col_local[0])
+    #     )
+
+    #     filter_start_time = deploy_start + timedelta(hours=time_crop_start)
+    #     filter_end_time = deploy_end + timedelta(hours=time_crop_end)
+
+    #     dataframe = dataframe.filter(
+    #             (pl.col(time_col_local) >= filter_start_time) & 
+    #             (pl.col(time_col_local) <= filter_end_time)
+    #         )
+
+    #     return dataframe.drop(time_col_local)
+    # find TIME column (first match)
+        time_cols = [c for c in dataframe.columns if "TIME" in c.upper()]
+        if not time_cols:
+            return dataframe  # nothing to do
+
+        time_col = time_cols[0]
+        time_col_local = time_col + "_local"
 
         dataframe = dataframe.with_columns(
-        (pl.col(time_col) + timedelta(hours=utc_offset)).alias(time_col_local[0])
+            (
+                pl.col(time_col)
+                .dt.replace_time_zone("UTC")
+                .dt.convert_time_zone(timezone)
+            ).alias(time_col_local)
         )
 
-        filter_start_time = deploy_start + timedelta(hours=time_crop_start)
-        filter_end_time = deploy_end + timedelta(hours=time_crop_end)
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(timezone)
+
+        def _localize(dt: datetime) -> datetime:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=tz)
+            else:
+                return dt.astimezone(tz)
+
+        filter_start_time = _localize(deploy_start + timedelta(hours=time_crop_start))
+        filter_end_time = _localize(deploy_end + timedelta(hours=time_crop_end))
 
         dataframe = dataframe.filter(
-                (pl.col(time_col_local) >= filter_start_time) & 
-                (pl.col(time_col_local) <= filter_end_time)
-            )
+            (pl.col(time_col_local) >= filter_start_time) & (pl.col(time_col_local) <= filter_end_time)
+        )
 
         return dataframe.drop(time_col_local)
     
