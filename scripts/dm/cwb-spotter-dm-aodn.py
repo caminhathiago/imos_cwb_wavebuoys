@@ -114,7 +114,7 @@ def process_from_SD(raw_data_path, suffixes_to_concat=["FLT","LOC","SST","BARO"]
 
     return collected_results
 
-def filter_dates(results, utc_offset, deploy_start, deploy_end, time_crop_start, time_crop_end) -> list[pl.DataFrame]:
+def filter_dates(results, timezone, deploy_start, deploy_end, time_crop_start, time_crop_end) -> list[pl.DataFrame]:
 
     cp = csvProcess()
     # DEP_LOGGER.info(f"Filtering displacements data with passed deployment datetimes: {deploy_start} - {deploy_end}")
@@ -672,7 +672,7 @@ if __name__ == "__main__":
             results = process_from_SD(metadata['raw_data_path'])
             
             results = filter_dates(results, 
-                                    metadata_args.site_buoys_to_process.utc_offset, 
+                                    metadata_args.site_buoys_to_process.timezone, 
                                     metadata_args.deploy_start,
                                     metadata_args.deploy_end,
                                     metadata_args.site_buoys_to_process.time_crop_start,
