@@ -137,6 +137,7 @@ class SofarAPI:
                             start_date: datetime = datetime.now() - timedelta(hours=24), 
                             end_date: datetime = datetime.now(),
                             parameters_type:str = "waves",
+                            pagination_limit:int = None,
                             **kwargs) -> dict:
         page = 1
         current_start_date = start_date
@@ -189,10 +190,11 @@ class SofarAPI:
                 page += 1
                 print(page)
             
-            if page == 10:
-                message = f"Too many paginations executed (page = {page}). Check if spotter is operational and toggle off aodn processing in buoys_metadata"
-                SITE_LOGGER.warning(message)
-                raise Exception(message)
+            if pagination_limit is not None:
+                if page == pagination_limit:
+                    message = f"Too many paginations executed (page = {page}). Check if spotter is operational and toggle off aodn processing in buoys_metadata"
+                    SITE_LOGGER.warning(message)
+                    raise Exception(message)
 
         return raw_data
     
