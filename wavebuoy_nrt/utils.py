@@ -296,14 +296,17 @@ class csvOutput:
     
     @staticmethod
     def extract_monthly_date(data:pd.DataFrame) -> list[pd.DataFrame]:
-        periods = (pd.to_datetime(data["TIME"])
+        
+        time_col = [col for col in data.columns if "TIME" in col][0]
+        
+        periods = (pd.to_datetime(data[time_col])
                    .dt.to_period("M")
                    .unique()
                 )
 
         dataframes = []
         for period in periods:
-            mask = data["TIME"].dt.to_period("M") == period
+            mask = data[time_col].dt.to_period("M") == period
             monthly_df = data.loc[mask]
             dataframes.append((period, monthly_df))
 

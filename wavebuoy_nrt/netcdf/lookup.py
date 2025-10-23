@@ -22,6 +22,9 @@ class NetCDFFileHandler():
     """
     Class used to handle NetCDF files.
     """
+
+    WAVE_COLS = ['WSSH', 'WPPE', 'WPFM', 'WPDI', 'WPDS', 'SSWMD', 'WMDS', 'WAVE_quality_control']
+    TEMP_COLS = ["TEMP","TEMP_quality_control"]
     
     def __init__(self):
         pass
@@ -85,7 +88,10 @@ class NetCDFFileHandler():
 
         site_name, _ = self._check_drifter(site_id)
 
+        site_name = self._format_site_id_to_filename(site_id=site_id)
+
         nc_file_paths_needed = []
+
         for month in monthly_daterange:
             nc_file_name = file_name_template.format(operating_institution=operating_institution,# Temporary data
                                                 monthly_datetime=month.strftime("%Y%m%d"),
@@ -240,24 +246,33 @@ class NetCDFFileHandler():
             return pd.DataFrame()
 
         if isinstance(nc_file_paths, list):
-            global_dataframe = pd.DataFrame([])
-            for nc_file in nc_file_paths:
-                dataframe = (xr.open_dataset(nc_file, engine="netcdf4")
-                             .to_dataframe()
-                             .reset_index())
-                global_dataframe = pd.concat([global_dataframe,dataframe])
-        elif isinstance(nc_file_paths, str):
-            global_dataframe = (xr.open_dataset(nc_file_paths, engine="netcdf4")
+            
+            if parameters_type == "bulk":
+            
+                waves_global = pd.DataFrame([])
+                temp_global = pd.DataFrame([])
+                
+                for nc_file in nc_file_paths:
+                    ds = xr.open_dataset(nc_file, engine="netcdf4")
+                    waves_dataframe = ds[self.WAVE_COLS].to_dataframe().reset_index()
+                    waves_global = pd.concat([waves_global, waves_dataframe])
+                    
+                    if "TEMP" in list(ds.variables):
+                        temp_dataframe = ds[self.TEMP_COLS].to_dataframe().reset_index()
+                        temp_global = pd.concat([temp_global, temp_dataframe])
+
+                return waves_global, temp_global
+        
+        elif parameters_type == "spectral":
+                
+                global_dataframe = pd.DataFrame([])
+                for nc_file in nc_file_paths:
+                    dataframe = (xr.open_dataset(nc_file, engine="netcdf4")
                                 .to_dataframe()
                                 .reset_index())
+                    global_dataframe = pd.concat([global_dataframe,dataframe])
 
-        if flag_previous_new:
-            global_dataframe["flag_previous_new"] = "prev"
-
-        if parameters_type == "spectral":
-            global_dataframe = self._pivot_previous_spectral(global_dataframe)
-
-        return global_dataframe
+                return self._pivot_previous_spectral(global_dataframe)
 
     def _pivot_previous_spectral(self, dataframe: pd.DataFrame) -> pd.DataFrame:
         

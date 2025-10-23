@@ -138,10 +138,10 @@ def main():
                         nc_to_load = None
 
                 
-                previous_data_df = wb.load_datasets(nc_file_paths=nc_to_load,
+                waves_previous, temp_previous = wb.load_datasets(nc_file_paths=nc_to_load,
                                                     flag_previous_new=vargs.flag_previous_new,
                                                     parameters_type="bulk")
-                if not previous_data_df.empty:
+                if not waves_previous.empty:
                     window_start_time = latest_processed_time
                     SITE_LOGGER.info(f"considering window start time as lastest processed time ({window_start_time}) as previous nc files are being loaded.")
             
@@ -168,53 +168,118 @@ def main():
             # Processing ---------------------------------------
             SITE_LOGGER.info("PRE-PROCESSING STEP ====================================")
 
+            # Waves
             waves = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="waves")
             waves = wb.convert_to_datetime(data=waves)         
             
-            all_new_data_df = waves.copy()
-            all_new_data_df = wb.create_timeseries_aodn_column(data=all_new_data_df)
-            all_new_data_df = wb.conform_columns_names_aodn(data=all_new_data_df)
-            all_new_data_df = wb.sort_datetimes(data=all_new_data_df)
+            waves = wb.create_timeseries_aodn_column(data=waves)
+            waves = wb.conform_columns_names_aodn(data=waves)
+            waves = wb.sort_datetimes(data=waves)
 
             if vargs.flag_previous_new:
-                all_new_data_df["flag_previous_new"] = "new"
+                waves["flag_previous_new"] = "new"
 
             if nc_files_available:
-                if not previous_data_df.empty:
+                if not waves_previous.empty:
                     if vargs.flag_previous_new:
-                        previous_data_df["processing_source"] = "prev"
-                    all_data_df = wb.concat_previous_new(previous_data=previous_data_df,
-                                                    new_data=all_new_data_df,
+                        waves_previous["processing_source"] = "prev"
+                    waves = wb.concat_previous_new(previous_data=waves_previous,
+                                                    new_data=waves,
                                                     drop_duplicates=True)
                     SITE_LOGGER.info("concatenate new data with previous since available")
-                else:
-                    all_data_df = all_new_data_df
-            else:
-                all_data_df = all_new_data_df
+
             
-            csvOutput.save_csv(data=all_data_df, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves.csv")
+            csvOutput.save_csv(data=waves, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves.csv")
             
+            # Temp
+            temp = None
+            if new_raw_data["surfaceTemp"]:
+                temp = wb.convert_wave_data_to_dataframe(raw_data=new_raw_data, parameters_type="surfaceTemp")
+                temp = wb.convert_to_datetime(data=temp, parameter_type="temp")
+                # generalTesting().generate_pickle_file(data=temp, file_name="surfaceTemp_new_data", site_name=site.name)
+                SITE_LOGGER.info(f"temp data converted to DataFrame and pre-processed if exists")
+            
+            elif not new_raw_data["surfaceTemp"] and site.version in ("smart_mooring", "half_smart_mooring"):
+                SITE_LOGGER.info(f"no sst available from spotter, grab smart mooring data since it is available (i.e. buoy version: {site.version})")
+                
+                new_sensor_data_raw = sofar_api.get_sensor_data(spot_id=site.serial,
+                                                            token=site.sofar_token,
+                                                            start_date=window_start_time,
+                                                            end_date=window_end_date)
+                SITE_LOGGER.info(f"raw smart mooring data extracted from Sofar API")
+                
+                temp = wb.convert_smart_mooring_to_dataframe(raw_data=new_sensor_data_raw)
+                temp = wb.convert_to_datetime(data=temp, parameter_type="temp")
+                temp = wb.get_temp_from_smart_mooring(data=temp, sensor_type="temperature")
+                temp = wb.process_smart_mooring_columns(data=temp)
+
+                SITE_LOGGER.info("smart mooring data processed")
+
+            if temp is not None:
+
+                temp = wb.create_timeseries_aodn_column(data=temp)
+                temp = wb.conform_columns_names_aodn(data=temp)
+                temp = wb.sort_datetimes(data=temp)
+                temp = wb.drop_lat_lon(data=temp)
+                temp = wb.filter_timerange(data=temp, waves=waves)
+
+                if nc_files_available:
+                    if not temp_previous.empty:
+                        if vargs.flag_previous_new:
+                            temp_previous["processing_source"] = "prev"
+                        temp = wb.concat_previous_new(previous_data=temp_previous,
+                                                        new_data=temp,
+                                                        data_type="temp")
+                        SITE_LOGGER.info("concatenate new data with previous since available")
+
+                csvOutput.save_csv(data=temp, site_name=site.name.upper(), file_path=vargs.incoming_path, file_name_preffix="_temp_data.csv")
+
             # Qualification ---------------------------------------
-            # GENERAL_LOGGER.info("Starting qualification step")
             SITE_LOGGER.info("QUALIFICATION STEP ====================================")
 
+            # Waves
             qc = WaveBuoyQC(config_id=1)
 
-            all_data_df = qc.create_global_qc_columns(data=all_data_df, parameter_type="waves")
+            waves = qc.create_global_qc_columns(data=waves, parameter_type="waves")
             
-            qc.load_data(data=all_data_df)
-            parameters_to_qc = qc.get_parameters_to_qc(data=all_data_df, qc_config=qc.qc_config)
-            qualified_data_embedded, waves_subflags = qc.qualify(data=all_data_df,
+            qc.load_data(data=waves)
+            parameters_to_qc = qc.get_parameters_to_qc(data=waves, qc_config=qc.qc_config)
+            waves_qualified, waves_subflags = qc.qualify(data=waves,
                                                  parameter_type="waves",
                                                 parameters=parameters_to_qc,
                                                 window = int(vargs.window),
                                                 gross_range_test=True,
                                                 rate_of_change_test=True)
+            
             SITE_LOGGER.info("Qualification successfull")
             
             csvOutput.save_csv(data=waves_subflags, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves_qc_subflags.csv")
-            csvOutput.save_csv(data=qualified_data_embedded, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves_qc.csv")
+            csvOutput.save_csv(data=waves_qualified, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_waves_qc.csv")
             
+            # Temp
+            temp_qualified = None
+            if temp is not None:
+
+                temp = qc.create_global_qc_columns(data=temp, parameter_type="temp")
+                
+                qc = WaveBuoyQC(config_id=1)
+
+                qc.load_data(data=temp)
+                parameters_to_qc = qc.get_parameters_to_qc(data=temp, qc_config=qc.qc_config)
+
+                temp_qualified, temp_subflags = qc.qualify(data=temp,
+                                                 parameter_type="temp",
+                                                parameters=parameters_to_qc,
+                                                window = int(vargs.window),
+                                                gross_range_test=True,
+                                                rate_of_change_test=True)
+                
+                SITE_LOGGER.info("Qualification successfull")
+                
+                csvOutput.save_csv(data=temp_subflags, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_temp_qc_subflags.csv")
+                csvOutput.save_csv(data=temp_qualified, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_temp_qc.csv")
+
+
             # Processing Nc File --------------------------------------------
             SITE_LOGGER.info("NC FILE PROCESSING STEP ====================================")
 
@@ -224,29 +289,29 @@ def main():
                                                 regional_metadata=regional_metadata)
 
             # embedded dataset
-            ds_embedded = ncProcessor.compose_dataset(data=qualified_data_embedded)
+            ds = ncProcessor.compose_dataset(waves=waves_qualified, temp=temp_qualified)
             SITE_LOGGER.info("embedded dataset composed")
             
-            ds_embedded = ncProcessor.convert_dtypes(dataset=ds_embedded, parameters_type="bulk")
+            ds = ncProcessor.convert_dtypes(dataset=ds, parameters_type="bulk")
             SITE_LOGGER.info("variables dtypes converted and now conforming to template")
 
             ### Drifters conversion name
             site_name, drifter = ncProcessor.convert_drifter_name(site_name=site.name)
 
-            ds_embedded = nc_attrs_composer.assign_general_attributes(dataset=ds_embedded, site_name=site_name, drifter=drifter)
+            ds = nc_attrs_composer.assign_general_attributes(dataset=ds, site_name=site_name, drifter=drifter)
             SITE_LOGGER.info("general attributes assigned to embedded dataset")
             
-            ds_embedded = ncProcessor.create_timeseries_variable(dataset=ds_embedded)
+            ds = ncProcessor.create_timeseries_variable(dataset=ds)
             SITE_LOGGER.info("time series variable created in embedded dataset")
 
-            periods_embedded = ncProcessor.extract_monthly_periods_dataset(dataset=ds_embedded)
-            ds_objects_embedded = ncProcessor.split_dataset_monthly(dataset=ds_embedded, periods=periods_embedded)
+            periods_embedded = ncProcessor.extract_monthly_periods_dataset(dataset=ds)
+            ds_objects = ncProcessor.split_dataset_monthly(dataset=ds, periods=periods_embedded)
             SITE_LOGGER.info(f"combined dataset split monthly for periods {periods_embedded}")
             
-            ds_objects_embedded = ncProcessor.process_time_to_CF_convention(dataset_objects=ds_objects_embedded)
+            ds_objects = ncProcessor.process_time_to_CF_convention(dataset_objects=ds_objects)
             SITE_LOGGER.info("dataset objects time dimension processed to conform to CF conventions")
             
-            ds_objects_embedded = nc_attrs_composer.assign_variables_attributes_dataset_objects(dataset_objects=ds_objects_embedded)
+            ds_objects = nc_attrs_composer.assign_variables_attributes_dataset_objects(dataset_objects=ds_objects)
             SITE_LOGGER.info("variables attributes assigned to datasets")
             
             nc_file_names_embedded = nc_writer.compose_file_names(
@@ -259,7 +324,7 @@ def main():
            # Validation before saving
            
             reports_path = ncValidator().generate_reports_path(site.name, vargs.incoming_path)
-            for nc_file_name, ds_object in zip(nc_file_names_embedded, ds_objects_embedded):
+            for nc_file_name, ds_object in zip(nc_file_names_embedded, ds_objects):
                 validation_log = ncValidator().create_validation_log_contents(nc_file_name)
                 ncValidator().validate_regional_metadata(nc_file_name, ds_object, regional_metadata, validation_log)
                 ncValidator().validate_spot_id(site.name, ds_object, deployment_metadata, wb.buoys_metadata, validation_log)
@@ -271,7 +336,7 @@ def main():
                 nc_writer.save_nc_file(site_id=site.name,
                                         output_path=vargs.incoming_path,
                                     file_names=nc_file_names_embedded,
-                                    dataset_objects=ds_objects_embedded)
+                                    dataset_objects=ds_objects)
                 SITE_LOGGER.info(f"embedded nc files saved to the output path as {nc_file_names_embedded}")
             else:
                 raise ValueError(f"{validation_log["contents"]}")    

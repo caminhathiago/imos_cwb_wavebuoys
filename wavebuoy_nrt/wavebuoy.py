@@ -96,9 +96,17 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
     def _get_sites_per_region(self, buoys_metadata:pd.DataFrame):
         pass 
 
-    def convert_to_datetime(self, data: pd.DataFrame, timestamp_col_name: str="timestamp") -> pd.DataFrame:
+    def convert_to_datetime(self, data: pd.DataFrame, timestamp_col_name: str="timestamp", parameter_type="waves") -> pd.DataFrame:
+        
+        if parameter_type == "waves":
+            time_col = "TIME"
+        elif parameter_type == "temp":
+            time_col = "TIME_TEMP"
+        else:
+            raise ValueError(f"Unsupported parameter type: {parameter_type}")
+
         if data is not None:
-            data["TIME"] = (pd.to_datetime(data[timestamp_col_name], errors="coerce", utc=True)
+            data[time_col] = (pd.to_datetime(data[timestamp_col_name], errors="coerce", utc=True)
                             .dt.tz_localize(None)) # making sure to generate tz naive times following AODN previous data and templates
             data = data.drop(columns=[timestamp_col_name])
             return data
@@ -106,12 +114,29 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
             return None
         
     def sort_datetimes(self, data: pd.DataFrame) -> pd.DataFrame:
-        return data.sort_values("TIME")
+        time_col = [col for col in data.columns if "TIME" in col][0]
+        return data.sort_values(time_col)
 
-    def concat_previous_new(self, previous_data: pd.DataFrame, new_data: pd.DataFrame, drop_duplicates:bool = True) -> pd.DataFrame:
+    def concat_previous_new(self,
+                            previous_data: pd.DataFrame,
+                            new_data: pd.DataFrame,
+                            data_type:str = "waves",
+                            drop_duplicates:bool = True) -> pd.DataFrame:
         
+        if data_type == "waves":
+            cols_to_drop = [col for col in previous_data.columns if "TEMP" in col and col not in ("LONGITUDE", "LATITUDE", "timeSeries")]
+        elif data_type == "temp":
+            cols_to_drop = [col for col in previous_data.columns if "TEMP" not in col]
+        
+        if cols_to_drop:
+            previous_data = previous_data.drop(columns=cols_to_drop)
+
+        
+        if previous_data.empty:
+            return new_data
+
         concat_data = pd.concat([previous_data, new_data], axis=0)
-        
+
         time_col = [col for col in concat_data.columns if "TIME" in col][0]
 
         if drop_duplicates:
@@ -122,4 +147,18 @@ class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
     def create_timeseries_aodn_column(self, data: pd.DataFrame) -> pd.DataFrame:
         data["timeSeries"] = float(1)
         return data
+
+    def drop_lat_lon(self, data: pd.DataFrame) -> pd.DataFrame:
+        return data.drop(columns=["LATITUDE", "LONGITUDE"])
+
+    def filter_timerange(self, data:pd.DataFrame, waves:pd.DataFrame) -> pd.DataFrame:
+        
+        time_col_data = [col for col in data.columns if "TIME" in col][0]
+        time_col_waves = [col for col in waves.columns if "TIME" in col][0]
+
+        return data.loc[(data[time_col_data] >= waves[time_col_waves].min()) 
+                 & (data[time_col_data] <= waves[time_col_waves].max())]
+    
+    def drop_duplicates(self, data:pd.DataFrame) -> pd.DataFrame:
+        return data.drop_duplicates(subset=["TEMP", "TIME_TEMP"]) 
 

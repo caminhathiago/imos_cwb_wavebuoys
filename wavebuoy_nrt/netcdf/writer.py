@@ -411,13 +411,16 @@ class ncAttrsComposer:
                               ._get_template_imos(file_name=self.attrs_templates_files[self.parameters_type])
                         )
     
-    def _match_valid_min_max_dtype(self, variable:str, variables_attributes:dict , dataset: xr.Dataset):
-        return (np.dtype(dataset[variable]).type(variables_attributes["valid_min"]),
-                np.dtype(dataset[variable]).type(variables_attributes["valid_max"]))
+    def _match_valid_min_max_dtype(self, variable:str, variables_attributes:dict , dataset: xr.Dataset,
+                                min_attribute_name:str, max_attribute_name:str):
     
+        return (np.dtype(dataset[variable]).type(variables_attributes[min_attribute_name]),
+            np.dtype(dataset[variable]).type(variables_attributes[max_attribute_name]))
+
 
 
     def assign_variables_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
+        
         variables = list(self.attrs_template['variables'].keys())
         # variables.remove("timeSeries")
         for variable in variables:
@@ -427,11 +430,13 @@ class ncAttrsComposer:
                 if "quality_control" in variable:
                     variables_attributes["flag_values"] = np.int8(variables_attributes["flag_values"])
                 
-                if "valid_min" in variables_attributes or variable not in ("TIME","timeSeries"):
+                if "valid_min" in variables_attributes or variable not in ("TIME", "TIME_TEMP", "timeSeries", "FREQUENCY"):
                     variables_attributes["valid_min"], variables_attributes["valid_max"] = self._match_valid_min_max_dtype(
                                                                                 variable=variable,
                                                                                 dataset=dataset,
-                                                                                variables_attributes=variables_attributes
+                                                                                variables_attributes=variables_attributes,
+                                                                                min_attribute_name="valid_min",
+                                                                                max_attribute_name="valid_max"
                                                                             )
                     
                 dataset[variable] = (dataset[variable].assign_attrs(variables_attributes))
@@ -439,6 +444,7 @@ class ncAttrsComposer:
         return dataset
 
     def assign_variables_attributes_dataset_objects(self, dataset_objects: xr.Dataset) -> xr.Dataset:
+        
         for dataset in dataset_objects:
             dataset = self.assign_variables_attributes(dataset=dataset)
 
@@ -563,21 +569,24 @@ class ncProcessor:
         return data[data["processing_source"] == processing_source]
 
     @staticmethod
-    def _compose_coords_dimensions(data: pd.DataFrame, parameters_type: str = "bulk") -> dict:
+    def _compose_coords_dimensions(waves: pd.DataFrame, temp: pd.DataFrame = None, parameters_type: str = "bulk") -> dict:
 
-        coords = {
-                "TIME":("TIME", data["TIME"]),
-                "LATITUDE":("TIME", data["LATITUDE"]),
-                "LONGITUDE":("TIME", data["LONGITUDE"])
-            }
+        if parameters_type == "bulk":
+            coords = {
+                    "TIME":("TIME", waves["TIME"]),
+                    "LATITUDE":("TIME", waves["LATITUDE"]),
+                    "LONGITUDE":("TIME", waves["LONGITUDE"])
+                }
+            if temp is not None:
+                coords.update({"TIME_TEMP": ("TIME_TEMP", temp["TIME_TEMP"])})
 
         if parameters_type == "spectral":
-            coords.update({"FREQUENCY": ("FREQUENCY", data["FREQUENCY"].iloc[-1])})
+            coords.update({"FREQUENCY": ("FREQUENCY", waves["FREQUENCY"].iloc[-1])})
 
         return coords 
 
     @staticmethod
-    def _compose_data_vars(data: pd.DataFrame, parameters_type: str = "bulk") -> dict:
+    def _compose_data_vars(waves: pd.DataFrame, temp: pd.DataFrame = None, parameters_type: str = "bulk") -> dict:
       
         data_vars = {}
         cols_to_drop = ['TIME', 'timeSeries', 'LATITUDE', 'LONGITUDE', "processing_source"]
@@ -587,21 +596,27 @@ class ncProcessor:
             cols_to_drop.extend(["FREQUENCY", "DIFFREQUENCY", "DIRECTION", "DIRSPREAD"])
             dimensions.append("FREQUENCY")
 
-        vars_to_include = data.drop(columns=cols_to_drop).columns
+        vars_to_include = waves.drop(columns=cols_to_drop).columns.to_list()
+        if temp is not None:
+            vars_to_include.extend(["TEMP","TEMP_quality_control"])
 
         for var in vars_to_include:
             if parameters_type == "bulk":
-                data_vars.update({var:(tuple(dimensions), data[var])})
+                if var in ("TEMP","TEMP_quality_control"):
+                    data_vars.update({var:(("TIME_TEMP"), temp[var])})
+                else:
+                    data_vars.update({var:(tuple(dimensions), waves[var])})
+
             elif parameters_type == "spectral":
-                data_vars.update({var:(tuple(dimensions), np.vstack(data[var].values))})
+                data_vars.update({var:(tuple(dimensions), np.vstack(waves[var].values))})
         
         return data_vars
     
     @staticmethod
-    def compose_dataset(data: pd.DataFrame, parameters_type: str = "bulk") -> xr.Dataset:
+    def compose_dataset(waves: pd.DataFrame, temp: pd.DataFrame = None, parameters_type: str = "bulk") -> xr.Dataset:
         
-        coords = ncProcessor._compose_coords_dimensions(data=data,parameters_type=parameters_type)
-        data_vars = ncProcessor._compose_data_vars(data=data, parameters_type=parameters_type)
+        coords = ncProcessor._compose_coords_dimensions(waves=waves, temp=temp, parameters_type=parameters_type)
+        data_vars = ncProcessor._compose_data_vars(waves=waves, temp=temp, parameters_type=parameters_type)
         
         dataset = xr.Dataset(coords=coords, data_vars=data_vars)
         
@@ -643,23 +658,37 @@ class ncProcessor:
 
     @staticmethod
     def split_dataset_monthly(dataset: xr.Dataset, periods: PeriodIndex) -> Tuple[xr.Dataset, ...]:
+        
         dataset_objects = []
         for period in periods:
-            print(period)
-            monthly_dataset = dataset.sel(TIME=str(period))
+            time_sel = {"TIME": str(period)}
+
+            if "TIME_TEMP" in dataset.dims:
+                time_sel["TIME_TEMP"] = str(period)
+
+            monthly_dataset = dataset.sel(time_sel)
             dataset_objects.append(monthly_dataset)
+        
         return tuple(dataset_objects)
 
     @staticmethod
     def process_time_to_CF_convention(dataset_objects: tuple) -> List[xr.Dataset]:
+        
+        time_dims = [time_dim for time_dim in list(dataset_objects[0].dims) if "TIME" in time_dim]
+
+
         for dataset in dataset_objects:
-            time = np.array(dataset["TIME"]
-                            .to_dataframe()["TIME"]
-                            .dt.to_pydatetime()
-            )
-            dataset["TIME"] = date2num(time,
-                                "days since 1950-01-01 00:00:00 UTC",
-                                "gregorian")
+            
+            for time_dim in time_dims:
+                
+                time = np.array(dataset[time_dim]
+                                .to_dataframe()[time_dim]
+                                .dt.to_pydatetime()
+                )
+                dataset[time_dim] = date2num(time,
+                                    "days since 1950-01-01 00:00:00 UTC",
+                                    "gregorian"
+                )
             
         return dataset_objects
 

@@ -99,7 +99,7 @@ class SpotterWaveBuoy():
     def process_smart_mooring_columns(self, data: pd.DataFrame) -> pd.DataFrame:
         cols_to_drop = ["sensorPosition","units","unit_type","data_type_name"]
         data = data.drop(columns=cols_to_drop)
-        data = data.rename(columns={"value":"temp"})
+        data = data.rename(columns={"value":"TEMP"})
         return data
     
     def round_parameter_values(self, data: pd.DataFrame, parameter: str, decimals: int = 2) -> pd.DataFrame:

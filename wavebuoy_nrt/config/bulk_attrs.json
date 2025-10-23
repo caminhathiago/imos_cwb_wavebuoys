@@ -10,9 +10,15 @@
         "calendar": "gregorian",
         "standard_name": "time",
         "long_name": "time",
+        "axis": "T"
+        },
+        "TIME_TEMP": {
+        "units": "days since 1950-01-01 00:00:00 UTC",
+        "calendar": "gregorian",
+        "standard_name": "time",
+        "long_name": "temperature measurement time",
         "axis": "T",
-        "valid_min": 0.0,
-        "valid_max": 90000.0
+        "comment": "This is the time at which temperature information is sampled"
         },
         "LATITUDE": {
         "_FillValue": -9999.0,
