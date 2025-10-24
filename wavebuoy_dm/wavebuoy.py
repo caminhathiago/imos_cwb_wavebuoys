@@ -184,7 +184,7 @@ class WaveBuoy():
         if os.path.exists(file_path):
             
             all_buoys_to_process = pd.read_csv(file_path, dtype={'dep_id': str})
-            buoys_to_process = all_buoys_to_process.loc[buoys_to_process['process']==1]
+            buoys_to_process = all_buoys_to_process.loc[all_buoys_to_process['process']==1]
             
             return all_buoys_to_process, buoys_to_process, region_path
         

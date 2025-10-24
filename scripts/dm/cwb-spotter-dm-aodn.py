@@ -728,6 +728,8 @@ if __name__ == "__main__":
             DEP_LOGGER.info(f"Processsing finished in {round((time.time() - start_exec_time)/60, 2)} min")
             imos_logging.logging_stop(logger=DEP_LOGGER)
 
+            GENERAL_LOGGER.info(f"buoys to process saved as delayed_mode_buoys_to_process.csv")
+            all_buoys_to_process.to_csv(os.path.join(region_path, "delayed_mode_buoys_to_process.csv"), index=False)
 
         except Exception as e:
             DEP_LOGGER.error(str(e), exc_info=True)
@@ -742,8 +744,7 @@ if __name__ == "__main__":
                                                                         add_runtime=False)
             continue
     
-    GENERAL_LOGGER.info(f"buoys to process saved as delayed_mode_buoys_to_process.csv")
-    all_buoys_to_process.to_csv(os.path.join(region_path, "delayed_mode_buoys_to_process.csv"), index=False)
+    
 
     GENERAL_LOGGER.info("Processing finished.")
     imos_logging.logging_stop(logger=GENERAL_LOGGER)
