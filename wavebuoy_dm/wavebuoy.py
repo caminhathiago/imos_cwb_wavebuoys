@@ -182,9 +182,11 @@ class WaveBuoy():
         file_path = glob.glob(os.path.join(region_path, pattern))[0]
         
         if os.path.exists(file_path):
-            buoys_to_process = pd.read_csv(file_path, dtype={'dep_id': str})
-            buoys_to_process = buoys_to_process.loc[buoys_to_process['process']==1]
-            return buoys_to_process
+            
+            all_buoys_to_process = pd.read_csv(file_path, dtype={'dep_id': str})
+            buoys_to_process = all_buoys_to_process.loc[buoys_to_process['process']==1]
+            
+            return all_buoys_to_process, buoys_to_process, region_path
         
         else:
             raise NotADirectoryError(f"{file_path} does not exist")

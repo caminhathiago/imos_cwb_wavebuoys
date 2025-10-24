@@ -168,32 +168,39 @@ class csvConcat:
             #     # df, missing, extra, inferred_schema = self._force_header_corrupted_file(file_path, expected_columns)
             #     df, missing, extra, inferred_schema = self.fix_corrupted_csv(file_path, expected_columns)
 
+            error_messages = []
+
             if missing or extra:
-                print(f"Schema mismatch in {file_path}:")
-                if missing:
-                    print(f"  Missing columns: {missing}")
-                if extra:
-                    print(f"  Extra columns: {extra}")
-                return False
+                
+                error_messages.append(f"Schema mismatch in {os.path.basename(file_path)}. Missing columns: {missing}, Extra columns: {extra}")
+                
+                return False, error_messages
 
             for col in expected_columns:
+                
                 inferred_type = inferred_schema[col]
                 expected_type = expected_schema[col]
+                
                 if isinstance(expected_type, tuple):
+                    
                     if inferred_type not in expected_type:
-                        print(f"Schema mismatch in {file_path}: column '{col}' "
-                            f"has type {inferred_type}, expected one of {expected_type}")
-                        return False
+                       
+                        error_messages.append(f"Schema mismatch in {os.path.basename(file_path)}: column '{col}' has type {inferred_type}, expected one of {expected_type}")
+                        
+                        return False, error_messages
+                
                 else:
+                    
                     if inferred_type != expected_type:
-                        print(f"Schema mismatch in {file_path}: column '{col}' "
-                            f"has type {inferred_type}, expected {expected_type}")
-                        return False
+                        
+                        error_messages.append(f"Schema mismatch in {os.path.basename(file_path)}: column '{col}' has type {inferred_type}, expected {expected_type}")
+                       
+                        return False, error_messages
 
-            return True
+            return True, None
 
         except Exception as e:
-            print(f"Error processing {file_path}: {e}")
+            print(f"Error processing {os.path.basename(file_path)}: {e}")
             return False
 
     def _force_header_corrupted_file(self, file_path:str, expected_columns):
@@ -338,19 +345,30 @@ class csvConcat:
     def lazy_concat_files(self) -> pl.LazyFrame:
       
         results = self.map_concat_results()
+        error_messages = self.map_concat_results()
+        ignored_files = []
 
         for suffix in self.files_suffixes.keys():
             data_list = []
             
             for file in self.files_suffixes[suffix]:
-                if self.ignore_files(file=file) and self.validate_schema(file, suffix):
+                
+                validation_pass, error_messages_suffix = self.validate_schema(file, suffix)
+
+                if self.ignore_files(file=file) and validation_pass:
                     df_lazy = self.load_csv(file)
                     data_list.append(df_lazy)
+                
+                elif not self.ignore_files(file=file):
+                    ignored_files.append(file)
+
+                if error_messages_suffix:
+                    error_messages[suffix].extend(error_messages_suffix)
 
             if not data_list:
                 continue
 
             concat_df_lazy = pl.concat(data_list, how="vertical")    
-            results.update({suffix:concat_df_lazy})
+            results.update({suffix : concat_df_lazy})
 
-        return results
+        return results, ignored_files, error_messages

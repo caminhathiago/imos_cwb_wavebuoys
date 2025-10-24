@@ -77,7 +77,7 @@ def load_metadata(site_buoys_to_process:pd.DataFrame, dm_deployment_path) -> lis
             "raw_data_path": raw_data_path,
         }
 
-def process_from_SD(raw_data_path, suffixes_to_concat=["FLT","LOC","SST","BARO"]) -> list[pl.DataFrame]:
+def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to_concat=["FLT","LOC","SST","BARO"]) -> list[pl.DataFrame]:
 
     # DEP_LOGGER.info(f"Lazy concatenating csv files for {suffixes_to_concat}")
     # cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat)
@@ -93,7 +93,21 @@ def process_from_SD(raw_data_path, suffixes_to_concat=["FLT","LOC","SST","BARO"]
     # return collected_results["displacements"], collected_results["gps"], collected_results["surface_temp"]
     DEP_LOGGER.info(f"Lazy concatenating csv files for suffixes_to_concat")
     cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat) 
-    lazy_concat_results = cc.lazy_concat_files()
+    lazy_concat_results, ignored_files, error_messages = cc.lazy_concat_files()
+    
+    DEP_LOGGER.info(f"{len(ignored_files)} files ignored. Storing count to deployment metadata.")
+    deployment_metadata.loc["ignored_files", "metadata_wave_buoy"] = len(ignored_files)
+    
+    if error_messages:
+        
+        DEP_LOGGER.warning(f"Error messages for files that failed schema validation: {json.dumps(error_messages, indent=4)}")
+        
+        all_error_messages = []
+        for key, _ in error_messages.items():
+            all_error_messages.extend(error_messages[key])
+                    
+        deployment_metadata.loc["files_fail", "metadata_wave_buoy"] = len(all_error_messages)
+
 
     cp = csvProcess()
     DEP_LOGGER.info("Lazy processing cocatenated csv files")
@@ -166,7 +180,7 @@ def qc_watch_circle(spectra_bulk_df, site_buoys_to_process:pd.DataFrame, output_
 
 
     DEP_LOGGER.info(f"Qualifying with respect to watch circle")
-    spectra_bulk_df, out_of_radious_pct = cp.qc_watch_circle(
+    spectra_bulk_df, out_of_radius_pct = cp.qc_watch_circle(
         spectra_bulk_df,
         deploy_lat=s.DeployLat,
         deploy_lon=s.DeployLon,
@@ -180,15 +194,15 @@ def qc_watch_circle(spectra_bulk_df, site_buoys_to_process:pd.DataFrame, output_
     DEP_LOGGER.info(f"Extracting drifting periods")
     cp.extract_drifting_periods(spectra_bulk_df, output_path)
 
-    if out_of_radious_pct >= s.out_of_radius_tolerance:
+    if out_of_radius_pct >= s.out_of_radius_tolerance:
         
-        DEP_LOGGER.info(f"First watch circle QC not satisfactory, {out_of_radious_pct}% out of radius (> tolerance = {s.out_of_radius_tolerance})")
+        DEP_LOGGER.info(f"First watch circle QC not satisfactory, {out_of_radius_pct}% out of radius (> tolerance = {s.out_of_radius_tolerance})")
         DEP_LOGGER.info(f"Reaplying strech factor over calculated mooring setting")
         
         mainline, catenary, watch_circle = cp.calculate_watch_circle(s, reprocess=True)
 
         DEP_LOGGER.info(f"Requalifying with respect to watch circle (={watch_circle})")
-        spectra_bulk_df, out_of_radious_pct = cp.qc_watch_circle(
+        spectra_bulk_df, out_of_radius_pct = cp.qc_watch_circle(
                                                     spectra_bulk_df,
                                                     deploy_lat=s.DeployLat,
                                                     deploy_lon=s.DeployLon,
@@ -202,7 +216,7 @@ def qc_watch_circle(spectra_bulk_df, site_buoys_to_process:pd.DataFrame, output_
         DEP_LOGGER.info(f"Extracting drifting periods after reprocessing")
         cp.extract_drifting_periods(spectra_bulk_df, output_path, reprocess=True)
 
-        DEP_LOGGER.info(f"Requalification successful, {out_of_radious_pct}% out of radius (< tolerance = {s.out_of_radius_tolerance}")
+        DEP_LOGGER.info(f"Requalification successful, {out_of_radius_pct}% out of radius (< tolerance = {s.out_of_radius_tolerance}")
         
 
     p = Plots(site_name=site_buoys_to_process.loc['name'],
@@ -214,11 +228,12 @@ def qc_watch_circle(spectra_bulk_df, site_buoys_to_process:pd.DataFrame, output_
                                map_coverage=(800,40,10,5,1,.3),
                                figsize=(15,5))
 
-    if out_of_radious_pct >= s.out_of_radius_tolerance: 
-        raise ValueError(f"{out_of_radious_pct}% out of radius (watchcircle = {round(watch_circle,2)}), greater then tolerance ({s.out_of_radius_tolerance}%). CSV with qc_flag_watch saved as {spectra_bulk_csv_path}")
+    if out_of_radius_pct >= s.out_of_radius_tolerance: 
+        raise ValueError(f"{out_of_radius_pct}% out of radius (watchcircle = {round(watch_circle,2)}), greater then tolerance ({s.out_of_radius_tolerance}%). CSV with qc_flag_watch saved as {spectra_bulk_csv_path}")
 
     DEP_LOGGER.info(f"Storing watch_circle in deployment metadata")
     deployment_metadata.loc["watch_circle", "metadata_wave_buoy"] = round(watch_circle,2)
+    deployment_metadata.loc["out_of_radius_pct", "metadata_wave_buoy"] = round(out_of_radius_pct,2)
 
     return spectra_bulk_df, deployment_metadata
 
@@ -619,6 +634,15 @@ def generate_raw_displacements_NC_files(disp,
                             parameters_type='displacements'
                         )
 
+def log_reports_buoys_to_process(all_buoys_to_process:pd.DataFrame, site_buoys_to_process:pd.Series, deployment_medatada:pd.DataFrame) -> None:
+    
+    match = all_buoys_to_process["dep_id"] == site_buoys_to_process["dep_id"]
+
+    all_buoys_to_process.loc[match, "out_of_radius"] = deployment_medatada.loc["out_of_radius_pct", "metadata_wave_buoy"]
+    all_buoys_to_process.loc[match, "ignored_files"] = deployment_medatada.loc["ignored_files", "metadata_wave_buoy"]
+    all_buoys_to_process.loc[match, "files_fail"] = deployment_medatada.loc["files_fail", "metadata_wave_buoy"]
+
+
 if __name__ == "__main__":
     
     load_dotenv()
@@ -632,17 +656,19 @@ if __name__ == "__main__":
     GENERAL_LOGGER = IMOSLogging().logging_start(logger_name=f"{datetime.now().strftime("%Y%m%dT%H%M%S")}_{vargs.region}_general_logger.log",
                                                 logging_filepath=os.getenv("GENERAL_LOGGER_PATH"))
 
-    buoys_to_process = WaveBuoy().load_buoys_to_process()
+    all_buoys_to_process, buoys_to_process, region_path = WaveBuoy().load_buoys_to_process()
+    all_buoys_to_process.to_csv(os.path.join(region_path, "delayed_mode_buoys_to_process_backup.csv"), index=False)
 
     log_dep_ids = buoys_to_process[['dep_id', 'name', 'datapath']].to_dict(orient='records')
     GENERAL_LOGGER.info(f"Deployments being processed: {json.dumps(log_dep_ids, indent=6)}")
 
     for idx, site in buoys_to_process.iterrows():
+        
         start_exec_time = time.time()
+        
         try:
 
             dm_deployment_path, output_path = process_paths(site)
-
 
             DEP_LOGGER = imos_logging.logging_start(logging_filepath=output_path,
                                                     logger_name="DM_processing.log")
@@ -669,7 +695,7 @@ if __name__ == "__main__":
                             )
 
             DEP_LOGGER.info(f"SD card data processing ".upper() + "="*50)
-            results = process_from_SD(metadata['raw_data_path'])
+            results = process_from_SD(metadata['raw_data_path'], metadata['deployment_metadata'])
             
             results = filter_dates(results, 
                                     metadata_args.site_buoys_to_process.timezone, 
@@ -687,6 +713,8 @@ if __name__ == "__main__":
             DEP_LOGGER.info(f"Spectra results watch circle qualification ".upper() + "="*50)
             spectra_bulk_df, metadata['deployment_metadata'] = qc_watch_circle(spectra_bulk_df, site, output_path, metadata['deployment_metadata'])
 
+            log_reports_buoys_to_process(all_buoys_to_process, metadata_args.site_buoys_to_process, metadata_args.deployment_metadata)
+
             DEP_LOGGER.info(f"WAVE-SPECTRA AODN compliant file generation step ".upper() + "="*50)
             generate_spectra_NC_file(spectra_bulk_df, results['gps'], **vars(metadata_args))
 
@@ -700,6 +728,7 @@ if __name__ == "__main__":
             DEP_LOGGER.info(f"Processsing finished in {round((time.time() - start_exec_time)/60, 2)} min")
             imos_logging.logging_stop(logger=DEP_LOGGER)
 
+
         except Exception as e:
             DEP_LOGGER.error(str(e), exc_info=True)
             GENERAL_LOGGER.error(str(e), exc_info=True)
@@ -712,4 +741,9 @@ if __name__ == "__main__":
                                                                         script_name=os.path.basename(__file__).removesuffix(".py"),
                                                                         add_runtime=False)
             continue
-        
+    
+    GENERAL_LOGGER.info(f"buoys to process saved as delayed_mode_buoys_to_process.csv")
+    all_buoys_to_process.to_csv(os.path.join(region_path, "delayed_mode_buoys_to_process.csv"), index=False)
+
+    GENERAL_LOGGER.info("Processing finished.")
+    imos_logging.logging_stop(logger=GENERAL_LOGGER)
