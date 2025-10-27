@@ -532,3 +532,31 @@ class csvProcess:
                     for col, dtype in dtype_mapping.items()
             ])
         
+    def rename_qc_watch_circle_column(self, dataframe: pl.DataFrame) -> pl.DataFrame:
+
+        watch_circle_cols = [col for col in dataframe.columns if "WATCH_quality_control" in col]
+        flag_col = "WATCH_CIRCLE_flag"
+
+        if not watch_circle_cols:
+            return dataframe.with_columns(pl.lit(1).alias(flag_col))
+
+        preferred_order = [
+            "WATCH_quality_control_secondary",
+            "WATCH_quality_control_primary" 
+        ]
+
+        for col in preferred_order:
+            if col in watch_circle_cols:
+                watch_circle_col = col
+                break
+        else:
+            watch_circle_col = watch_circle_cols[0]
+
+        df = dataframe.rename({watch_circle_col: flag_col})
+
+        cols_to_drop = [c for c in watch_circle_cols if c != watch_circle_col]
+        if cols_to_drop:
+            df = df.drop(cols_to_drop)
+
+        return df
+

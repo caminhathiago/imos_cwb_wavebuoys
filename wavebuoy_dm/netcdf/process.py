@@ -28,10 +28,11 @@ class Process:
                         'TEMP':{"dtype":np.float32},
                         'WAVE_quality_control':{"dtype":np.int8},
                         'TEMP_quality_control':{"dtype":np.int8},
+                        'WATCH_CIRCLE_flag':{"dtype":np.int8},
                         # 'TIME':{"dtype":np.float64},
                         'LATITUDE':{"dtype":np.float64},
                         'LONGITUDE':{"dtype":np.float64},
-                        'timeSeries':{"dtype":np.int16}}\
+                        'timeSeries':{"dtype":np.int16}}
                         
     
     DTYPES_SPECTRAL = {
@@ -43,7 +44,8 @@ class Process:
                 "A2": {"dtype": np.float32},
                 "B2": {"dtype": np.float32},
                 "ENERGY": {"dtype": np.float32},
-                'timeSeries':{"dtype":np.int16}
+                'timeSeries':{"dtype":np.int16},
+                'WATCH_CIRCLE_flag':{"dtype":np.int8},
             }
 
     def __init__(self):
@@ -142,6 +144,7 @@ class ncSpectra(Process):
                 "B1": (["TIME", "FREQUENCY"], global_result["B1"].to_numpy()),
                 "A2": (["TIME", "FREQUENCY"], global_result["A2"].to_numpy()),
                 "B2": (["TIME", "FREQUENCY"], global_result["B2"].to_numpy()),
+                "WATCH_CIRCLE_flag": ("TIME", global_result["WATCH_CIRCLE_flag"].to_numpy())
             },
             coords={
                 "TIME": global_result["TIME"].to_numpy(),
@@ -241,7 +244,6 @@ class ncDisp(Process):
         
         return tuple(dataset_objects), periods
     
-
 class ncBulk(Process):
     def __init__(self):
         super().__init__()

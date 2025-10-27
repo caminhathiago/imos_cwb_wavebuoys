@@ -537,7 +537,11 @@ class Spectra:
         return pl.DataFrame(results)     
 
 
-    def select_parameters(self, dataframe:pl.DataFrame, dataset_type:str = "spectra", include_latlon:bool=True) -> pl.DataFrame:
+    def select_parameters(self, dataframe:pl.DataFrame,
+                          dataset_type:str = "spectra",
+                          include_latlon:bool = True,
+                          include_watch_circle_flag:bool = True) -> pl.DataFrame:
+        
         if dataset_type == "spectra":
             cols = self.spectra_params
         if dataset_type == "bulk":
@@ -545,6 +549,9 @@ class Spectra:
         
         if include_latlon:
             cols.extend(["LATITUDE", "LONGITUDE"])
+
+        if include_watch_circle_flag:
+            cols.extend(['WATCH_CIRCLE_flag'])
 
         return dataframe.select(cols)
     
