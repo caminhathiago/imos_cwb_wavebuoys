@@ -77,7 +77,16 @@
             "valid_min": 0,
             "valid_max": 2000000,
             "coordinates": "TIME LATITUDE LONGITUDE"
-            }
+            },
+        "WATCH_CIRCLE_flag": {
+            "long_name": "primary Quality Control flag for positioning",
+            "_FillValue": -127,
+            "valid_min": 1,
+            "valid_max": 9,
+            "flag_values": [1,2,3,4,9],
+            "flag_meanings": "good not_evaluated questionable bad missing",
+            "comment": "flags as suspect datapoints where the distance between current position and site location is greater than watch_circle (see global attributes). The same applies to fail flags, but using a slighly increased watch_circle (multiplied by an error factor)."
+        }
         
         
     },
