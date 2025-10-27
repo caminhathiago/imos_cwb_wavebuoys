@@ -230,7 +230,7 @@ def qc_watch_circle(spectra_bulk_df, site_buoys_to_process:pd.DataFrame, output_
                                figsize=(15,5))
 
     if out_of_radius_pct >= s.out_of_radius_tolerance: 
-        raise ValueError(f"{out_of_radius_pct}% out of radius (watchcircle = {round(watch_circle,2)}), greater then tolerance ({s.out_of_radius_tolerance}%). CSV with qc_flag_watch saved as {spectra_bulk_csv_path}")
+        DEP_LOGGER.warning(f"{out_of_radius_pct}% out of radius (watchcircle = {round(watch_circle,2)}), greater then tolerance ({s.out_of_radius_tolerance}%). CSV with qc_flag_watch saved as {spectra_bulk_csv_path}")
 
     GENERAL_LOGGER.warning(f"WATCH CIRCLE: {round(watch_circle,2)}")
     GENERAL_LOGGER.warning(f"OUT OF RADIUS: {round(out_of_radius_pct,2)}")
