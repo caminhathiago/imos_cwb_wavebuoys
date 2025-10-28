@@ -279,6 +279,15 @@ def main():
                 csvOutput.save_csv(data=temp_subflags, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_temp_qc_subflags.csv")
                 csvOutput.save_csv(data=temp_qualified, site_name=site.name, file_path=vargs.incoming_path, file_name_preffix="_temp_qc.csv")
 
+            # Watch Circle
+            qc = WaveBuoyQC(config_id=1)
+
+            waves_qualified, watch_circle = qc.watch_circle_test(data=waves,
+                                         deployment_depth=site.DeployDepth,
+                                         deployment_latitude=site.DeployLat,
+                                         deployment_longitude=site.DeployLon)               
+
+            deployment_metadata.loc["watch_circle", "metadata_wave_buoy"] = watch_circle
 
             # Processing Nc File --------------------------------------------
             SITE_LOGGER.info("NC FILE PROCESSING STEP ====================================")

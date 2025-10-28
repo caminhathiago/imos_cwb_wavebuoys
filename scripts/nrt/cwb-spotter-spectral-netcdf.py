@@ -187,6 +187,16 @@ def main():
             # Qualification ---------------------------------------
             SITE_LOGGER.info("QUALIFICATION STEP ====================================")
 
+            # Watch Circle
+            qc = WaveBuoyQC(config_id=1)
+
+            spectra, watch_circle = qc.watch_circle_test(data=spectra,
+                                         deployment_depth=site.DeployDepth,
+                                         deployment_latitude=site.DeployLat,
+                                         deployment_longitude=site.DeployLon)               
+
+            deployment_metadata.loc["watch_circle", "metadata_wave_buoy"] = watch_circle
+
 
             # Processing Nc File --------------------------------------------
             SITE_LOGGER.info("NC FILE PROCESSING STEP ====================================")
@@ -197,7 +207,7 @@ def main():
                                                 regional_metadata=regional_metadata,
                                                 parameters_type="spectral")
     
-            ds_embedded = ncProcessor.compose_dataset(data=spectra, parameters_type="spectral")
+            ds_embedded = ncProcessor.compose_dataset(waves=spectra, parameters_type="spectral")
             SITE_LOGGER.info("embedded dataset composed")
 
             ds_embedded = ncProcessor.convert_dtypes(dataset=ds_embedded, parameters_type="spectral")
