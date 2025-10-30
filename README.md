@@ -1,6 +1,11 @@
-# Sofar Spotter SD Card Processor
+# IMOS Coastal Wave Buoys Facility toolboxes
 
-This repository provides tools to process data exported from SD cards used by **Sofar Spotter** wave buoys. The main script extracts, filters, and calculates spectral data from raw log files.
+This repository provides tools used by the IMOS Coastal Wave Buoys Facility to process and qualify both near real-time (NRT) and delayed mode (DM) data of SOFAR Spotters.
+
+
+# Sofar Spotter SD Card Processor (wavebuoy_dm)
+
+The package wavebuoy_dm provides tools for data exported from SD cards used by **Sofar Spotter** wave buoys. The main script extracts, filters, and calculates spectral data from raw log files.
 
 ---
 
