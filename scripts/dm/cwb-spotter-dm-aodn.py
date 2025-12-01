@@ -238,7 +238,7 @@ def qc_watch_circle(spectra_bulk_df, site_buoys_to_process:pd.DataFrame, output_
     GENERAL_LOGGER.warning(f"OUT OF RADIUS: {round(out_of_radius_pct,2)}")
 
     DEP_LOGGER.info(f"Storing watch_circle in deployment metadata")
-    deployment_metadata.loc["watch_circle", "metadata_wave_buoy"] = round(watch_circle,2)
+    deployment_metadata.loc["watch_circle", "metadata_wave_buoy"] = round(watch_circle,0)
 
     spectra_bulk_df = cp.rename_qc_watch_circle_column(spectra_bulk_df)
 

@@ -89,7 +89,24 @@ class ncAttrsExtractor:
     #         return op_inst_code[operating_institution]
     
     def _extract_deployment_metadata_water_depth(deployment_metadata: pd.DataFrame) -> str:
-        return deployment_metadata.loc["Water depth", "metadata_wave_buoy"]
+        
+        try:
+            water_depth = deployment_metadata.loc["Water depth", "metadata_wave_buoy"]
+        except KeyError:
+            raise ValueError("Water depth metadata is missing")
+        
+        if isinstance(water_depth, str):
+            
+            match = re.search(r'(\d+(\.\d+)?)', water_depth)
+            if match:
+                water_depth = match.group(1)
+            else:
+                raise ValueError("No numeric water depth found")
+            
+        try:
+            return np.int8(water_depth)
+        except (TypeError, ValueError):
+            raise ValueError("Invalid water depth format")
     
     def _extract_deployment_metadata_water_depth_units(deployment_metadata: pd.DataFrame) -> str:
         return "m"
@@ -146,7 +163,10 @@ class ncAttrsExtractor:
             return operating_institution_code
         
     def _extract_deployment_metadata_watch_circle(deployment_metadata: pd.DataFrame) -> str:
-        return deployment_metadata.loc["watch_circle", "metadata_wave_buoy"]
+        return int(deployment_metadata.loc["watch_circle", "metadata_wave_buoy"])
+
+    def _extract_deployment_metadata_watch_circle_units(deployment_metadata: pd.DataFrame) -> str:
+        return "m"
 
     def _extract_regional_metadata_principal_investigator(regional_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame) -> str:
         operating_institution_code = ncAttrsExtractor._process_operating_institution(deployment_metadata=deployment_metadata)
@@ -496,7 +516,7 @@ class ncWriter:
     
     def _remove_coordinates_qc_variables(self, dataset: xr.Dataset) -> xr.Dataset:
         
-        qc_variables = [var for var in list(dataset.variables.keys()) if var.endswith("quality_control")]
+        qc_variables = [var for var in list(dataset.variables.keys()) if var.endswith("quality_control") or var.endswith("_flag")]
         
         for qc_var in qc_variables:
             dataset[qc_var].encoding["coordinates"] = None
