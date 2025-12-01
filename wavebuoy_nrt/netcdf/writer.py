@@ -259,7 +259,7 @@ class ncAttrsExtractor:
                 raise ValueError("No numeric water depth found")
 
         try:
-            return np.float32(water_depth)
+            return np.int8(water_depth)
         except (TypeError, ValueError):
             raise ValueError("Invalid water depth format")
     
@@ -303,6 +303,12 @@ class ncAttrsExtractor:
             return "IMOS"
         else:
             return operating_institution_code
+
+    def _extract_deployment_metadata_watch_circle(deployment_metadata: pd.DataFrame) -> str:
+        return int(deployment_metadata.loc["watch_circle", "metadata_wave_buoy"])
+
+    def _extract_deployment_metadata_watch_circle_unit(deployment_metadata: pd.DataFrame) -> str:
+        return "m"
 
     def _extract_regional_metadata_principal_investigator(regional_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame) -> str:
         operating_institution_code = ncAttrsExtractor._process_operating_institution(deployment_metadata=deployment_metadata)
@@ -537,19 +543,20 @@ class ncAttrsComposer:
 class ncProcessor:
 
     DTYPES_BULK = {'WSSH':{"dtype":np.float64},
-                        'WPPE':{"dtype":np.float64},
-                        'WPFM':{"dtype":np.float64},
-                        'WPDI':{"dtype":np.float64},
-                        'WPDS':{"dtype":np.float64},
-                        'SSWMD':{"dtype":np.float64},
-                        'WMDS':{"dtype":np.float64},
-                        'TEMP':{"dtype":np.float64},
+                        'WPPE':{"dtype":np.float32},
+                        'WPFM':{"dtype":np.float32},
+                        'WPDI':{"dtype":np.float32},
+                        'WPDS':{"dtype":np.float32},
+                        'SSWMD':{"dtype":np.float32},
+                        'WMDS':{"dtype":np.float32},
+                        'TEMP':{"dtype":np.float32},
                         'WAVE_quality_control':{"dtype":np.int8},
                         'TEMP_quality_control':{"dtype":np.int8},
+                        'WATCH_CIRCLE_flag':{"dtype":np.int8},
                         # 'TIME':{"dtype":np.float64},
                         'LATITUDE':{"dtype":np.float64},
                         'LONGITUDE':{"dtype":np.float64},
-                        'timeSeries':{"dtype":np.int16}}\
+                        'timeSeries':{"dtype":np.int16}}
                         
     
     DTYPES_SPECTRAL = {
@@ -561,8 +568,11 @@ class ncProcessor:
                 "A2": {"dtype": np.float32},
                 "B2": {"dtype": np.float32},
                 "ENERGY": {"dtype": np.float32},
-                'timeSeries':{"dtype":np.int16}
+                'timeSeries':{"dtype":np.int16},
+                'WATCH_CIRCLE_flag':{"dtype":np.int8},
             }
+                        
+
 
     @staticmethod
     def select_processing_source(data: pd.DataFrame, processing_source : str) -> pd.DataFrame:
@@ -752,6 +762,7 @@ class ncWriter(WaveBuoy):
                             'TEMP':{"dtype":np.float64},
                             'WAVE_quality_control':{"dtype":np.int8},
                             'TEMP_quality_control':{"dtype":np.int8},
+                            'WATCH_CIRCLE_flag':{"dtype":np.int8},
                             'TIME':{"dtype":np.float64},
                             'LATITUDE':{"dtype":np.float64},
                             'LONGITUDE':{"dtype":np.float64},
@@ -768,7 +779,9 @@ class ncWriter(WaveBuoy):
                 "A2": {"dtype": np.float32},
                 "B2": {"dtype": np.float32},
                 "ENERGY": {"dtype": np.float32},
-                'timeSeries':{"dtype":np.int16}
+                'timeSeries':{"dtype":np.int16},
+                'WATCH_CIRCLE_flag':{"dtype":np.int8}
+
             }
 
 
@@ -858,9 +871,12 @@ class ncWriter(WaveBuoy):
             
     
     def _remove_coordinates_qc_variables(self, dataset: xr.Dataset) -> xr.Dataset:
-        qc_variables = [var for var in list(dataset.variables.keys()) if var.endswith("quality_control")]
+        
+        qc_variables = [var for var in list(dataset.variables.keys()) if var.endswith("quality_control") or var.endswith("_flag")]
+        
         for qc_var in qc_variables:
             dataset[qc_var].encoding["coordinates"] = None
+        
         return dataset
 
     def _remove_fillvalue_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
