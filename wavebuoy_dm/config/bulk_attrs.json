@@ -169,7 +169,7 @@
         "valid_max": 9,
         "flag_values": [1,2,3,4,9],
         "flag_meanings": "good not_evaluated questionable bad missing",
-        "comment": "flags as suspect datapoints where the distance between current position and site location is greater than watch_circle (see global attributes). The same applies to fail flags, but using a slighly increased watch_circle (multiplied by an error factor)."
+        "comment": "flags as suspect/questionable datapoints where the distance between current position and site location is greater than watch_circle (see global attributes). The same applies to fail/bad flags, but using a slighly increased watch_circle (multiplied by an error factor)."
         }
     },
 "general_attributes":
