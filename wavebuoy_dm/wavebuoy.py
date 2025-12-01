@@ -177,9 +177,8 @@ class WaveBuoy():
 
     def load_buoys_to_process(self) -> pd.DataFrame:
         
-        region_path = os.path.join(os.getenv('IRDS_PATH'), 'Data', 'aodn_dm_python')
-        pattern = f"delayed_mode_buoys_to_process.csv"
-        file_path = glob.glob(os.path.join(region_path, pattern))[0]
+        region_path = os.path.join(os.getenv('DM_DATA_PATH'), "delayed_mode_buoys_to_process.csv")
+        file_path = glob.glob(region_path)[0]
         
         if os.path.exists(file_path):
             

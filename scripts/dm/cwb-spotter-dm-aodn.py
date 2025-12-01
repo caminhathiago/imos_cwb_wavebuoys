@@ -36,11 +36,13 @@ class MetadataArgs:
 
 def process_paths(site_buoys_to_process):
 
-    dm_deployment_path = site_buoys_to_process.loc["datapath"]
+    region = site_buoys_to_process.loc["region"] + "waves"
+    dm_deployment_folder = site_buoys_to_process.loc["datapath"]
     # dm_deployment_path = os.path.dirname(dm_deployment_path
     #                                     .replace("Y:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
     #                                     .replace("X:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
     #                                     )
+    dm_deployment_path = os.path.join(os.getenv('DM_DATA_PATH'), region, dm_deployment_folder)
     output_path = os.path.join(dm_deployment_path, "processed_py")
     if not os.path.exists(output_path):
         os.mkdir(output_path)
