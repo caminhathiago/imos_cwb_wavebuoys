@@ -263,8 +263,8 @@ class NetCDFFileHandler():
 
                 return waves_global, temp_global
         
-        elif parameters_type == "spectral":
-                
+            elif parameters_type == "spectral":
+                    
                 global_dataframe = pd.DataFrame([])
                 for nc_file in nc_file_paths:
                     dataframe = (xr.open_dataset(nc_file, engine="netcdf4")

@@ -259,7 +259,7 @@ class ncAttrsExtractor:
                 raise ValueError("No numeric water depth found")
 
         try:
-            return np.float32(water_depth)
+            return np.int8(water_depth)
         except (TypeError, ValueError):
             raise ValueError("Invalid water depth format")
     
@@ -303,6 +303,12 @@ class ncAttrsExtractor:
             return "IMOS"
         else:
             return operating_institution_code
+
+    def _extract_deployment_metadata_watch_circle(deployment_metadata: pd.DataFrame) -> str:
+        return int(deployment_metadata.loc["watch_circle", "metadata_wave_buoy"])
+
+    def _extract_deployment_metadata_watch_circle_unit(deployment_metadata: pd.DataFrame) -> str:
+        return "m"
 
     def _extract_regional_metadata_principal_investigator(regional_metadata: pd.DataFrame, deployment_metadata: pd.DataFrame) -> str:
         operating_institution_code = ncAttrsExtractor._process_operating_institution(deployment_metadata=deployment_metadata)
@@ -537,19 +543,20 @@ class ncAttrsComposer:
 class ncProcessor:
 
     DTYPES_BULK = {'WSSH':{"dtype":np.float64},
-                        'WPPE':{"dtype":np.float64},
-                        'WPFM':{"dtype":np.float64},
-                        'WPDI':{"dtype":np.float64},
-                        'WPDS':{"dtype":np.float64},
-                        'SSWMD':{"dtype":np.float64},
-                        'WMDS':{"dtype":np.float64},
-                        'TEMP':{"dtype":np.float64},
+                        'WPPE':{"dtype":np.float32},
+                        'WPFM':{"dtype":np.float32},
+                        'WPDI':{"dtype":np.float32},
+                        'WPDS':{"dtype":np.float32},
+                        'SSWMD':{"dtype":np.float32},
+                        'WMDS':{"dtype":np.float32},
+                        'TEMP':{"dtype":np.float32},
                         'WAVE_quality_control':{"dtype":np.int8},
                         'TEMP_quality_control':{"dtype":np.int8},
+                        'WATCH_CIRCLE_flag':{"dtype":np.int8},
                         # 'TIME':{"dtype":np.float64},
                         'LATITUDE':{"dtype":np.float64},
                         'LONGITUDE':{"dtype":np.float64},
-                        'timeSeries':{"dtype":np.int16}}\
+                        'timeSeries':{"dtype":np.int16}}
                         
     
     DTYPES_SPECTRAL = {
@@ -561,8 +568,11 @@ class ncProcessor:
                 "A2": {"dtype": np.float32},
                 "B2": {"dtype": np.float32},
                 "ENERGY": {"dtype": np.float32},
-                'timeSeries':{"dtype":np.int16}
+                'timeSeries':{"dtype":np.int16},
+                'WATCH_CIRCLE_flag':{"dtype":np.int8},
             }
+                        
+
 
     @staticmethod
     def select_processing_source(data: pd.DataFrame, processing_source : str) -> pd.DataFrame:
@@ -571,12 +581,14 @@ class ncProcessor:
     @staticmethod
     def _compose_coords_dimensions(waves: pd.DataFrame, temp: pd.DataFrame = None, parameters_type: str = "bulk") -> dict:
 
-        if parameters_type == "bulk":
-            coords = {
+        coords = {
                     "TIME":("TIME", waves["TIME"]),
                     "LATITUDE":("TIME", waves["LATITUDE"]),
                     "LONGITUDE":("TIME", waves["LONGITUDE"])
                 }
+
+        if parameters_type == "bulk":
+            
             if temp is not None:
                 coords.update({"TIME_TEMP": ("TIME_TEMP", temp["TIME_TEMP"])})
 
@@ -608,7 +620,11 @@ class ncProcessor:
                     data_vars.update({var:(tuple(dimensions), waves[var])})
 
             elif parameters_type == "spectral":
-                data_vars.update({var:(tuple(dimensions), np.vstack(waves[var].values))})
+                
+                if var == ("WATCH_CIRCLE_flag"):
+                    data_vars.update({var:(("TIME"), waves[var].values)})
+                else:
+                    data_vars.update({var:(tuple(dimensions), np.vstack(waves[var].values))})
         
         return data_vars
     
@@ -742,6 +758,7 @@ class ncProcessor:
 class ncWriter(WaveBuoy):
 
     ENCODING_ENFORCEMENT_BULK = {"TIME":{"_FillValue":None},
+                            "TIME_TEMP":{"_FillValue":None},
                             'WSSH':{"dtype":np.float64},
                             'WPPE':{"dtype":np.float64},
                             'WPFM':{"dtype":np.float64},
@@ -752,7 +769,7 @@ class ncWriter(WaveBuoy):
                             'TEMP':{"dtype":np.float64},
                             'WAVE_quality_control':{"dtype":np.int8},
                             'TEMP_quality_control':{"dtype":np.int8},
-                            'TIME':{"dtype":np.float64},
+                            'WATCH_CIRCLE_flag':{"dtype":np.int8},
                             'LATITUDE':{"dtype":np.float64},
                             'LONGITUDE':{"dtype":np.float64},
                             'timeSeries':{"dtype":np.int16}
@@ -768,7 +785,9 @@ class ncWriter(WaveBuoy):
                 "A2": {"dtype": np.float32},
                 "B2": {"dtype": np.float32},
                 "ENERGY": {"dtype": np.float32},
-                'timeSeries':{"dtype":np.int16}
+                'timeSeries':{"dtype":np.int16},
+                'WATCH_CIRCLE_flag':{"dtype":np.int8}
+
             }
 
 
@@ -858,13 +877,18 @@ class ncWriter(WaveBuoy):
             
     
     def _remove_coordinates_qc_variables(self, dataset: xr.Dataset) -> xr.Dataset:
-        qc_variables = [var for var in list(dataset.variables.keys()) if var.endswith("quality_control")]
+        
+        qc_variables = [var for var in list(dataset.variables.keys()) if var.endswith("quality_control") or var.endswith("_flag")]
+        
         for qc_var in qc_variables:
             dataset[qc_var].encoding["coordinates"] = None
+        
         return dataset
 
     def _remove_fillvalue_attributes(self, dataset: xr.Dataset) -> xr.Dataset:
+        
         time_variables = [var for var in list(dataset.variables.keys()) if var.startswith("TIME")]
+        
         for time_var in time_variables:
             dataset[time_var].encoding["_FillValue"] = None
 
@@ -876,14 +900,20 @@ class ncWriter(WaveBuoy):
     def _process_encoding(self, dataset: xr.Dataset, parameters_type: str) -> dict:
                 
         if parameters_type == "bulk":
+            
             encoding = self.ENCODING_ENFORCEMENT_BULK.copy()
+            
             if "TEMP" not in list(dataset.variables):
                 del encoding["TEMP"]
                 del encoding["TEMP_quality_control"]
+                del encoding["TIME_TEMP"]
 
         elif parameters_type == "spectral":
+            
             encoding = self.ENCODING_ENFORCEMENT_SPECTRAL.copy()
+        
         SITE_LOGGER.warning(encoding)
+        
         return encoding
 
     
@@ -922,27 +952,28 @@ class ncWriter(WaveBuoy):
                      file_names: str,
                      dataset_objects: xr.Dataset,
                      parameters_type: str = "bulk"):
+        
         file_paths = self._compose_file_paths(site_id=site_id,
                                                 output_path=output_path,
                                                 file_names=file_names)       
+        
         backup_file_paths = self._compose_file_paths(site_id=site_id,
                                                         output_path=output_path,
                                                         file_names=file_names,
                                                         stage="backup") 
         
         for file_path, backup_file_path, dataset in zip(file_paths, backup_file_paths, dataset_objects):
+            
             dataset = self._remove_coordinates_qc_variables(dataset=dataset)
             dataset = self._remove_fillvalue_attributes(dataset=dataset)
 
             encoding = self._process_encoding(dataset=dataset, parameters_type=parameters_type)
             
             if not self._is_file_locked(file_path):
-                dataset.to_netcdf(file_path, engine="netcdf4",
-                                    encoding=encoding)
+                dataset.to_netcdf(file_path, engine="netcdf4", encoding=encoding)
                 
             else:
-                dataset.to_netcdf(backup_file_path, engine="netcdf4",
-                                    encoding=encoding)
+                dataset.to_netcdf(backup_file_path, engine="netcdf4", encoding=encoding)
                 raise RuntimeError(f"File was locked, saving to {backup_file_path}")
                 
 
