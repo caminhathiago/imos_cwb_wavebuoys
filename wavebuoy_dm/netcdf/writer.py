@@ -163,7 +163,7 @@ class ncAttrsExtractor:
             return operating_institution_code
         
     def _extract_deployment_metadata_watch_circle(deployment_metadata: pd.DataFrame) -> str:
-        return int(deployment_metadata.loc["watch_circle", "metadata_wave_buoy"])
+        return np.int16(deployment_metadata.loc["watch_circle", "metadata_wave_buoy"])
 
     def _extract_deployment_metadata_watch_circle_units(deployment_metadata: pd.DataFrame) -> str:
         return "m"
