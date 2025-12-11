@@ -224,7 +224,24 @@ class ncAttrsExtractor:
 
     # from buoys metadata ------------------
     
+    def _extract_buoys_metadata_wigos_id(site_name:str, buoys_metadata:pd.DataFrame) -> str:
+        
+        wigos_id = buoys_metadata.loc[site_name, "wigos_id"]
 
+        if pd.isna(wigos_id):
+            return "n/a"
+
+        return wigos_id
+
+    def _extract_buoys_metadata_wmo_id(site_name:str, buoys_metadata:pd.DataFrame) -> str:
+        
+        wmo_id = buoys_metadata.loc[site_name, "wmo_id"]
+
+        if pd.isna(wmo_id):
+            return "n/a"
+
+        return wmo_id
+        
     # from deployment metadata -------------
     def _extract_deployment_metadata_site_name(deployment_metadata: pd.DataFrame) -> str:
         site_name = deployment_metadata.loc["Site Name", "metadata_wave_buoy"]
@@ -295,6 +312,12 @@ class ncAttrsExtractor:
 
     def _extract_deployment_metadata_abstract(deployment_metadata: pd.DataFrame, regional_metadata:pd.DataFrame) -> str:
         return ncAttrsExtractor._extract_deployment_metadata_title(deployment_metadata=deployment_metadata, regional_metadata=regional_metadata)
+
+    def _extract_deployment_metadata_watch_circle(deployment_metadata: pd.DataFrame) -> str:
+        return int(deployment_metadata.loc["watch_circle", "metadata_wave_buoy"])
+
+    def _extract_deployment_metadata_watch_circle_unit(deployment_metadata: pd.DataFrame) -> str:
+        return "m"
 
     # from regional metadata -------------
     def _process_operating_institution(deployment_metadata: pd.DataFrame) -> str:
@@ -476,13 +499,20 @@ class ncAttrsComposer:
             if name.startswith("_extract_"): 
                 method = getattr(ncAttrsExtractor, name)
                 if callable(method):
+                    
                     if name.startswith("_extract_buoys_metadata_"):
+                        
+                        # if name.endswith("_wigos_id") or name.endswith("_wmo_id"):
+                            
+                        #     col_name = name.removeprefix("_extract_buoys_metadata_")
+                        #     if np.isnan(self.buoys_metadata.loc[site_name, col_name]):
+                        #         continue
+                        
                         key = name.removeprefix("_extract_buoys_metadata_")
                         kwargs = {"site_name": site_name,
                                   "buoys_metadata":self.buoys_metadata}
-                         
+                        
                     elif name.startswith("_extract_data_"):
-                        key = name.removeprefix("_extract_data_") 
                         kwargs = {"dataset":dataset}
                         
                     elif name.startswith("_extract_deployment_metadata_"):
