@@ -228,8 +228,8 @@ class ncAttrsExtractor:
         
         wigos_id = buoys_metadata.loc[site_name, "wigos_id"]
 
-        if np.isnan(wigos_id):
-            return ""
+        if pd.isna(wigos_id):
+            return "n/a"
 
         return wigos_id
 
@@ -237,13 +237,11 @@ class ncAttrsExtractor:
         
         wmo_id = buoys_metadata.loc[site_name, "wmo_id"]
 
-        if np.isnan(wmo_id):
-            return ""
+        if pd.isna(wmo_id):
+            return "n/a"
 
         return wmo_id
         
-
-
     # from deployment metadata -------------
     def _extract_deployment_metadata_site_name(deployment_metadata: pd.DataFrame) -> str:
         site_name = deployment_metadata.loc["Site Name", "metadata_wave_buoy"]
