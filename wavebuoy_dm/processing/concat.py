@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import glob
 import polars as pl
-
+import pandas as pd
 
 class csvConcat:
     """
@@ -372,3 +372,219 @@ class csvConcat:
             results.update({suffix : concat_df_lazy})
 
         return results, ignored_files, error_messages
+    
+    def concat_files(self) -> pl.DataFrame:
+        
+        results = self.map_concat_results()
+        error_messages = self.map_concat_results()
+
+        for suffix in self.files_suffixes.keys():
+            
+            if not self.files_suffixes[suffix]:
+                continue
+            
+            data_list = []
+            
+            for file in self.files_suffixes[suffix]:
+                
+                if suffix == "LOC":
+                    self.EXPECTED_SCHEMAS["LOC"]["GPS_Epoch_Time(s)"] = pl.Float64
+
+                data = pl.read_csv(
+                    file,
+                    schema=self.EXPECTED_SCHEMAS[suffix],
+                    has_header=False,
+                    truncate_ragged_lines=True,
+                    ignore_errors=True,
+                )
+
+                data = data.drop_nulls()
+
+                if not data.is_empty():
+                    data_list.append(data)
+
+            concat_data = pl.concat(data_list, how="vertical")    
+            results.update({suffix : concat_data})
+
+        return results
+# class csvPdConcat:
+
+
+#     # EXPECTED_SCHEMAS = {
+#     #     "FLT": {
+#     #         "millis": "Int64",
+#     #         "GPS_Epoch_Time(s)": "float64",
+#     #         "outx(mm)": "float64",
+#     #         "outy(mm)": "float64",
+#     #         "outz(mm)": "float64",
+#     #     },
+
+#     #     "SPC": {
+#     #         "type": "string",
+#     #         "millis": "Int64",
+#     #         "t0_GPS_Epoch_Time(s)": "float64",
+#     #         "tN_GPS_Epoch_Time(s)": "float64",
+#     #         "ens_count": "Int64",
+#     #         "Sxx_re": "float64",
+#     #         "Syy_re": "float64",
+#     #         "Szz_re": "float64",
+#     #         "Sxy_re": "float64",
+#     #         "Szx_re": "float64",
+#     #         "Szy_re": "float64",
+#     #         "Sxx_im": "float64",
+#     #         "Syy_im": "float64",
+#     #         "Szz_im": "float64",
+#     #         "Sxy_im": "float64",
+#     #         "Szx_im": "float64",
+#     #         "Szy_im": "float64",
+#     #     },
+
+#     #     "LOC": {
+#     #         "GPS_Epoch_Time(s)": "float64",   # union (Float64, Int64) → float64
+#     #         "lat(deg)": "Int64",
+#     #         "lat(min*1e5)": "Int64",
+#     #         "long(deg)": "Int64",
+#     #         "long(min*1e5)": "Int64",
+#     #     },
+
+#     #     "SST": {
+#     #         "timestamp (ticks/UTC)": "float64",
+#     #         "temperature (C)": "float64",
+#     #     },
+
+#     #     "HDR": {
+#     #         "GPS_Epoch_Time(s)": "float64",
+#     #         "dmx(mm)": "Int64",
+#     #         "dmy(mm)": "Int64",
+#     #         "dmz(mm)": "Int64",
+#     #         "dmn(mm)": "Int64",
+#     #     },
+
+#     #     "BARO": {
+#     #         "timestamp (ticks/UTC)": "float64",
+#     #         "pressure (mbar)": "float64",
+#     #     },
+
+#     #     "SENS_AGG": {
+#     #         "bm_node_id": "string",
+#     #         "node_position": "Int64",
+#     #         "node_app_name": "string",
+#     #         "timestamp (ticks/UTC)": "float64",
+#     #         "reading_count": "Int64",
+#     #     },
+
+#     #     "SENS_IND": {
+#     #         "bm_node_id": "string",
+#     #         "node_position": "Int64",
+#     #         "node_app_name": "string",
+#     #         "reading_uptime_millis": "Int64",
+#     #         "reading_time_utc_s": "float64",
+#     #         "sensor_reading_time_s": "float64",
+#     #     },
+#     # }
+
+#     EXPECTED_SCHEMAS = {"FLT":{"millis": pl.Int64,
+#                                 "GPS_Epoch_Time(s)": pl.Float64,
+#                                 "outx(mm)": pl.Float64,
+#                                 "outy(mm)": pl.Float64,
+#                                 "outz(mm)": pl.Float64
+#                                 },
+#                         'SPC':{"type": pl.Utf8,
+#                                 "millis": pl.Int64,
+#                                 "t0_GPS_Epoch_Time(s)": pl.Float64,
+#                                 "tN_GPS_Epoch_Time(s)": pl.Float64,
+#                                 "ens_count": pl.Int64,
+#                                 "Sxx_re": pl.Float64,
+#                                 "Syy_re": pl.Float64,
+#                                 "Szz_re": pl.Float64,
+#                                 "Sxy_re": pl.Float64,
+#                                 "Szx_re": pl.Float64,
+#                                 "Szy_re": pl.Float64,
+#                                 "Sxx_im": pl.Float64,
+#                                 "Syy_im": pl.Float64,
+#                                 "Szz_im": pl.Float64,
+#                                 "Sxy_im": pl.Float64,
+#                                 "Szx_im": pl.Float64,
+#                                 "Szy_im": pl.Float64
+#                                 },
+#                         'LOC':{"GPS_Epoch_Time(s)": (pl.Float64, pl.Int64),
+#                                 "lat(deg)": pl.Int64,
+#                                 "lat(min*1e5)": pl.Int64,
+#                                 "long(deg)": pl.Int64,
+#                                 "long(min*1e5)": pl.Int64
+#                                 },
+#                         'SST':{"timestamp (ticks/UTC)": pl.Float64,
+#                                 "temperature (C)": pl.Float64 
+#                                 },
+#                         'HDR':{"GPS_Epoch_Time(s)": pl.Float64,
+#                                 "dmx(mm)": pl.Int64,  
+#                                 "dmy(mm)": pl.Int64,
+#                                 "dmz(mm)": pl.Int64,
+#                                 "dmn(mm)": pl.Int64
+#                                 },
+#                         'BARO':{"timestamp (ticks/UTC)": pl.Float64,  
+#                                 "pressure (mbar)": pl.Float64 
+#                                 },
+#                         'SENS_AGG':{
+#                                 'bm_node_id': pl.Utf8,
+#                                 'node_position': pl.Int64,
+#                                 'node_app_name': pl.Utf8, 
+#                                 "timestamp (ticks/UTC)": pl.Float64, 
+#                                 'reading_count': pl.Int64
+#                                  },
+#                         'SENS_IND':{
+#                                 'bm_node_id': pl.Utf8,
+#                                 'node_position': pl.Int64,
+#                                 'node_app_name': pl.Utf8, 
+#                                 'reading_uptime_millis': pl.Int64,
+#                                 "reading_time_utc_s": pl.Float64, 
+#                                 'sensor_reading_time_s': pl.Float64
+#                                  }
+#                         }
+
+#     def __init__(self,
+#                  files_path: List[str],
+#                  suffixes_to_concat: List[str] = None):
+        
+#         self.files_path = files_path
+        
+#         if suffixes_to_concat:
+#             self.suffixes_to_concat = suffixes_to_concat
+#         else:
+#             self.suffixes_to_concat = ['FLT','SPC','LOC','SST','HDR','BARO','SMD','SENS_AGG']
+
+#         self.files_suffixes = self.map_files_suffixes()
+#         # self.suffixes_schemas = self.scan_schemas()
+
+#     def filter_files_suffix(self, suffix:str, extension:str = ".csv") -> list:
+#         return glob.glob(os.path.join(self.files_path, "*" + suffix + extension))
+
+#     def map_files_suffixes(self) -> dict:
+        
+#         map_suffixes_files = {suffix: [] for suffix in self.suffixes_to_concat}
+#         for suffix in map_suffixes_files.keys():
+#             files_list = self.filter_files_suffix(suffix=suffix)
+#             map_suffixes_files.update({suffix: files_list})
+
+#         if not map_suffixes_files.get("FLT") or not map_suffixes_files.get("LOC"):
+#             raise FileNotFoundError(f"No files found for FLT or LOC. Please check if path contains SD card files.")
+
+#         return map_suffixes_files
+
+#     def map_concat_results(self) -> dict:
+#         return {suffix: [] for suffix in self.suffixes_to_concat} 
+
+#     def concat_files(self):
+
+#         results = self.map_concat_results()
+#         error_messages = self.map_concat_results()
+#         ignored_files = []
+
+#         for suffix in self.files_suffixes.keys():
+#             data_list = []
+            
+#             for file in self.files_suffixes[suffix]:
+#                 data = pd.read_csv(self.files_suffixes[suffix][1],
+#                             usecols=self.EXPECTED_SCHEMAS[suffix].keys)
+
+        

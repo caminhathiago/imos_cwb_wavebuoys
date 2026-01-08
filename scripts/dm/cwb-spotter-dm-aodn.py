@@ -79,7 +79,7 @@ def load_metadata(site_buoys_to_process:pd.DataFrame, dm_deployment_path) -> lis
             "raw_data_path": raw_data_path,
         }
 
-def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to_concat=["FLT","LOC","SST","BARO"]) -> list[pl.DataFrame]:
+def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to_concat=["FLT","LOC","SST","BARO"], instrument:str="Sofar Spotter V3") -> list[pl.DataFrame]:
 
     # DEP_LOGGER.info(f"Lazy concatenating csv files for {suffixes_to_concat}")
     # cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat)
@@ -93,34 +93,50 @@ def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to
     # collected_results = cp.collect_results(lazy_processed_results)   
 
     # return collected_results["displacements"], collected_results["gps"], collected_results["surface_temp"]
-    DEP_LOGGER.info(f"Lazy concatenating csv files for suffixes_to_concat")
+    
+    
     cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat) 
-    lazy_concat_results, ignored_files, error_messages = cc.lazy_concat_files()
     
-    DEP_LOGGER.info(f"{len(ignored_files)} files ignored. Storing count to deployment metadata.")
-    GENERAL_LOGGER.warning(f"IGNORED FILES: {len(ignored_files)}")
+    if "Sofar Spotter V" in instrument:
+
+        DEP_LOGGER.info(f"Lazy concatenating csv files for suffixes_to_concat")
+        lazy_concat_results, ignored_files, error_messages = cc.lazy_concat_files()
+        
+        DEP_LOGGER.info(f"{len(ignored_files)} files ignored. Storing count to deployment metadata.")
+        GENERAL_LOGGER.warning(f"IGNORED FILES: {len(ignored_files)}")
+        
+        if error_messages:
+            
+            DEP_LOGGER.warning(f"Error messages for files that failed schema validation: {json.dumps(error_messages, indent=4)}")
+            
+            all_error_messages = []
+            for key, _ in error_messages.items():
+                all_error_messages.extend(error_messages[key])
+            
+            GENERAL_LOGGER.warning(f"FILES FAILED: ({len(all_error_messages)})")
+
+        cp = csvProcess()
+        DEP_LOGGER.info("Lazy processing cocatenated csv files")
+        lazy_processed_results = cp.process_concat_results(lazy_concat_results)
+
+        DEP_LOGGER.info("Collecting processed csv files")
+        collected_results = cp.collect_results(lazy_processed_results)
+
     
-    if error_messages:
+    elif "Smart Mooring" in instrument:
         
-        DEP_LOGGER.warning(f"Error messages for files that failed schema validation: {json.dumps(error_messages, indent=4)}")
-        
-        all_error_messages = []
-        for key, _ in error_messages.items():
-            all_error_messages.extend(error_messages[key])
-        
-        GENERAL_LOGGER.warning(f"FILES FAILED: ({len(all_error_messages)})")
+        DEP_LOGGER.info(f"Concatenating csv files for suffixes_to_concat")
+        collected_results = cc.concat_files()
 
-    cp = csvProcess()
-    DEP_LOGGER.info("Lazy processing cocatenated csv files")
-    lazy_processed_results = cp.process_concat_results(lazy_concat_results)
+        cp = csvProcess()
+        DEP_LOGGER.info("Processing cocatenated csv files")
 
-    DEP_LOGGER.info("Collecting processed csv files")
-    collected_results = cp.collect_results(lazy_processed_results)
+        collected_results = cp.process_concat_results_df(collected_results)
 
     if isinstance(collected_results.get("surface_temp"), pl.DataFrame) and not collected_results["surface_temp"].is_empty():
-        collected_results["surface_temp"] = collected_results["surface_temp"].rename(
-            {"temperature": "TEMP", "datetime": "TIME_TEMP"}
-        )
+            collected_results["surface_temp"] = collected_results["surface_temp"].rename(
+                {"temperature": "TEMP", "datetime": "TIME_TEMP"}
+            )
 
     if isinstance(collected_results.get("barometer"), pl.DataFrame) and not collected_results["barometer"].is_empty():
         collected_results["barometer"] = collected_results["barometer"].rename(
@@ -702,7 +718,7 @@ if __name__ == "__main__":
                             )
 
             DEP_LOGGER.info(f"SD card data processing ".upper() + "="*50)
-            results = process_from_SD(metadata['raw_data_path'], metadata['deployment_metadata'])
+            results = process_from_SD(metadata['raw_data_path'], metadata['deployment_metadata'], instrument=site.instrument)
             
             results = filter_dates(results, 
                                     metadata_args.site_buoys_to_process.timezone, 

@@ -124,10 +124,39 @@ class csvProcess:
         else:
             return df_lazy 
         
-    def sort_by_datetime(self, df_lazy: pl.LazyFrame) -> pl.LazyFrame:
-        return df_lazy.sort("datetime")
+    def convert_to_datetime_df(
+                    self,
+                    df: pl.DataFrame,
+                    suffix: str,
+                    drop_original_column: bool = True
+                    ) -> pl.DataFrame:
+
+        # Determine the time column for this suffix
+        time_col = self.get_time_column(df, suffix=suffix)
+
+        # Filter out unrealistic GPS seconds
+        valid_range = (0, 4e9)  # GPS seconds between 1980–2107
+        df = df.filter(
+            (pl.col(time_col) >= valid_range[0]) & 
+            (pl.col(time_col) <= valid_range[1])
+        )
+
+        # Convert GPS seconds to Polars datetime
+        df = df.with_columns(
+            pl.from_epoch(pl.col(time_col), time_unit="s").alias("datetime")
+        )
+
+        # Optionally drop the original time column
+        if drop_original_column:
+            df = df.drop(time_col)
+
+        return df
     
-    def rename_columns(self, df_lazy: pl.LazyFrame, column_map: Dict[str, str]) -> pl.LazyFrame:
+    def sort_by_datetime(self, df: pl.DataFrame | pl.LazyFrame) -> pl.DataFrame | pl.LazyFrame:
+        return df.sort("datetime")
+    
+    
+    def rename_columns(self, df: pl.DataFrame | pl.LazyFrame, column_map: Dict[str, str]) -> pl.DataFrame | pl.LazyFrame:
         """
         Rename columns in the lazy dataframe based on a provided mapping.
 
@@ -138,7 +167,7 @@ class csvProcess:
         Returns:
             pl.LazyFrame: The dataframe with renamed columns.
         """
-        return df_lazy.rename(column_map)
+        return df.rename(column_map)
     
     def convert_displacement_to_meters(self, df_lazy: pl.LazyFrame) -> pl.LazyFrame:
         operations = [(pl.col('x') / 1000),
@@ -198,7 +227,9 @@ class csvProcess:
         return results
 
     def collect_results(self, results: dict) -> dict:
+        
         collected_results = results.copy()
+        
         for suffix in results:
             if isinstance(results[suffix], pl.LazyFrame):
                 collected_result = results[suffix].collect()
@@ -559,4 +590,37 @@ class csvProcess:
             df = df.drop(cols_to_drop)
 
         return df
+
+
+    def process_concat_results_df(self, concat_results:dict):
+        
+        results = concat_results.copy()
+        
+        for suffix in results:
+            
+            if isinstance(concat_results[suffix], pl.DataFrame):
+                df = concat_results[suffix] 
+                df = self.convert_to_datetime_df(df, suffix)
+                df = self.sort_by_datetime(df)
+                df = self.rename_columns(df, column_map=self.column_map[suffix])
+                
+                if suffix == "FLT":
+                    df = self.convert_displacement_to_meters(df)
+                elif suffix == "HDR":
+                    df = self.convert_displacement_to_meters(df)
+                elif suffix == "LOC":
+                    df = self.loc_process.process_lat_lon(df)
+                    df = self.loc_process.filter_bad_lat_lon(df)
+            
+                if not suffix in ('SMD', 'SENS_AGG'):
+                    df = self.drop_nat(df)
+
+                results.update({suffix:df})
+        
+        renamed_results = {
+            self.suffix_name_map.get(suffix, suffix): value
+            for suffix, value in results.items()
+        }
+
+        return renamed_results
 
