@@ -79,7 +79,7 @@ def load_metadata(site_buoys_to_process:pd.DataFrame, dm_deployment_path) -> lis
             "raw_data_path": raw_data_path,
         }
 
-def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to_concat=["FLT","LOC","SST","BARO"], instrument:str="Sofar Spotter V3") -> list[pl.DataFrame]:
+def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to_concat=["FLT","LOC","SST","BARO"], instrument:str="Sofar Spotter V3", process_zero_files:bool=False) -> list[pl.DataFrame]:
 
     # DEP_LOGGER.info(f"Lazy concatenating csv files for {suffixes_to_concat}")
     # cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat)
@@ -100,7 +100,7 @@ def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to
     if "Sofar Spotter V" in instrument:
 
         DEP_LOGGER.info(f"Lazy concatenating csv files for suffixes_to_concat")
-        lazy_concat_results, ignored_files, error_messages = cc.lazy_concat_files()
+        lazy_concat_results, ignored_files, error_messages = cc.lazy_concat_files(process_0000=process_zero_files)
         
         DEP_LOGGER.info(f"{len(ignored_files)} files ignored. Storing count to deployment metadata.")
         GENERAL_LOGGER.warning(f"IGNORED FILES: {len(ignored_files)}")
@@ -289,7 +289,7 @@ def filter_watch_circle(disp, gps, site_buoys_to_process) -> list[pl.DataFrame]:
 
     return disp, gps
 
-def calculate_spectra_from_displacements(disp: pl.DataFrame, enable_dask:bool):  
+def calculate_spectra_from_displacements(disp: pl.DataFrame, enable_dask:bool, calculate_waves_partition:bool):  
 
     s = Spectra()
     
@@ -358,7 +358,8 @@ def calculate_spectra_from_displacements(disp: pl.DataFrame, enable_dask:bool):
                 fs,
                 merge,
                 'xyz',
-                info
+                info,
+                calculate_waves_partition
             )
             for chunk in scattered_chunks
         ]
@@ -370,6 +371,7 @@ def calculate_spectra_from_displacements(disp: pl.DataFrame, enable_dask:bool):
         spectra_bulk_df = pl.concat(spectra_bulk_results)
 
         client.close()
+            
         return spectra_bulk_df
 
     else:
@@ -383,7 +385,39 @@ def calculate_spectra_from_displacements(disp: pl.DataFrame, enable_dask:bool):
             'xyz',
             min_samples,
             info
-        )
+        ) 
+
+def split_bulk_partitioned(output_path, spectra_bulk_df:pl.DataFrame) -> pl.DataFrame:
+
+    partitioned_variables = [
+                    'hsSea', 
+                    'Tm1Sea', 
+                    'Tm2Sea', 
+                    'mdir1Sea', 
+                    'mdir2Sea', 
+                    'sea_T_limits', 
+                    'hsSwell', 
+                    'Tm1Swell', 
+                    'Tm2Swell', 
+                    'mdir1Swell', 
+                    'mdir2Swell', 
+                    'swell_T_limits'
+                ]
+
+    spectra_variables = ['FREQUENCY', 'A1', 'B1', 'A2', 'B2', 'ENERGY']
+
+    waves_bulk_partitioned = spectra_bulk_df.drop(spectra_variables)
+
+    for partition in ("sea", "swell"):
+        waves_bulk_partitioned = waves_bulk_partitioned.with_columns(
+            pl.col(f"{partition}_T_limits").arr.get(0).alias(f"{partition}_T_min"),
+            pl.col(f"{partition}_T_limits").arr.get(1).alias(f"{partition}_T_max"),
+        ).drop(f"{partition}_T_limits")
+
+    file_path = os.path.join(output_path, "waves_bulk_partitioned.csv")
+    waves_bulk_partitioned.write_csv(file_path)
+
+    return spectra_bulk_df.drop(partitioned_variables)
 
 def generate_spectra_NC_file(spectra_bulk_df,
                             gps,
@@ -718,7 +752,7 @@ if __name__ == "__main__":
                             )
 
             DEP_LOGGER.info(f"SD card data processing ".upper() + "="*50)
-            results = process_from_SD(metadata['raw_data_path'], metadata['deployment_metadata'], instrument=site.instrument)
+            results = process_from_SD(metadata['raw_data_path'], metadata['deployment_metadata'], instrument=site.instrument, process_zero_files=vargs.process_zero_files)
             
             results = filter_dates(results, 
                                     metadata_args.site_buoys_to_process.timezone, 
@@ -728,10 +762,14 @@ if __name__ == "__main__":
                                     metadata_args.site_buoys_to_process.time_crop_end)
             
             DEP_LOGGER.info(f"Spectra Calculation ".upper() + "="*50)
-            spectra_bulk_df = calculate_spectra_from_displacements(results['displacements'], vargs.enable_dask)
+            spectra_bulk_df = calculate_spectra_from_displacements(results['displacements'], vargs.enable_dask, vargs.calculate_waves_partition)
 
             DEP_LOGGER.info(f"Spectra results processing ".upper() + "="*50)
             spectra_bulk_df = align_gps(spectra_bulk_df, results['gps'])
+
+            if vargs.calculate_waves_partition:
+                DEP_LOGGER.info(f"Saving partitioned data bulk waves with partitioned data to a csv file.")
+                spectra_bulk_df = split_bulk_partitioned(output_path, spectra_bulk_df)
 
             DEP_LOGGER.info(f"Spectra results watch circle qualification ".upper() + "="*50)
             spectra_bulk_df, metadata['deployment_metadata'] = qc_watch_circle(spectra_bulk_df, site, output_path, metadata['deployment_metadata'])

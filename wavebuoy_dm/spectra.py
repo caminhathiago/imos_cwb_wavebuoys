@@ -83,7 +83,7 @@ class Spectra:
         
         return zup
 
-    def spectra_from_displacements(self, heave, north, east, nfft, nover, fs, merge, data_type, info):
+    def spectra_from_displacements(self, heave, north, east, nfft, nover, fs, merge, data_type, info, calculate_waves_partition):
         # FIRST SPLIT DATA INTO CHUNKS
         pts = len(heave)  # record length in data points
         windows = math.floor((1 / nover) * (pts / nfft - 1) + 1)  # number of windows/segments
@@ -357,6 +357,27 @@ class Spectra:
             out['segments'] = windows
             out['segments_used'] = windows - len(rw)
             out['zup'] = zup
+
+        if calculate_waves_partition:
+            partition_results = self.spectra_partitioning(freq, s, a1, a2, b1, b2, info)
+
+            out["hsSea"] = partition_results["sea"]["Hm0_Sea"] 
+            out["Tm1Sea"] = partition_results["sea"]["Tm1_Sea"] 
+            out["Tm2Sea"] = partition_results["sea"]["Tm2_Sea"] 
+            out["mdir1Sea"] = partition_results["sea"]["mdir1_Sea"] 
+            out["mdir2Sea"] = partition_results["sea"]["mdir2_Sea"] 
+            if "sea_T_limits" in partition_results["sea"]:
+                out["sea_T_limits"] = partition_results["sea"]["sea_T_limits"]
+
+            out["hsSwell"] = partition_results["swell"]["Hm0_Swell"] 
+            out["Tm1Swell"] = partition_results["swell"]["Tm1_Swell"] 
+            out["Tm2Swell"] = partition_results["swell"]["Tm2_Swell"] 
+            out["mdir1Swell"] = partition_results["swell"]["mdir1_SS"] 
+            out["mdir2Swell"] = partition_results["swell"]["mdir2_SS"] 
+            if "swell_T_limits" in partition_results["swell"]:
+                out["swell_T_limits"] = partition_results["swell"]["swell_T_limits"]
+
+
         # elif type == 'enu':  # enu = velocity
         #     # Apply depth correction
         #     depth = info['hab'] + np.mean(heave)
@@ -397,6 +418,176 @@ class Spectra:
 
         return out, spectra
 
+    def spectra_partitioning(self, freq, s, a1, a2, b1, b2, info):
+
+        # freq = spectra_bulk_df["FREQUENCY"].to_numpy()
+        # s = spectra_bulk_df["ENERGY"].to_numpy()
+        # a1 = spectra_bulk_df["A1"].to_numpy()
+        # a2 = spectra_bulk_df["A2"].to_numpy()
+        # b1 = spectra_bulk_df["B1"].to_numpy()
+        # b2 = spectra_bulk_df["B2"].to_numpy()
+
+        if 'fmaxSea' in info:
+            # if max frequency set for seas
+            indSea = (freq >= info['fmaxSS']) & (freq < info['fmaxSea'])
+        else:
+            # otherwise everything greater *or equal* sea/swell cut off
+            indSea = freq >= info['fmaxSS']
+
+        # save cutoffs based on actual frequency bins
+        sea_max_min_T = 1.0 / np.array([
+            np.min(freq[indSea]),
+            np.max(freq[indSea])
+        ])
+
+        # Mean wave directions (Sea)
+        mdir1_Sea = np.rad2deg(
+            np.arctan2(
+                np.nansum(s[indSea] * b1[indSea]),
+                np.nansum(s[indSea] * a1[indSea])
+            )
+        )
+
+        mdir2_Sea = np.rad2deg(
+            np.arctan2(
+                np.nansum(s[indSea] * b2[indSea]),
+                np.nansum(s[indSea] * a2[indSea])
+            ) / 2.0
+        )
+
+        # rotate to WAVES FROM
+        mdir1_Sea = np.mod(270.0 - mdir1_Sea, 360.0)
+        mdir2_Sea = np.mod(270.0 - mdir2_Sea, 360.0)
+
+        # method following Rogers and Wang eq. 7 (modified to specific partition)
+        num = np.trapz(a1[indSea] * s[indSea], freq[indSea])
+        den = np.trapz(s[indSea], freq[indSea])
+        a1_bar_Sea = num / den
+
+        num = np.trapz(b1[indSea] * s[indSea], freq[indSea])
+        b1_bar_Sea = num / den
+
+        spreadSea = (180.0 / np.pi) * np.sqrt(
+            2.0 * (1.0 - np.sqrt(a1_bar_Sea**2 + b1_bar_Sea**2))
+        )
+
+        # calculate moments of spectrum – sea
+        n = np.arange(4)
+        mSea = np.zeros(4)
+
+        for jj in range(4):
+            # Mi = ∫ f^i * E(f) df
+            mSea[jj] = np.trapz(
+                freq[indSea] ** n[jj] * s[indSea],
+                freq[indSea]
+            )
+
+            if n[jj] == 0:
+                Hm0_Sea = 4.0 * np.sqrt(mSea[jj])  # significant wave height
+
+        # save output
+        # mdir1_Sea = mdir1_Sea
+        # mdir2_Sea = mdir2_Sea
+        Tm1_Sea = mSea[0] / mSea[1]            # m0 / m1
+        Tm2_Sea = np.sqrt(mSea[0] / mSea[2])  # sqrt(m0 / m2)
+        # spreadSea = spreadSea
+
+
+
+        if 'fmaxSS' in info and 'fminSS' in info:
+            indSS = (freq >= info['fminSS']) & (freq < info['fmaxSS'])
+        elif 'fmaxSS' in info:
+            indSS = freq < info['fmaxSS']
+        else:
+            indSS = None
+
+        # save cutoffs based on actual frequency bins
+        swell_max_min_T = 1.0 / np.array([
+            np.min(freq[indSS]),
+            np.max(freq[indSS])
+        ])
+
+        mdir1_SS = np.rad2deg(
+            np.arctan2(
+                np.nansum(s[indSS] * b1[indSS]),
+                np.nansum(s[indSS] * a1[indSS])
+            )
+        )
+
+        mdir2_SS = np.rad2deg(
+            np.arctan2(
+                np.nansum(s[indSS] * b2[indSS]),
+                np.nansum(s[indSS] * a2[indSS])
+            ) / 2.0
+        )
+
+        # rotate to WAVES FROM
+        mdir1_SS = np.mod(270.0 - mdir1_SS, 360.0)
+        mdir2_SS = np.mod(270.0 - mdir2_SS, 360.0)
+
+        # method following rogers and wang eq 7 - modify to specific partition 
+        a1_bar_SS = np.trapz(
+            a1[indSS] * s[indSS],
+            freq[indSS]
+        ) / np.trapz(s[indSS], freq[indSS])
+
+        b1_bar_SS = np.trapz(
+            b1[indSS] * s[indSS],
+            freq[indSS]
+        ) / np.trapz(s[indSS], freq[indSS])
+
+        spreadSS = (180.0 / np.pi) * np.sqrt(
+            2.0 * (1.0 - np.sqrt(a1_bar_SS**2 + b1_bar_SS**2))
+        )
+
+        # calcualte moments of spectrum - swell 
+        n = np.arange(4)
+        mSS = np.zeros(4)
+
+        for jj in range(4):
+            mSS[jj] = np.trapz(
+                freq[indSS] ** n[jj] * s[indSS],
+                freq[indSS]
+            )
+
+            if n[jj] == 0:
+                Hm0_Swell = 4.0 * np.sqrt(mSS[jj])
+
+        # mdir1_Swell = mdir1_SS
+        # mdir2_Swell = mdir2_SS
+        Tm1_Swell = mSS[0] / mSS[1]             # m0 / m1
+        Tm2_Swell = np.sqrt(mSS[0] / mSS[2])   # sqrt(m0 / m2)
+        # spreadSwell = spreadSS
+
+        return {
+            "sea": {
+                "indSea": indSea,
+                "sea_T_limits": sea_max_min_T,
+                "mdir1_Sea": mdir1_Sea,
+                "mdir2_Sea": mdir2_Sea,
+                "a1_bar_Sea": a1_bar_Sea,
+                "b1_bar_Sea": b1_bar_Sea,
+                "spreadSea": spreadSea,
+                "mSea": mSea,
+                "Hm0_Sea": Hm0_Sea,
+                "Tm1_Sea": Tm1_Sea,
+                "Tm2_Sea": Tm2_Sea,
+            },
+            "swell": {
+                "indSS": indSS,
+                "swell_T_limits": swell_max_min_T,
+                "mdir1_SS": mdir1_SS,
+                "mdir2_SS": mdir2_SS,
+                "a1_bar_SS": a1_bar_SS,
+                "b1_bar_SS": b1_bar_SS,
+                "spreadSS": spreadSS,
+                "mSS": mSS,
+                "Hm0_Swell": Hm0_Swell,
+                "Tm1_Swell": Tm1_Swell,
+                "Tm2_Swell": Tm2_Swell,
+            }
+        }
+
     def generate_time_chunks(self, data:pl.DataFrame, time_chunk:str = '30m') -> pl.DataFrame:
         return (data
                       .group_by_dynamic("datetime", every=time_chunk, closed="left")
@@ -436,13 +627,32 @@ class Spectra:
         
         return dask_chunks
 
-    def process_dask_chunk(self, dask_chunk, nfft, nover, fs, merge, data_type, info):
+    def process_dask_chunk(self, dask_chunk, nfft, nover, fs, merge, data_type, info, calculate_waves_partition):
         start_time = dask_chunk.select(pl.col("datetime").min()).item()
         end_time = dask_chunk.select(pl.col("datetime").max()).item() 
         
         results = {"TIME": [], "FREQUENCY": [],
                    "A1": [], "B1": [], "A2": [], "B2": [], "ENERGY": [],
                    'WSSH':[], 'WPFM':[], 'WPPE':[], 'SSWMD':[], 'WPDI':[], 'WMDS':[], 'WPDS':[]}
+        
+        if calculate_waves_partition:
+            
+            results.update(
+                        {
+                    "hsSea" : [],
+                    "Tm1Sea" : [],
+                    "Tm2Sea" : [],    
+                    "mdir1Sea" : [],              
+                    "mdir2Sea" : [],
+                    "sea_T_limits" : [],          
+                    "hsSwell" : [], 
+                    "Tm1Swell" : [],
+                    "Tm2Swell" : [],
+                    "mdir1Swell" : [],            
+                    "mdir2Swell" : [], 
+                    "swell_T_limits" : []
+                    }
+                )
 
         chunk_size = timedelta(minutes=30)
 
@@ -460,7 +670,7 @@ class Spectra:
             out, spectra = self.spectra_from_displacements(data_chunk["z"].item().to_numpy(),
                                             data_chunk["y"].item().to_numpy(), 
                                             data_chunk["x"].item().to_numpy(),
-                                            nfft, nover, fs, merge, data_type, info)
+                                            nfft, nover, fs, merge, data_type, info, calculate_waves_partition)
             
             results["TIME"].append(current_time)
             results["FREQUENCY"].append(spectra["f"])
@@ -477,6 +687,41 @@ class Spectra:
             results["WPDI"].append(out["Dp"])
             results["WMDS"].append(out["spread"])
             results["WPDS"].append(out["spread_Dp"])
+
+            if calculate_waves_partition:
+                
+                results["hsSea"].append(out["hsSea"])
+                results["Tm1Sea"].append(out["Tm1Sea"])
+                results["Tm2Sea"].append(out["Tm2Sea"])
+                results["mdir1Sea"].append(out["mdir1Sea"])
+                results["mdir2Sea"].append(out["mdir2Sea"])
+                results["sea_T_limits"].append(out["sea_T_limits"])
+                
+                results["hsSwell"].append(out["hsSwell"])
+                results["Tm1Swell"].append(out["Tm1Swell"])
+                results["Tm2Swell"].append(out["Tm2Swell"])
+                results["mdir1Swell"].append(out["mdir1Swell"])
+                results["mdir2Swell"].append(out["mdir2Swell"])
+                results["swell_T_limits"].append(out["swell_T_limits"])
+
+            """
+            out["hsSea"] = partition_results["sea"]["Hm0_Sea"] 
+            out["Tm1Sea"] = partition_results["sea"]["Tm1_Sea"] 
+            out["Tm2Sea"] = partition_results["sea"]["Tm2_Sea"] 
+            out["mdir1Sea"] = partition_results["sea"]["mdir1_Sea"] 
+            out["mdir2Sea"] = partition_results["sea"]["mdir2_Sea"] 
+            if "sea_T_limits" in partition_results:
+                out["sea_T_limits"] = partition_results["sea"]["sea_max_min_T"]
+
+            out["hsSwell"] = partition_results["swell"]["Hm0_Swell"] 
+            out["Tm1Swell"] = partition_results["swell"]["Tm1_Swell"] 
+            out["Tm2Swell"] = partition_results["swell"]["Tm2_Swell"] 
+            out["mdir1Swell"] = partition_results["swell"]["mdir1_SS"] 
+            out["mdir2Swell"] = partition_results["swell"]["mdir2_SS"] 
+            if "swell_T_limits" in partition_results:
+                out["swell_T_limits"] = partition_results["swell"]["swell_max_min_T"]
+
+            """
             
             current_time += chunk_size
 
@@ -554,4 +799,5 @@ class Spectra:
             cols.extend(['WATCH_CIRCLE_flag'])
 
         return dataframe.select(cols)
+    
     

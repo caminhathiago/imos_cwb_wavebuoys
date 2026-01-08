@@ -295,14 +295,19 @@ class csvConcat:
         # If no valid schema found, return the original LazyFrame
         return lf
 
-    def ignore_files(self, file: str, size: int = 70, file_id: str = '0000'):
+    def ignore_files(self, file: str, size: int = 70, file_id: str = '0000', process_0000:bool=False):
         """
         size in kbytes
         """
         if os.path.isfile(file):
-            if os.path.getsize(file) < size or file_id in os.path.basename(file):
-                return False
-        
+            
+            if not process_0000:
+                if os.path.getsize(file) < size or file_id in os.path.basename(file):
+                    return False
+            else:
+                if os.path.getsize(file) < size:
+                    return False
+
         return True
 
     def collect_schema(self, file:str , suffix: str):
@@ -342,7 +347,7 @@ class csvConcat:
     def map_concat_results(self) -> dict:
         return {suffix: [] for suffix in self.suffixes_to_concat} 
 
-    def lazy_concat_files(self) -> pl.LazyFrame:
+    def lazy_concat_files(self, process_0000:bool=True) -> pl.LazyFrame:
       
         results = self.map_concat_results()
         error_messages = self.map_concat_results()
@@ -355,11 +360,11 @@ class csvConcat:
                 
                 validation_pass, error_messages_suffix = self.validate_schema(file, suffix)
 
-                if self.ignore_files(file=file) and validation_pass:
+                if self.ignore_files(file=file, process_0000=process_0000) and validation_pass:
                     df_lazy = self.load_csv(file)
                     data_list.append(df_lazy)
                 
-                elif not self.ignore_files(file=file):
+                elif not self.ignore_files(file=file, process_0000=process_0000):
                     ignored_files.append(file)
 
                 if error_messages_suffix:

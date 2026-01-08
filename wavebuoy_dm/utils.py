@@ -39,7 +39,13 @@ def args_aodn_processing():
                         required=True)
     
     parser.add_argument('-ed', '--enable-dask', dest='enable_dask', action='store_true',
-                    help="Whether to enable spectra calculation with dask threading")
+                    help="Enable spectra calculation with dask threading.")
+
+    parser.add_argument('-cwp', '--calculate-waves-partition', dest='calculate_waves_partition', action='store_true',
+                    help="Enable waves partitioning.")
+
+    parser.add_argument('-pzf', '--process-zero-files', dest='process_zero_files', action='store_true',
+                    help="Enable processing files with 0000_ prefix.")
 
     vargs = parser.parse_args()
     
