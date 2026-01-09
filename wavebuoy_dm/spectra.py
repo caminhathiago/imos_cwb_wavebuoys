@@ -13,8 +13,24 @@ warnings.filterwarnings("ignore", category=ComplexWarning)
 class Spectra:
 
     def __init__(self):
+        
         self.spectra_params = ['TIME', 'FREQUENCY', 'A1', 'B1', 'A2', 'B2', 'ENERGY']
         self.bulk_params = ['TIME', 'WSSH', 'WPFM', 'WPPE', 'SSWMD', 'WPDI', 'WMDS', 'WPDS']
+        self.partitioned_params = [
+                    'TIME',
+                    'hsSea', 
+                    'Tm1Sea', 
+                    'Tm2Sea', 
+                    'mdir1Sea', 
+                    'mdir2Sea', 
+                    'sea_T_limits', 
+                    'hsSwell', 
+                    'Tm1Swell', 
+                    'Tm2Swell', 
+                    'mdir1Swell', 
+                    'mdir2Swell', 
+                    'swell_T_limits'
+                ]
 
     def calculate_nfft(self, fs: float, segments: int = 8, spec_window: int = 30) -> float:
         return (2** int(np.ceil(np.log2(spec_window * 60 * fs / segments))))
