@@ -79,7 +79,7 @@ def load_metadata(site_buoys_to_process:pd.DataFrame, dm_deployment_path) -> lis
             "raw_data_path": raw_data_path,
         }
 
-def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to_concat=["FLT","LOC","SST","BARO"], instrument:str="Sofar Spotter V3", process_zero_files:bool=False) -> list[pl.DataFrame]:
+def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to_concat=["FLT","LOC","SST","BARO", "SENS_AGG"], instrument:str="Sofar Spotter V3", process_zero_files:bool=False) -> list[pl.DataFrame]:
 
     # DEP_LOGGER.info(f"Lazy concatenating csv files for {suffixes_to_concat}")
     # cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat)
@@ -132,6 +132,7 @@ def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to
         DEP_LOGGER.info("Processing cocatenated csv files")
 
         collected_results = cp.process_concat_results_df(collected_results)
+        collected_results = cp.process_sens_agg_results(collected_results)
 
     if isinstance(collected_results.get("surface_temp"), pl.DataFrame) and not collected_results["surface_temp"].is_empty():
             collected_results["surface_temp"] = collected_results["surface_temp"].rename(
@@ -176,6 +177,17 @@ def filter_dates(results, timezone, deploy_start, deploy_end, time_crop_start, t
         raise ValueError(f"Buffering GPS based on displacements didn't work as resulting gps dataset is empty.")
 
     return results
+
+def smart_mooring_data_to_csv(output_path:str, results:dict) -> None:
+
+    for key in results.keys():
+        
+        if key.startswith("sm_"):
+            
+            file_path = os.path.join(output_path, f"{key}.csv")
+
+            results[key].write_csv(file_path)
+
 
 def align_gps(spectra_bulk_df, gps) -> pl.DataFrame:
 
@@ -761,6 +773,12 @@ if __name__ == "__main__":
                                     metadata_args.site_buoys_to_process.time_crop_start,
                                     metadata_args.site_buoys_to_process.time_crop_end)
             
+            if "smart" in site.instrument.lower():
+                DEP_LOGGER.info("Saving smart mooring data nodes as separate csvs")
+                smart_mooring_data_to_csv(output_path, results)
+
+            continue
+
             DEP_LOGGER.info(f"Spectra Calculation ".upper() + "="*50)
             spectra_bulk_df = calculate_spectra_from_displacements(results['displacements'], vargs.enable_dask, vargs.calculate_waves_partition)
 

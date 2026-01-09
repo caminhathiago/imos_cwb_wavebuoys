@@ -64,7 +64,12 @@ class csvProcess:
                             'SST': {'temperature (C)':'temperature'},
                             'HDR': {'dmx(mm)':'x', 'dmy(mm)':'y', 'dmz(mm)':'z', 'dmn(mm)':'n'},
                             'BARO': {'pressure (mbar)':'baro_pressure'},
-                            'SPC': {},
+                            'SENS_AGG': {
+                                'bm_node_id':'bm_node_id',
+                                'node_position':'node_position',
+                                'node_app_name': 'node_app_name', 
+                                'reading_count': 'reading_count'
+                                },
                             'SYS': {},
                         }
 
@@ -73,6 +78,50 @@ class csvProcess:
                             "BARO": "barometer",
                             "SST": "surface_temp",
                             "LOC": "gps"}
+
+        # Smart Mooring
+        self.smart_mooring_sensors_suffix_name_map = {
+            "RBR.T": "temperature",
+            "aanderaa": "currents",
+            "RBR.DT": "pressure",
+        }
+
+        self.node_position_prefix_map = {
+            "1": "subsurface",
+            "2": "mid_water",
+            "3": "bottom"
+        }
+
+        self.smart_mooring_base_schema = {
+                'bm_node_id': pl.String,
+                'node_position': pl.String, 
+                'node_app_name': pl.String, 
+                'timestamp (ticks/UTC)': pl.Float64, 
+                'reading_count': pl.Int64,
+            }
+
+        self.sensor_schemas = {
+            "RBR.T":{
+                "column_6": ("temperature_mean", pl.Float64)
+            },
+            "aanderaa": {
+                "column_6": ("abs_speed_mean_cm_s", pl.Float64),
+                "column_7": ("abs_speed_std_cm_s", pl.Float64),
+                "column_8": ("direction_circ_mean_cm_s", pl.Float64),
+                "column_9": ("direction_circ_std_cm_s", pl.Float64),
+                "column_10": ("temp_mean_deg_c", pl.Float64),
+                "column_11": ("abs_tilt_mean_rad", pl.Float64),
+                "column_12": ("std_tilt_mean_rad", pl.Float64),
+            },
+            "RBR.DT":{
+                "column_6": ("temperature_mean", pl.Float64),
+                "column_7": ("pressure_mean", pl.Float64),
+                "column_8": ("pressure_stdev", pl.Float64)
+            },
+            
+        }
+
+
 
     def convert_to_datetime(self, 
                             df_lazy: pl.LazyFrame,
@@ -156,7 +205,7 @@ class csvProcess:
         return df.sort("datetime")
     
     
-    def rename_columns(self, df: pl.DataFrame | pl.LazyFrame, column_map: Dict[str, str]) -> pl.DataFrame | pl.LazyFrame:
+    def rename_columns(self, df: pl.DataFrame | pl.LazyFrame, column_map: Dict[str, str], suffix:str=None) -> pl.DataFrame | pl.LazyFrame:
         """
         Rename columns in the lazy dataframe based on a provided mapping.
 
@@ -166,7 +215,7 @@ class csvProcess:
 
         Returns:
             pl.LazyFrame: The dataframe with renamed columns.
-        """
+        """            
         return df.rename(column_map)
     
     def convert_displacement_to_meters(self, df_lazy: pl.LazyFrame) -> pl.LazyFrame:
@@ -598,16 +647,22 @@ class csvProcess:
         
         for suffix in results:
             
+            if suffix == "SENS_AGG":
+                continue
+
             if isinstance(concat_results[suffix], pl.DataFrame):
+                
                 df = concat_results[suffix] 
                 df = self.convert_to_datetime_df(df, suffix)
                 df = self.sort_by_datetime(df)
-                df = self.rename_columns(df, column_map=self.column_map[suffix])
+                df = self.rename_columns(df, column_map=self.column_map[suffix], suffix=suffix)
                 
                 if suffix == "FLT":
                     df = self.convert_displacement_to_meters(df)
+                
                 elif suffix == "HDR":
                     df = self.convert_displacement_to_meters(df)
+                
                 elif suffix == "LOC":
                     df = self.loc_process.process_lat_lon(df)
                     df = self.loc_process.filter_bad_lat_lon(df)
@@ -624,3 +679,116 @@ class csvProcess:
 
         return renamed_results
 
+    def process_sens_agg_results(self, results:dict) -> dict:
+
+        if "SENS_AGG" not in results:
+            return results
+        
+        results = self.split_nodes_sens_agg(results)
+        results = self.convert_smart_mooring_datatypes(results)
+        results = self.smart_mooring_convert_to_datetime(results)
+        results = self.rename_results_sens_agg(results)
+
+        return results
+
+    def split_nodes_sens_agg(self, results:dict) -> dict:
+
+        data = results["SENS_AGG"]
+        
+        node_positions = ["1", "2", "3"]
+
+        for node in node_positions:
+
+            node_data = data.filter(pl.col("node_position") == node)
+            
+            sensor_names = node_data["node_app_name"].unique()
+            if len(sensor_names) > 1:
+                raise ValueError(f"More than one instrument was assigned to the node position {node}: {sensor_names}")
+            
+            suffix_sensor_label = "SENS_AGG" + f"_node{node}" + f"_{sensor_names[0]}"
+            # suffix_sensor_label = self.rename_results_sens_agg(node, sensor_names[0])
+
+            results.update({suffix_sensor_label: node_data})
+        
+        del results["SENS_AGG"]
+
+        return results
+
+    def convert_smart_mooring_datatypes(self, results:dict) -> dict:
+
+        sens_agg_results_keys = [key for key in results.keys() if "SENS_AGG_" in key]
+
+        for result_key in sens_agg_results_keys:
+
+            sensor_type = result_key.split("_")[-1]
+            schema = self.sensor_schemas[sensor_type]
+
+            data = results[result_key]
+
+            # Smart Mooring base schema casting
+            data = data.with_columns([
+                pl.col(col).cast(dtype)
+                for col, dtype in self.smart_mooring_base_schema.items()
+                if col in data.columns
+            ])
+
+            # Sensor Measurements renaming and casting
+            data = data.with_columns([
+                pl.col(old_name)
+                .cast(dtype)
+                .alias(new_name)
+                for old_name, (new_name, dtype) in schema.items()
+                if old_name in data.columns
+            ]).drop(schema.keys())
+
+            columns_to_drop = [col for col in data.columns if "column_" in col]
+            data = data.drop(columns_to_drop)
+
+            results[result_key] = data
+
+        return results
+
+    def rename_results_sens_agg(self, results:dict) -> dict:
+        
+        sens_agg_results_keys = [key for key in results.keys() if "SENS_AGG_" in key]
+
+        for result_key in sens_agg_results_keys:
+            
+            sensor_node = result_key.split("_")[-2].replace("node", "")
+            sensor_type = result_key.split("_")[-1]
+
+            new_label = f"sm_{self.node_position_prefix_map[sensor_node]}_" + f"{self.smart_mooring_sensors_suffix_name_map[sensor_type]}"
+        
+            results[new_label] = results.pop(result_key)
+
+        return results
+    
+    def smart_mooring_convert_to_datetime(self, results:dict, drop_original_column:bool=True) -> dict:
+
+        sens_agg_results_keys = [key for key in results.keys() if "SENS_AGG_" in key]
+
+        for result_key in sens_agg_results_keys:
+
+            data = results[result_key]
+
+            time_col = [col for col in data.columns if "time" in col][0]
+
+            # Filter out unrealistic GPS seconds
+            valid_range = (0, 4e9)  # GPS seconds between 1980–2107
+            data = data.filter(
+                (pl.col(time_col) >= valid_range[0]) & 
+                (pl.col(time_col) <= valid_range[1])
+            )
+
+            # Convert GPS seconds to Polars datetime
+            data = data.with_columns(
+                pl.from_epoch(pl.col(time_col), time_unit="s").alias("datetime")
+            )
+
+            # Optionally drop the original time column
+            if drop_original_column:
+                data = data.drop(time_col)
+
+            results[result_key] = data
+
+        return results
