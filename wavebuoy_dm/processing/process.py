@@ -83,7 +83,7 @@ class csvProcess:
         self.smart_mooring_sensors_suffix_name_map = {
             "RBR.T": "temperature",
             "aanderaa": "currents",
-            "RBR.DT": "pressure",
+            "RBR.DT": "temperature_pressure",
         }
 
         self.node_position_prefix_map = {
@@ -681,7 +681,7 @@ class csvProcess:
 
     def process_sens_agg_results(self, results:dict) -> dict:
 
-        if "SENS_AGG" not in results:
+        if "SENS_AGG" in results.keys() and not results['SENS_AGG']:
             return results
         
         results = self.split_nodes_sens_agg(results)
@@ -695,7 +695,8 @@ class csvProcess:
 
         data = results["SENS_AGG"]
         
-        node_positions = ["1", "2", "3"]
+        node_positions = results["SENS_AGG"]["node_position"].unique()
+        node_positions = [p for p in node_positions if p in self.node_position_prefix_map.keys()]
 
         for node in node_positions:
 
