@@ -777,8 +777,6 @@ if __name__ == "__main__":
                 DEP_LOGGER.info("Saving smart mooring data nodes as separate csvs")
                 smart_mooring_data_to_csv(output_path, results)
 
-            continue
-
             DEP_LOGGER.info(f"Spectra Calculation ".upper() + "="*50)
             spectra_bulk_df = calculate_spectra_from_displacements(results['displacements'], vargs.enable_dask, vargs.calculate_waves_partition)
 
