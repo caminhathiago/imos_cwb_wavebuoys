@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from wavebuoy_nrt.processor.spotter import SpotterWaveBuoy
 from wavebuoy_nrt.netcdf.lookup import NetCDFFileHandler
+from wavebuoy_nrt.csv.lookup import CSVFileHandler
 from wavebuoy_nrt.utils import FilesHandler
 
 load_dotenv()
@@ -17,7 +18,7 @@ GENERAL_LOGGER = logging.getLogger("general_logger")
 SITE_LOGGER = logging.getLogger("site_logger")
 
 
-class WaveBuoy(FilesHandler, NetCDFFileHandler, SpotterWaveBuoy):
+class WaveBuoy(FilesHandler, NetCDFFileHandler, CSVFileHandler, SpotterWaveBuoy):
     
     def __init__(self, buoy_type:str, buoys_metadata_file_name:str="buoys_metadata.csv", exclude_drifters:bool = False):
         

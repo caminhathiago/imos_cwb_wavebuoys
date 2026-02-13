@@ -283,6 +283,9 @@ class ncAttrsExtractor:
     def _extract_deployment_metadata_water_depth_units(deployment_metadata: pd.DataFrame, drifter:bool = False) -> str:
         return np.nan if drifter else "m"
     
+    def _extract_deployment_metadata_watch_circle(deployment_metadata: pd.DataFrame) -> str:
+        return deployment_metadata.loc["watch_circle", "metadata_wave_buoy"]
+
     def _extract_deployment_metadata_instrument_burst_duration(deployment_metadata: pd.DataFrame) -> str:
         return deployment_metadata.loc["Instrument burst duration", "metadata_wave_buoy"]
 
@@ -650,10 +653,16 @@ class ncProcessor:
                     data_vars.update({var:(tuple(dimensions), waves[var])})
 
             elif parameters_type == "spectral":
+<<<<<<< Updated upstream
                 
                 if var == ("WATCH_CIRCLE_flag"):
                     data_vars.update({var:(("TIME"), waves[var].values)})
                 else:
+=======
+                if var in ("WATCH_CIRCLE_flag"):
+                    data_vars.update({var:("TIME", waves[var].values)})
+                else:    
+>>>>>>> Stashed changes
                     data_vars.update({var:(tuple(dimensions), np.vstack(waves[var].values))})
         
         return data_vars

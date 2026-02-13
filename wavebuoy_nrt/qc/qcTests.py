@@ -194,7 +194,7 @@ class WaveBuoyQC():
             (rate_of_change_test, self.rate_of_change_test),
             # (flat_line_test, self.flat_line_test),
             (mean_std_test, self.mean_std_test),
-            (spike_test, self.spike_test),
+            (spike_test, self.spike_test)
         ]
 
         for param in parameters:
@@ -490,6 +490,7 @@ class WaveBuoyQC():
 
         return data
 
+<<<<<<< Updated upstream
     def watch_circle_test(self,
                           data:pd.DataFrame,
                         deployment_depth:int,
@@ -524,6 +525,56 @@ class WaveBuoyQC():
         data.loc[distance > secondary_watch_circle, "WATCH_CIRCLE_flag"] = 4
 
         return data, secondary_watch_circle
+=======
+    def calculate_watch_circle(self, deployment_depth:float) -> tuple[float]:
+
+        mainline = deployment_depth * 1.5
+        catenary = 20
+        error = 5 # in meters
+
+        watch_circle = np.sqrt(mainline**2 - deployment_depth**2) + catenary + error
+
+        watch_circle_streched = watch_circle * 1.25
+
+        return mainline, catenary, watch_circle, watch_circle_streched
+
+    def watch_circle_test(self,
+                          data: pd.DataFrame,
+                          deployment_latitude: float,
+                          deployment_longitude: float,
+                          deployment_depth:pd.Series) -> pd.DataFrame:
+        
+        if deployment_depth == 0:
+            SITE_LOGGER.info(f"Deployment Depth set to {deployment_depth}, probably a drifter")
+            return data
+
+        mainline, catenary, watch_circle, watch_circle_streched = self.calculate_watch_circle(deployment_depth)
+
+        from geopy.distance import geodesic
+        data["distance"] = data.apply(
+                lambda row: geodesic(
+                    (row["LATITUDE"], row["LONGITUDE"]),
+                    (deployment_latitude, deployment_longitude)
+                ).meters,
+                axis=1
+            )
+
+        data["WATCH_CIRCLE_flag"] = 2
+        
+        watch_pass = data["distance"] <= watch_circle
+        data.loc[watch_pass, "WATCH_CIRCLE_flag"] = 1
+
+        watch_suspect = data["distance"] > watch_circle
+        data.loc[watch_suspect, "WATCH_CIRCLE_flag"] = 3
+        
+        watch_fail = data["distance"] > watch_circle_streched
+        data.loc[watch_fail, "WATCH_CIRCLE_flag"] = 4
+
+        data = data.drop(columns="distance")
+
+        return data, round(watch_circle_streched)
+
+>>>>>>> Stashed changes
 
 
    # def compose_config(self,
