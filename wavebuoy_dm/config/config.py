@@ -2,7 +2,10 @@ OPERATING_INSTITUTIONS = {"UWA":"UWA",
                           "Deakin":"VIC-DEAKIN-UNI",
                           "NSW-DCCEEW" : "NSW-DPE",
                           "IMOS":"IMOS_COASTAL-WAVE-BUOYS",
-                          "SARDI": "SARDI"
+                          "SARDI": "SARDI",
+                          "SARDI-CSIRO": "CSIRO",
+                          "DEW":"SA-DEW",
+                          "SARDI-Flinders":"SA-FLINDERS",
                           }
 
 AODN_COLUMNS_TEMPLATE = {
