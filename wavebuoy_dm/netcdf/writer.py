@@ -281,9 +281,9 @@ class ncAttrsComposer:
             if variable in list(dataset.variables):
                 variables_attributes = self.attrs_template['variables'][variable]
                 
-                if "quality_control" in variable:
+                if any(x in variable for x in ("quality_control", "flag")):
                     variables_attributes["flag_values"] = np.int8(variables_attributes["flag_values"])
-                
+
                 if "valid_min" in variables_attributes or variable not in ("TIME", "TIME_TEMP", "timeSeries", "FREQUENCY"):
                     variables_attributes["valid_min"], variables_attributes["valid_max"] = self._match_valid_min_max_dtype(
                                                                                 variable=variable,
@@ -399,6 +399,7 @@ class ncWriter:
                 "A2": {"dtype": np.float32},
                 "B2": {"dtype": np.float32},
                 "ENERGY": {"dtype": np.float32},
+                'WATCH_CIRCLE_flag':{"dtype":np.int8}
             }
     
     ENCODING_ENFORCEMENT_BULK = {"TIME":{"_FillValue":None},
@@ -413,10 +414,12 @@ class ncWriter:
                             'TEMP':{"dtype":np.float32},
                             'WAVE_quality_control':{"dtype":np.int8},
                             'TEMP_quality_control':{"dtype":np.int8},
+                            'WATCH_CIRCLE_flag':{"dtype":np.int8},
                             'TIME':{"dtype":np.float64},
                             'LATITUDE':{"dtype":np.float64},
                             'LONGITUDE':{"dtype":np.float64},
-                            'timeSeries':{"dtype":np.int16}
+                            'timeSeries':{"dtype":np.int16},
+                            'WATCH_CIRCLE_flag':{"dtype":np.int8}
                     }
 
     ENCODING_ENFORCEMENT_DISPLACEMENTS = {
