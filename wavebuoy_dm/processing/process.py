@@ -191,9 +191,17 @@ class csvProcess:
         )
 
         # Convert GPS seconds to Polars datetime
+        # df = df.with_columns(
+        #     pl.from_epoch(pl.col(time_col), time_unit="s").alias("datetime")
+        # )
+
         df = df.with_columns(
-            pl.from_epoch(pl.col(time_col), time_unit="s").alias("datetime")
-        )
+                (pl.col(time_col) * 1_000_000_000)
+                .round()
+                .cast(pl.Int64)
+                .pipe(pl.from_epoch, time_unit="ns")
+                .alias("datetime")
+            )
 
         # Optionally drop the original time column
         if drop_original_column:
@@ -681,8 +689,17 @@ class csvProcess:
 
     def process_sens_agg_results(self, results:dict) -> dict:
 
-        if "SENS_AGG" in results.keys() and not results['SENS_AGG']:
-            return results
+        if "SENS_AGG" in results:
+            val = results["SENS_AGG"]
+
+            is_empty = (
+                val is None
+                or (isinstance(val, list) and len(val) == 0)
+                or (isinstance(val, pl.DataFrame) and val.is_empty())
+            )
+
+            if is_empty:
+                return results
         
         results = self.split_nodes_sens_agg(results)
         results = self.convert_smart_mooring_datatypes(results)
