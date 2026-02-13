@@ -94,10 +94,9 @@ def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to
 
     # return collected_results["displacements"], collected_results["gps"], collected_results["surface_temp"]
     
-    
     cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat) 
     
-    if "Sofar Spotter V" in instrument:
+    if "12345" in instrument:#if "Sofar Spotter V" in instrument:
 
         DEP_LOGGER.info(f"Lazy concatenating csv files for suffixes_to_concat")
         lazy_concat_results, ignored_files, error_messages = cc.lazy_concat_files(process_0000=process_zero_files)
@@ -123,7 +122,7 @@ def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to
         collected_results = cp.collect_results(lazy_processed_results)
 
     
-    elif "Smart Mooring" in instrument:
+    elif "Smart Mooring" in instrument or "Sofar Spotter V" in instrument:
         
         DEP_LOGGER.info(f"Concatenating csv files for suffixes_to_concat")
         collected_results = cc.concat_files()
@@ -143,6 +142,9 @@ def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to
         collected_results["barometer"] = collected_results["barometer"].rename(
             {"baro_pressure": "ATM_PRESSURE", "datetime": "TIME_ATM_PRESSURE"}
         )
+
+    if "Sofar Spotter V2" in instrument:
+       collected_results["surface_temp"] = []
 
     return collected_results
 
@@ -308,8 +310,8 @@ def calculate_spectra_from_displacements(disp: pl.DataFrame, enable_dask:bool, c
     DEP_LOGGER.info(f"Setting spectra calculation parameters")
     info = {
         "hab": None,
-        "fmaxSS": 1/8,
-        "fmaxSea": 1/2,
+        "fmaxSS": 1/8,#1/25,#1/8
+        "fmaxSea": 1/2,#1/2
         "bad_data_thresh": 2/3,
         "hs0_thresh": 3,
         "t0_thresh": 5

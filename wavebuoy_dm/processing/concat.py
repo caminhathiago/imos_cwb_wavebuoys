@@ -315,12 +315,24 @@ class csvConcat:
 
     def scan_schemas(self) -> dict:
         suffixes_schemas = {}
+        
         for suffix in self.files_suffixes.keys():
             files_schemas = []
+            
             for file in self.files_suffixes[suffix]:
-                schema = self.load_csv(file).collect_schema()
+                
+                csv = self.load_csv(file)
+
+                try:
+                    schema = csv.collect_schema()
+                except pl.exceptions.NoDataError:
+                    print(f"File is empty: {file}, skipping")
+                    continue
+
                 files_schemas.append({file:schema})
+            
             suffixes_schemas.update({suffix:files_schemas})
+        
         return suffixes_schemas
 
     def load_csv(self, file: str, truncate_ragged_lines: bool = True) -> pl.LazyFrame:
