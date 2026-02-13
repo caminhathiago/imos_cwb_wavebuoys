@@ -604,6 +604,95 @@ class Spectra:
             }
         }
 
+    def spectra_frequency_range(self, freq, s, a1, a2, b1, b2, info):
+
+        # freq = spectra_bulk_df["FREQUENCY"].to_numpy()
+        # s = spectra_bulk_df["ENERGY"].to_numpy()
+        # a1 = spectra_bulk_df["A1"].to_numpy()
+        # a2 = spectra_bulk_df["A2"].to_numpy()
+        # b1 = spectra_bulk_df["B1"].to_numpy()
+        # b2 = spectra_bulk_df["B2"].to_numpy()
+
+        if 'fmax' not in info:
+            raise ValueError("No frequency range provided in info.")
+        
+        indSea = (freq >= info['fmin']) & (freq <= info['fmax'])
+    
+        # save cutoffs based on actual frequency bins
+        sea_max_min_T = 1.0 / np.array([
+            np.min(freq[indSea]),
+            np.max(freq[indSea])
+        ])
+
+        # Mean wave directions (Sea)
+        mdir1_Sea = np.rad2deg(
+            np.arctan2(
+                np.nansum(s[indSea] * b1[indSea]),
+                np.nansum(s[indSea] * a1[indSea])
+            )
+        )
+
+        mdir2_Sea = np.rad2deg(
+            np.arctan2(
+                np.nansum(s[indSea] * b2[indSea]),
+                np.nansum(s[indSea] * a2[indSea])
+            ) / 2.0
+        )
+
+        # rotate to WAVES FROM
+        mdir1_Sea = np.mod(270.0 - mdir1_Sea, 360.0)
+        mdir2_Sea = np.mod(270.0 - mdir2_Sea, 360.0)
+
+        # method following Rogers and Wang eq. 7 (modified to specific partition)
+        num = np.trapz(a1[indSea] * s[indSea], freq[indSea])
+        den = np.trapz(s[indSea], freq[indSea])
+        a1_bar_Sea = num / den
+
+        num = np.trapz(b1[indSea] * s[indSea], freq[indSea])
+        b1_bar_Sea = num / den
+
+        spreadSea = (180.0 / np.pi) * np.sqrt(
+            2.0 * (1.0 - np.sqrt(a1_bar_Sea**2 + b1_bar_Sea**2))
+        )
+
+        # calculate moments of spectrum – sea
+        n = np.arange(4)
+        mSea = np.zeros(4)
+
+        for jj in range(4):
+            # Mi = ∫ f^i * E(f) df
+            mSea[jj] = np.trapz(
+                freq[indSea] ** n[jj] * s[indSea],
+                freq[indSea]
+            )
+
+            if n[jj] == 0:
+                Hm0_Sea = 4.0 * np.sqrt(mSea[jj])  # significant wave height
+
+        # save output
+        # mdir1_Sea = mdir1_Sea
+        # mdir2_Sea = mdir2_Sea
+        Tm1_Sea = mSea[0] / mSea[1]            # m0 / m1
+        Tm2_Sea = np.sqrt(mSea[0] / mSea[2])  # sqrt(m0 / m2)
+        # spreadSea = spreadSea
+      
+
+        return {
+            "results": {
+                "ind": indSea,
+                "T_limits": sea_max_min_T,
+                "mdir1": mdir1_Sea,
+                "mdir2": mdir2_Sea,
+                "a1_bar": a1_bar_Sea,
+                "b1_bar": b1_bar_Sea,
+                "spread": spreadSea,
+                "m": mSea,
+                "Hm0": Hm0_Sea,
+                "Tm1": Tm1_Sea,
+                "Tm2": Tm2_Sea,
+            }
+        }
+
     def generate_time_chunks(self, data:pl.DataFrame, time_chunk:str = '30m') -> pl.DataFrame:
         return (data
                       .group_by_dynamic("datetime", every=time_chunk, closed="left")
