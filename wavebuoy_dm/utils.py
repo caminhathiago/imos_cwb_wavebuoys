@@ -47,6 +47,11 @@ def args_aodn_processing():
     parser.add_argument('-pzf', '--process-zero-files', dest='process_zero_files', action='store_true',
                     help="Enable processing files with 0000_ prefix.")
 
+    parser.add_argument('-dmi', '--disp-manual-injection', dest='disp_manual_injection', type=str, default=None,
+                        help="path to displacements csv to be used.",
+                        required=False)
+
+
     vargs = parser.parse_args()
     
     # if not os.path.exists(vargs.output_path):

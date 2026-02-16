@@ -810,3 +810,51 @@ class csvProcess:
             results[result_key] = data
 
         return results
+    
+    def inject_sofar_parser_displacements(self, results: dict, displacements_path: str) -> Dict:
+
+        # load file (eager)
+        df = pl.read_csv(displacements_path)
+
+        # rename columns
+        df = df.rename({
+            "# year": "year",
+            "min": "minute",
+            "sec": "second",
+            "msec": "millisecond",
+            " x (m)": "x",
+            " y(m)": "y",
+            " z(m)": "z",
+        })
+
+        # process datetime
+        df = df.with_columns(
+        pl.datetime(
+            "year",
+            "month",
+            "day",
+            "hour",
+            "minute",
+            "second",
+            microsecond=pl.col("millisecond") * 1000
+        ).alias("datetime")
+    )
+
+        df = df.drop([
+            "year",
+            "month",
+            "day",
+            "hour",
+            "minute",
+            "second",
+            "millisecond",
+        ])
+
+        # add millis column
+        df = df.with_columns(
+            pl.lit(None).cast(pl.Float64).alias("millis")
+        )
+
+        results["displacements"] = df
+
+        return results

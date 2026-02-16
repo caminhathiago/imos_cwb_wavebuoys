@@ -38,10 +38,6 @@ def process_paths(site_buoys_to_process):
 
     region = site_buoys_to_process.loc["region"] + "waves"
     dm_deployment_folder = site_buoys_to_process.loc["datapath"]
-    # dm_deployment_path = os.path.dirname(dm_deployment_path
-    #                                     .replace("Y:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
-    #                                     .replace("X:", "\\\\drive.irds.uwa.edu.au\\OGS-COD-001")
-    #                                     )
     dm_deployment_path = os.path.join(os.getenv('DM_DATA_PATH'), region, dm_deployment_folder)
     output_path = os.path.join(dm_deployment_path, "processed_py")
     if not os.path.exists(output_path):
@@ -79,7 +75,12 @@ def load_metadata(site_buoys_to_process:pd.DataFrame, dm_deployment_path) -> lis
             "raw_data_path": raw_data_path,
         }
 
-def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to_concat=["FLT","LOC","SST","BARO", "SENS_AGG"], instrument:str="Sofar Spotter V3", process_zero_files:bool=False) -> list[pl.DataFrame]:
+def process_from_SD(raw_data_path,
+                    deployment_metadata:pd.DataFrame,
+                    suffixes_to_concat=["FLT","LOC","SST","BARO", "SENS_AGG"],
+                    instrument:str="Sofar Spotter V3",
+                    process_zero_files:bool=False,
+                    disp_manual_injection:str=None) -> list[pl.DataFrame]:
 
     # DEP_LOGGER.info(f"Lazy concatenating csv files for {suffixes_to_concat}")
     # cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat)
@@ -131,6 +132,11 @@ def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to
         DEP_LOGGER.info("Processing cocatenated csv files")
 
         collected_results = cp.process_concat_results_df(collected_results)
+        
+        if disp_manual_injection:
+            DEP_LOGGER.warning(f"Manually injecting displacements from {disp_manual_injection}")
+            collected_results = cp.inject_sofar_parser_displacements(collected_results, disp_manual_injection)
+        
         collected_results = cp.process_sens_agg_results(collected_results)
 
     if isinstance(collected_results.get("surface_temp"), pl.DataFrame) and not collected_results["surface_temp"].is_empty():
@@ -151,16 +157,6 @@ def process_from_SD(raw_data_path, deployment_metadata:pd.DataFrame, suffixes_to
 def filter_dates(results, timezone, deploy_start, deploy_end, time_crop_start, time_crop_end) -> list[pl.DataFrame]:
 
     cp = csvProcess()
-    # DEP_LOGGER.info(f"Filtering displacements data with passed deployment datetimes: {deploy_start} - {deploy_end}")
-    # disp = cp.filter_deployment_dates(dataframe=disp, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
-    #                                   time_crop_start=time_crop_start, time_crop_end=time_crop_end)
-    
-    # DEP_LOGGER.info(f"Filtering gps data with passed deployment datetimes: {deploy_start} - {deploy_end}")    
-    # temp = cp.filter_deployment_dates(dataframe=temp, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
-    #                                    time_crop_start=time_crop_start, time_crop_end=time_crop_end)
-
-    # # gps = cp.filter_deployment_dates(dataframe=gps, utc_offset=utc_offset, deploy_start=deploy_start, deploy_end=deploy_end,
-    # #                                      time_crop_start=time_crop_start, time_crop_end=time_crop_end)
     
     for key, dataframe in results.items():
         
@@ -766,7 +762,11 @@ if __name__ == "__main__":
                             )
 
             DEP_LOGGER.info(f"SD card data processing ".upper() + "="*50)
-            results = process_from_SD(metadata['raw_data_path'], metadata['deployment_metadata'], instrument=site.instrument, process_zero_files=vargs.process_zero_files)
+            results = process_from_SD(metadata['raw_data_path'],
+                                      metadata['deployment_metadata'],
+                                      instrument=site.instrument,
+                                      process_zero_files=vargs.process_zero_files,
+                                      disp_manual_injection=vargs.disp_manual_injection)
             
             results = filter_dates(results, 
                                     metadata_args.site_buoys_to_process.timezone, 
@@ -800,8 +800,8 @@ if __name__ == "__main__":
             DEP_LOGGER.info(f"WAVE-PARAMETERS AODN compliant file generation step ".upper() + "="*50)
             generate_bulk_NC_file(spectra_bulk_df, results['gps'], results['surface_temp'], **vars(metadata_args))
 
-            DEP_LOGGER.info(f"RAW-DISPLACEMENTS AODN compliant file generation step ".upper() + "="*50)
-            generate_raw_displacements_NC_files(results['displacements'], results['gps'], **vars(metadata_args))
+            # DEP_LOGGER.info(f"RAW-DISPLACEMENTS AODN compliant file generation step ".upper() + "="*50)
+            # generate_raw_displacements_NC_files(results['displacements'], results['gps'], **vars(metadata_args))
 
             GENERAL_LOGGER.info(f"Processsing finished in {round((time.time() - start_exec_time)/60, 2)} min")
             DEP_LOGGER.info(f"Processsing finished in {round((time.time() - start_exec_time)/60, 2)} min")
