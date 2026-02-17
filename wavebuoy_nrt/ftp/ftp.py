@@ -158,6 +158,11 @@ class ncPusher:
         with open(file["file_path"], "rb") as binary_obj:
             self._ftp.storbinary(file_name_ftp,binary_obj)
 
+    def push_file_to_ftp_dm(self, file: dict):
+        file_name_ftp = "STOR " + os.path.basename(file)
+        with open(file, "rb") as binary_obj:
+            self._ftp.storbinary(file_name_ftp, binary_obj)
+
     def check_size(self, file1_name: str, file2_name: str) -> bool:
         return self._ftp.size(file1_name) == self._ftp.size(file2_name)
     

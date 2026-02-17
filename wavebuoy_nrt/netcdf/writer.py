@@ -653,16 +653,9 @@ class ncProcessor:
                     data_vars.update({var:(tuple(dimensions), waves[var])})
 
             elif parameters_type == "spectral":
-<<<<<<< Updated upstream
-                
-                if var == ("WATCH_CIRCLE_flag"):
-                    data_vars.update({var:(("TIME"), waves[var].values)})
-                else:
-=======
                 if var in ("WATCH_CIRCLE_flag"):
                     data_vars.update({var:("TIME", waves[var].values)})
                 else:    
->>>>>>> Stashed changes
                     data_vars.update({var:(tuple(dimensions), np.vstack(waves[var].values))})
         
         return data_vars

@@ -490,42 +490,6 @@ class WaveBuoyQC():
 
         return data
 
-<<<<<<< Updated upstream
-    def watch_circle_test(self,
-                          data:pd.DataFrame,
-                        deployment_depth:int,
-                        deployment_latitude:float,
-                        deployment_longitude:float) -> list[pd.DataFrame, int]:
-        
-        from geopy.distance import geodesic
-        def calc_distance(lat, lon):
-            return geodesic((deployment_latitude, deployment_longitude), (lat, lon)).meters
-
-        distance = data.apply(
-            lambda row: calc_distance(row["LATITUDE"], row["LONGITUDE"]),
-            axis=1
-        )
-
-        # idealized mooring setup
-        mooring_stretch_factor = 0.25 
-        gps_error = 10
-        slop = 10
-        
-        mainline = 2 * deployment_depth + (2 * deployment_depth * mooring_stretch_factor)
-        catenary = 20 + (20 * mooring_stretch_factor)
-
-        primary_watch_circle = np.sqrt(mainline**2 - deployment_depth**2) + catenary + gps_error
-        secondary_watch_circle = primary_watch_circle + slop
-
-        if secondary_watch_circle is None or np.isnan(secondary_watch_circle):
-            raise ValueError(f"Watch circle not correctly calculated. Check deploy lat, lon or depth.")
-
-        data['WATCH_CIRCLE_flag'] = 1
-        data.loc[distance > primary_watch_circle, "WATCH_CIRCLE_flag"] = 3
-        data.loc[distance > secondary_watch_circle, "WATCH_CIRCLE_flag"] = 4
-
-        return data, secondary_watch_circle
-=======
     def calculate_watch_circle(self, deployment_depth:float) -> tuple[float]:
 
         mainline = deployment_depth * 1.5
@@ -574,7 +538,6 @@ class WaveBuoyQC():
 
         return data, round(watch_circle_streched)
 
->>>>>>> Stashed changes
 
 
    # def compose_config(self,
