@@ -46,7 +46,38 @@ class Spectra:
         elif nfft == 2048:
             return 7
 
-    def ZeroUpX3(self, eta, dt):
+    def LDIS(self, T, h) -> int:
+        
+        g = 9.81
+        omega = 2 * np.pi / T
+        D = omega**2 * h / g
+
+        iter_count = 0
+        iterm = 50 
+        error = 1.0
+
+        if D > 1:
+            xo = D
+        else:
+            xo = np.sqrt(D)
+
+        while error > 0.001 and iter_count < 10:
+            F = xo - D / np.tanh(xo)
+            DF = 1 + D / (np.sinh(xo)**2)
+            x1 = xo - F / DF
+
+            error = abs((x1 - xo) / xo)
+            xo = x1
+            iter_count += 1
+
+        if iter_count > iterm:
+            print("10 iterations have been exceeded")
+            return None
+        else:
+            l = 2 * np.pi * h / x1
+            return l
+
+    def ZeroUpX3(self, eta, dt, h):
         """
         Calculate significant wave height Hs and mean period Tz based on zero
         upcrossing of the wave record eta. Also obtain individual wave heights 
@@ -74,7 +105,9 @@ class Spectra:
             'Periods': np.zeros(n),
             'Heights': np.zeros(n),
             'Crests': np.zeros(n),
-            'Troughs': np.zeros(n)
+            'Troughs': np.zeros(n),
+            'L': np.zeros(n),
+            'steepness': np.zeros(n)
         }
 
         for m in range(n):
@@ -90,6 +123,9 @@ class Spectra:
             zup['Crests'][m] = maxpos  # crest
             zup['Troughs'][m] = maxneg  # trough
         
+            zup['L'][m] = self.LDIS(zup['Periods'][m], h)
+            zup['steepness'][m] = zup['Heights'][m] / zup['L'][m]
+
         # Significant wave height (Hs)
         SortedH = np.sort(zup['Heights'])[::-1]
         zup['Hs'] = np.mean(SortedH[:round(len(zup['Heights']) / 3)])  # Average of the largest 1/3 heights
@@ -105,8 +141,7 @@ class Spectra:
         windows = math.floor((1 / nover) * (pts / nfft - 1) + 1)  # number of windows/segments
 
         # COMPUTE ZERO UP CROSSING WAVE HEIGHTS FOR OUTLIER DETECTION
-        zup = self.ZeroUpX3(heave, 1 / fs)  # NOTE - use complete record
-
+        zup = self.ZeroUpX3(heave, 1 / fs, info['h'])  # NOTE - use complete record
         Hs0 = zup["Hs"]
         heights = zup["Heights"]
         periods = zup["Periods"]
@@ -122,6 +157,8 @@ class Spectra:
         heights_seg = []  # Heights for each segment
         periods_seg = []  # Periods for each segment
         T0_seg = np.zeros(windows)  # Wave periods for each segment
+        steep_seg = []  # Periods for each segment
+
 
         for q in range(windows):
             start_idx = int((q) * (nover * nfft))  # Start index for the segment
@@ -133,21 +170,50 @@ class Spectra:
             et_segs[:, q] = east[start_idx:end_idx]
             
             # Zero crossing analysis for each segment
-            zup_seg = self.ZeroUpX3(hv_segs[:, q], 1 / fs)
+            zup_seg = self.ZeroUpX3(hv_segs[:, q], 1 / fs, info['h'])
             
             # Store results for the segment
             Hs_seg[q] = zup_seg["Hs"]
             heights_seg.append(zup_seg["Heights"])
             periods_seg.append(zup_seg["Periods"])
             T0_seg[q] = zup_seg["Tz"]
+            steep_seg.append(zup_seg["steepness"])
 
-        rw = [
-        window for window in range(windows)
-        if np.any(np.isnan(np.concatenate([hv_segs[:, window], nt_segs[:, window], et_segs[:, window]]))) or
-            max(heights_seg[window]) > info["hs0_thresh"] * Hs0 or
-            max(periods_seg[window]) > info["t0_thresh"] * T0 or
-            max(periods_seg[window]) > 30
-    ]
+    #     rw = [
+    #     window for window in range(windows)
+    #     if np.any(np.isnan(np.concatenate([hv_segs[:, window], nt_segs[:, window], et_segs[:, window]]))) or
+    #         max(heights_seg[window]) > info["hs0_thresh"] * Hs0 or
+    #         max(periods_seg[window]) > info["t0_thresh"] * T0 or
+    #         max(periods_seg[window]) > 30
+    # ]
+
+        rw = []
+
+        if info["QC"] == True:  # flag to complete QC or not, 1=yes, 0=no
+            for window in range(windows):
+
+                # Combine heave, north, east and check for NaNs
+                combined = np.concatenate([
+                    hv_segs[:, window],
+                    nt_segs[:, window],
+                    et_segs[:, window]
+                ])
+
+                has_nan = np.any(np.isnan(combined))
+
+                height_exceed = max(heights_seg[window]) > info["hs0_thresh"] * Hs0
+                period_exceed_rel = max(periods_seg[window]) > info["t0_thresh"] * T0
+                period_exceed_abs = max(periods_seg[window]) > 30
+                steep_exceed = max(steep_seg[window]) > info['steepnes_thresh']
+
+                if any([
+                    has_nan,
+                    height_exceed,
+                    period_exceed_rel,
+                    period_exceed_abs,
+                    steep_exceed
+                ]):
+                    rw.append(window)
 
         if len(rw) == 0 or (len(rw) < windows * (1 - info['bad_data_thresh']) and np.sum(heave == 0) / len(heave) < 0.1):
             

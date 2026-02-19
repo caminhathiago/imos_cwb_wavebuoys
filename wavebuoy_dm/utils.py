@@ -51,6 +51,9 @@ def args_aodn_processing():
                         help="path to displacements csv to be used.",
                         required=False)
 
+    parser.add_argument('-dqc', '--displacements-qc', dest='displacements_qc', action='store_false',
+                    help="Enable qualification of raw diplacements before spectra calculations")
+
 
     vargs = parser.parse_args()
     

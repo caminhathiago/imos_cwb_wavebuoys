@@ -299,7 +299,11 @@ def filter_watch_circle(disp, gps, site_buoys_to_process) -> list[pl.DataFrame]:
 
     return disp, gps
 
-def calculate_spectra_from_displacements(disp: pl.DataFrame, enable_dask:bool, calculate_waves_partition:bool):  
+def calculate_spectra_from_displacements(disp: pl.DataFrame,
+                                         enable_dask:bool,
+                                         calculate_waves_partition:bool,
+                                         deploy_depth:float,
+                                         qc:bool):  
 
     s = Spectra()
     
@@ -310,7 +314,10 @@ def calculate_spectra_from_displacements(disp: pl.DataFrame, enable_dask:bool, c
         "fmaxSea": 1/2,#1/2
         "bad_data_thresh": 2/3,
         "hs0_thresh": 3,
-        "t0_thresh": 5
+        "t0_thresh": 5,
+        'h': deploy_depth,
+        'QC': qc,
+        'steepnes_thresh': 1/4
     }
     fs = 2.5
     min_samples = s.calculate_min_samples(fs=fs, spec_window=30)
@@ -780,7 +787,11 @@ if __name__ == "__main__":
                 smart_mooring_data_to_csv(output_path, results)
 
             DEP_LOGGER.info(f"Spectra Calculation ".upper() + "="*50)
-            spectra_bulk_df = calculate_spectra_from_displacements(results['displacements'], vargs.enable_dask, vargs.calculate_waves_partition)
+            spectra_bulk_df = calculate_spectra_from_displacements(results['displacements'],
+                                                                   vargs.enable_dask,
+                                                                   vargs.calculate_waves_partition,
+                                                                   site.DeployDepth,
+                                                                   vargs.displacements_qc)
 
             DEP_LOGGER.info(f"Spectra results processing ".upper() + "="*50)
             spectra_bulk_df = align_gps(spectra_bulk_df, results['gps'])
@@ -800,8 +811,8 @@ if __name__ == "__main__":
             DEP_LOGGER.info(f"WAVE-PARAMETERS AODN compliant file generation step ".upper() + "="*50)
             generate_bulk_NC_file(spectra_bulk_df, results['gps'], results['surface_temp'], **vars(metadata_args))
 
-            # DEP_LOGGER.info(f"RAW-DISPLACEMENTS AODN compliant file generation step ".upper() + "="*50)
-            # generate_raw_displacements_NC_files(results['displacements'], results['gps'], **vars(metadata_args))
+            DEP_LOGGER.info(f"RAW-DISPLACEMENTS AODN compliant file generation step ".upper() + "="*50)
+            generate_raw_displacements_NC_files(results['displacements'], results['gps'], **vars(metadata_args))
 
             GENERAL_LOGGER.info(f"Processsing finished in {round((time.time() - start_exec_time)/60, 2)} min")
             DEP_LOGGER.info(f"Processsing finished in {round((time.time() - start_exec_time)/60, 2)} min")
