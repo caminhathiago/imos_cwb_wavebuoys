@@ -797,7 +797,6 @@ class Spectra:
 
         return pl.DataFrame(results)     
 
-
     def select_parameters(self, dataframe:pl.DataFrame,
                           dataset_type:str = "spectra",
                           include_latlon:bool = True,

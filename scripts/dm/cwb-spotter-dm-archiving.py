@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 CSV_FILE = os.getenv('DM_BUOYS_TO_PROC_PATH')
+ARCHIVE_BASE_PATH = os.getenv('ARCHIVE_BASE_PATH')
+DM_DATA_PATH = os.getenv('DM_DATA_PATH')
 RAWDATAFOLDER = "log"
 SUBFOLDER = "processed_py"
 
@@ -21,14 +23,15 @@ def main():
         
         for row in reader:
             
-            if row["process"] == "0":
+            if row["archive"] != "1":
                 continue
 
             print("\n", row["datapath"])
 
             #  DEPLOYMENT FOLDER ------------------------------------------------
-            local_path_dep = Path(row["local_path"])
-            remote_path_dep = Path(row["archive_path"])
+            local_path_dep = Path(DM_DATA_PATH, row['region']+'waves', row["datapath"])
+            remote_path_dep = Path(ARCHIVE_BASE_PATH, row['region']+'waves', row['name'], 'delayedmode', row["datapath"])
+            # remote_path_dep = Path(row["archive_path"]) 
 
             # local
             if not local_path_dep.exists():
