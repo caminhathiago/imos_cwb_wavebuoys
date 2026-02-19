@@ -318,6 +318,21 @@ class Spectra:
         # Find the middle of each frequency band, only works when merging an odd number of bands!
         freq = 1 / nfft + bandwidth / 2 + bandwidth * np.arange(int(n))  # Middle of each frequency band
 
+        # LAKE: fmin = 1/10 (0.1), fmax = 1/1.25 (0.8)
+        # OCEAN: fmin = 1/8 (0.025), fmax = 1/1.25 (0.8)
+        if 'fmin' in info:
+            mask_freq_min = freq > info['fmin']
+
+            freq = freq[mask_freq_min]
+
+            hh_spec_merged = hh_spec_merged[mask_freq_min]
+            nn_spec_merged = nn_spec_merged[mask_freq_min]
+            ee_spec_merged = ee_spec_merged[mask_freq_min]
+
+            he_spec_merged = he_spec_merged[mask_freq_min]
+            hn_spec_merged = hn_spec_merged[mask_freq_min]
+            en_spec_merged = en_spec_merged[mask_freq_min]
+
         # Ensemble Average
         s = 2 * np.mean(hh_spec_merged, axis=1) / (nfft * fs)
         uu = 2 * np.mean(ee_spec_merged, axis=1) / (nfft * fs)

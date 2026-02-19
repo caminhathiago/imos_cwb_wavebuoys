@@ -310,15 +310,17 @@ def calculate_spectra_from_displacements(disp: pl.DataFrame,
     DEP_LOGGER.info(f"Setting spectra calculation parameters")
     info = {
         "hab": None,
-        "fmaxSS": 1/8,#1/25,#1/8
-        "fmaxSea": 1/2,#1/2
+        "fmaxSS": 1/8,
+        "fmaxSea": 1/2,
         "bad_data_thresh": 2/3,
         "hs0_thresh": 3,
         "t0_thresh": 5,
         'h': deploy_depth,
         'QC': qc,
-        'steepnes_thresh': 1/4
+        'steepnes_thresh': 1/4,
+        'fmin': 1/10
     }
+    
     fs = 2.5
     min_samples = s.calculate_min_samples(fs=fs, spec_window=30)
     nfft = s.calculate_nfft(fs=fs, spec_window=30)
