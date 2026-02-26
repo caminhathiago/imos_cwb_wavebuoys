@@ -141,10 +141,11 @@ class WaveBuoy():
        
         return latest_date_file
 
-    def load_latest_deployment_metadata(self, site_name:str, region:str) -> pd.DataFrame:
+    def load_deployment_metadata(self, site_name:str, region:str, file_path:str=None) -> pd.DataFrame:
         
-        file_paths = self._get_deployment_metadata_files(site_name=site_name, region=region)
-        file_path = self._get_latest_deployment_metadata(file_paths=file_paths)
+        if file_path is None:
+            file_paths = self._get_deployment_metadata_files(site_name=site_name, region=region)
+            file_path = self._get_latest_deployment_metadata(file_paths=file_paths)
         
         deployment_metadata = pd.read_excel(file_path)
         metadata_wave_buoy_col = deployment_metadata.filter(regex="Metadata").columns

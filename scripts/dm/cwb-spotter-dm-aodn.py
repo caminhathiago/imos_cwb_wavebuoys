@@ -61,10 +61,14 @@ def load_metadata(site_buoys_to_process:pd.DataFrame, dm_deployment_path) -> lis
     deploy_start, deploy_end, spot_id = WaveBuoy().extract_deploy_dates_spotid_from_path(site_buoys_to_process.datapath)
 
     site_name, region = WaveBuoy().extract_region_site_name(path=raw_data_path)
-    buoys_metadata = WaveBuoy()._get_buoys_metadata(buoy_type='sofar', buoys_metadata_file_name="buoys_metadata.csv")
-    deployment_metadata = WaveBuoy().load_latest_deployment_metadata(site_name=site_name, region=region)
+    
+    # buoys_metadata = WaveBuoy()._get_buoys_metadata(buoy_type='sofar', buoys_metadata_file_name="buoys_metadata.csv")
+    buoys_metadata = None
+    
+    deployment_metadata = WaveBuoy().load_deployment_metadata(site_name=site_name, region=region, file_path=site_buoys_to_process['metadata_sheet_path'])
     deployment_metadata.loc["instrument_burst_duration", "metadata_wave_buoy"] = site_buoys_to_process.instrument_burst_duration
     deployment_metadata.loc["instrument_burst_interval", "metadata_wave_buoy"] = site_buoys_to_process.instrument_burst_interval
+    
     regional_metadata = WaveBuoy().load_regional_metadata()
 
     return {
@@ -85,19 +89,6 @@ def process_from_SD(raw_data_path,
                     instrument:str="Sofar Spotter V3",
                     process_zero_files:bool=False,
                     disp_manual_injection:str=None) -> list[pl.DataFrame]:
-
-    # DEP_LOGGER.info(f"Lazy concatenating csv files for {suffixes_to_concat}")
-    # cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat)
-    # lazy_concat_results = cc.lazy_concat_files()
-
-    # cp = csvProcess()
-    # DEP_LOGGER.info("Lazy processing cocatenated csv files")
-    # lazy_processed_results = cp.process_concat_results(lazy_concat_results)
-
-    # DEP_LOGGER.info("Collecting processed csv files")
-    # collected_results = cp.collect_results(lazy_processed_results)   
-
-    # return collected_results["displacements"], collected_results["gps"], collected_results["surface_temp"]
     
     cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat) 
     
