@@ -34,12 +34,16 @@ class MetadataArgs:
     raw_data_path: str
     output_path: str
 
-def process_paths(site_buoys_to_process):
+def process_paths(site_buoys_to_process, processed_py_foldername:str=None):
 
     region = site_buoys_to_process.loc["region"] + "waves"
     dm_deployment_folder = site_buoys_to_process.loc["datapath"]
     dm_deployment_path = os.path.join(os.getenv('DM_DATA_PATH'), region, dm_deployment_folder)
-    output_path = os.path.join(dm_deployment_path, "processed_py")
+
+    if not processed_py_foldername:
+        processed_py_foldername = "processed_py"
+
+    output_path = os.path.join(dm_deployment_path, processed_py_foldername)
     if not os.path.exists(output_path):
         os.mkdir(output_path)
     
@@ -185,7 +189,6 @@ def smart_mooring_data_to_csv(output_path:str, results:dict) -> None:
             file_path = os.path.join(output_path, f"{key}.csv")
 
             results[key].write_csv(file_path)
-
 
 def align_gps(spectra_bulk_df, gps) -> pl.DataFrame:
 
@@ -744,7 +747,7 @@ if __name__ == "__main__":
         
         try:
 
-            dm_deployment_path, output_path = process_paths(site)
+            dm_deployment_path, output_path = process_paths(site, vargs.output_path)
 
             DEP_LOGGER = imos_logging.logging_start(logging_filepath=output_path,
                                                     logger_name="DM_processing.log")

@@ -71,6 +71,8 @@ def args_aodn_processing():
         vargs.deploy_dates_start = datetime.strptime(vargs.deploy_dates[0],"%Y%m%d")
         vargs.deploy_dates_end = datetime.strptime(vargs.deploy_dates[1],"%Y%m%d")
 
+    if not vargs.output_path:
+        vargs.output_path = None
 
     return vargs
 
@@ -248,6 +250,7 @@ class Plots:
                                 dataset,
                                 waves_subflags,
                                 temp_subflags,
+                                wind,
                                 figsize=(15, 3),
                                 variable=None):
 
@@ -289,6 +292,10 @@ class Plots:
             data_subflags[var].plot(marker='o', ax=ax[0], ms=2, label='python')
             data_subflags[primary_flags_column].plot(marker='o', ax=ax[2], ms=2)
             data_subflags[var].plot(marker='o', ax=ax[1], ms=2, label='python', alpha=0.4)
+
+            wind['speed'].plot(marker='o', ls='-', lw=2,ax=ax[1], ms=1, label='python', alpha=0.4)
+
+
 
             if var not in ("LATITUDE", "LONGITUDE") and not var.endswith("_quality_control"):
                 
@@ -378,6 +385,8 @@ class Plots:
                 bbox_to_anchor=(1.0, 0.5),
                 frameon=True
             )
+
+
 
             plt.tight_layout()
             output_file_name = f"{self.site_name}_{var}_subflags.png"
