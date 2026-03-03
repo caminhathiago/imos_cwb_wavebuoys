@@ -1,6 +1,7 @@
 import os
 import json
 import sys
+from datetime import datetime
 
 import numpy as np
 from netCDF4 import Dataset
@@ -9,10 +10,10 @@ from dotenv import load_dotenv
 import glob
 
 from wavebuoy_nrt.ftp.ftp import ncPusher
-from wavebuoy_nrt.utils import args_pushing, IMOSLogging, generalTesting
-from wavebuoy_nrt.netcdf.validation import ncValidator
-from wavebuoy_nrt.alerts.email import Email
-from wavebuoy_nrt.wavebuoy import WaveBuoy
+from wavebuoy_nrt.utils import args_pushing, IMOSLogging
+# from wavebuoy_nrt.netcdf.validation import ncValidator
+# from wavebuoy_nrt.alerts.email import Email
+# from wavebuoy_nrt.wavebuoy import WaveBuoy
 
 load_dotenv()
 
@@ -84,7 +85,7 @@ def main():
     
     imos_logging = IMOSLogging() 
     log_file = os.path.join(vargs.incoming_path, "logs", f"aodn_ftp_push.log")
-    LOGGER = imos_logging.logging_start(logger_name="aodn_ftp_push_logger", logging_filepath=log_file)
+    LOGGER = imos_logging.logging_start(logger_name=f"{datetime.now().strftime("%Y%m%dT%H%M%S")}_aodn_ftp_push_logger", logging_filepath=log_file)
     
     LOGGER.info(f"Uploader script started".upper())
     

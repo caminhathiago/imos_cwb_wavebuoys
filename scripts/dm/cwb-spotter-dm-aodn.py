@@ -311,8 +311,8 @@ def calculate_spectra_from_displacements(disp: pl.DataFrame,
         "t0_thresh": 5,
         'h': deploy_depth,
         'QC': qc,
-        'steepnes_thresh': 1/4,
-        'fmin': 1/10
+        'steepnes_thresh': 1/4
+        # 'fmin': 1/10
     }
     
     fs = 2.5
@@ -354,9 +354,8 @@ def calculate_spectra_from_displacements(disp: pl.DataFrame,
         DEP_LOGGER.info(f"Splitting Dask chunks by the number of workers (= {num_workers})")
         disp_dask_chunks = s.generate_dask_chunks(disp_chunks_30m, num_workers)
 
-        # --- Distributed workflow starts here ---
         DEP_LOGGER.info("Initializing Dask client")
-        client = Client()  # You can customize (e.g. Client(processes=False)) if needed
+        client = Client()
 
         DEP_LOGGER.info("Scattering chunks to workers")
         scattered_chunks = client.scatter(disp_dask_chunks)
@@ -746,7 +745,7 @@ if __name__ == "__main__":
             GENERAL_LOGGER.info("="*10 + f" {os.path.basename(dm_deployment_path)} " + "="*50)
             GENERAL_LOGGER.info(f"Deployment file path: {dm_deployment_path}")
             
-            DEP_LOGGER.info(f"DM Processing started - {site.name} ".upper())
+            DEP_LOGGER.info(f"DM Processing started - {site.dep_id} ".upper())
             DEP_LOGGER.info(f"Deployment file path: {dm_deployment_path}")
 
             DEP_LOGGER.info(f"Metadata loading ".upper() + "="*50)
