@@ -92,6 +92,9 @@ def process_from_SD(raw_data_path,
     
     cc = csvConcat(files_path=raw_data_path, suffixes_to_concat=suffixes_to_concat) 
     
+    if not isinstance(instrument, str):
+        raise ValueError("Instrument model not provided in buoys_to_process_csv. Check if the column 'instrument' in buoys_to_process csv is correctly filled with the instrument model name as a string (e.g. 'Sofar Spotter V3' or 'Smart Mooring').")
+
     if "12345" in instrument:#if "Sofar Spotter V" in instrument:
 
         DEP_LOGGER.info(f"Lazy concatenating csv files for suffixes_to_concat")
@@ -133,6 +136,9 @@ def process_from_SD(raw_data_path,
             collected_results = cp.inject_sofar_parser_displacements(collected_results, disp_manual_injection)
         
         collected_results = cp.process_sens_agg_results(collected_results)
+
+    else:
+        raise ValueError(f"Instrument model {instrument} not recognised. Check if the name in buoys_to_process csv is correct and matches one of the expected models.")
 
     if isinstance(collected_results.get("surface_temp"), pl.DataFrame) and not collected_results["surface_temp"].is_empty():
             collected_results["surface_temp"] = collected_results["surface_temp"].rename(
