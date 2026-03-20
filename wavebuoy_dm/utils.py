@@ -250,7 +250,6 @@ class Plots:
                                 dataset,
                                 waves_subflags,
                                 temp_subflags,
-                                wind,
                                 figsize=(15, 3),
                                 variable=None):
 
@@ -293,7 +292,6 @@ class Plots:
             data_subflags[primary_flags_column].plot(marker='o', ax=ax[2], ms=2)
             data_subflags[var].plot(marker='o', ax=ax[1], ms=2, label='python', alpha=0.4)
 
-            wind['speed'].plot(marker='o', ls='-', lw=2,ax=ax[1], ms=1, label='python', alpha=0.4)
 
 
 
