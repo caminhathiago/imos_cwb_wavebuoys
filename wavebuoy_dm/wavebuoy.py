@@ -144,7 +144,7 @@ class WaveBuoy():
     def load_deployment_metadata(self, site_name:str, region:str, file_path:str=None) -> pd.DataFrame:
         
         import numpy as np
-        if file_path is np.nan:
+        if np.isnan(file_path):
             file_paths = self._get_deployment_metadata_files(site_name=site_name, region=region)
             file_path = self._get_latest_deployment_metadata(file_paths=file_paths)
         
