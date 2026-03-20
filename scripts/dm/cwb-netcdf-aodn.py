@@ -84,24 +84,30 @@ def main():
     vargs = args_pushing()
     
     imos_logging = IMOSLogging() 
-    log_file = os.path.join(vargs.incoming_path, "logs", f"aodn_ftp_push.log")
-    LOGGER = imos_logging.logging_start(logger_name=f"{datetime.now().strftime("%Y%m%dT%H%M%S")}_aodn_ftp_push_logger", logging_filepath=log_file)
-    
+    log_file = os.path.join(vargs.incoming_path, "logs", f"{datetime.now().strftime('%Y%m%dT%H%M%S')}_aodn_ftp_push.log")
+    LOGGER = imos_logging.logging_start(logger_name=f"aodn_ftp_push_logger", logging_filepath=log_file)
+
     LOGGER.info(f"Uploader script started".upper())
+
     
-    # wb = WaveBuoy(buoy_type="sofar")
-
     buoys_to_proc = pd.read_csv(os.path.join(vargs.incoming_path, "delayed_mode_buoys_to_process.csv"))
-
-    # buoys_to_proc = buoys_to_proc.loc[buoys_to_proc['dep_id'] == 1]
 
     BASE_PATH = r"C:\Users\00116827\cwb\dm_data"
 
     for row, dep in buoys_to_proc.iterrows():
 
+        
         if dep['aodn_ready'] != 1:
             continue
-        
+
+        log_file_dep = os.path.join(vargs.incoming_path, f"{dep['region']}waves", dep["datapath"], "processed_py", "logs", f"{datetime.now().strftime('%Y%m%dT%H%M%S')}_aodn_ftp_push.log")
+        DEP_LOGGER = imos_logging.logging_start(logger_name=f"aodn_ftp_push_logger_dep", logging_filepath=log_file_dep)
+
+        dep_handler = DEP_LOGGER.handlers[0]
+        LOGGER.addHandler(dep_handler)  
+
+        LOGGER.info(f"DEP_ID: {dep['dep_id']} - processing started")
+
         LOGGER.info(f"="*250)
         LOGGER.info(f"DEP_ID: {dep['dep_id']} - {dep['datapath']}")
 
@@ -180,77 +186,12 @@ def main():
             print(logger_file_path)
             imos_logging.logging_stop(logger=LOGGER)
             error_logger_file_path = imos_logging.rename_push_log_if_error(file_path=logger_file_path, add_runtime=True)
-            # if vargs.email_alert:
-            #     e = Email(script_name=os.path.basename(__file__),
-            #             email=os.getenv("EMAIL_TO"),
-            #             log_file_path=error_logger_file_path)
-            #     e.send()
 
-        #     if files_to_push:
-        #         LOGGER.info(f"files to push:")
-        #         LOGGER.info(json.dumps(files_to_push, indent=6, default=str))
-                
-        #         working_dir = "wave"
-        #         ncp.change_dir(working_dir)
-        #         LOGGER.info(f"FTP working dir changed to '/{working_dir}'")
-
-        #         ncp._secure_data_connection()
-                
-        #         files_report = ncp.create_files_report()
-        #         for file in files_to_push:
-        #             LOGGER.info(f"="*60)
-        #             LOGGER.info(f"pushing {file['file_name']}")
-                    
-        #             validation_results = []
-        #             try:
-                        
-        #                 validation_results.append(ncValidator().validade_nc_integrity(file["file_path"]))
-        #                 LOGGER.info("file integrity validation passed")
-
-        #                 if not all("passed" in result for result in validation_results):
-        #                     raise Exception("One or more validation checks failed.")   
-                            
-        #                 ncp.push_file_to_ftp(file=file)
-        #                 LOGGER.info(f"file pushed: {file['file_name']}")
-
-        #                 ncp.update_files_report(files_report=files_report,
-        #                                         file=file,
-        #                                         error=False)
-        #                 LOGGER.info(f"="*60)
-
-        #             except Exception as e:
-        #                 error_message = f"Error pushing file: {file['file_name']}"
-        #                 LOGGER.error(error_message)
-        #                 LOGGER.error(str(e), exc_info=True)
-                        
-        #                 ncp.update_files_report(files_report=files_report,
-        #                                         file=file,
-        #                                         error=True,
-        #                                         validation_results=validation_results,
-        #                                         exception=e)
-                        
-        #                 continue
-                    
-        #         ncp.quit()
-
-        # LOGGER.info(f"Files pushed: {json.dumps(files_report['files_pushed'], indent=6)}")
-        # LOGGER.info(f"Pusher script finished".upper())
-
-        # if files_report["files_error"]:
-        #     raise Exception(f"Error pushing one or more files: {json.dumps(files_report['files_error'], indent=6)}")
-       
-        # # LOGGER.info("pushing successful")
-        # except Exception as e:
-        #     LOGGER.error(str(e), exc_info=True)
-        #     logger_file_path = imos_logging.get_log_file_path(LOGGER)
-        #     print(logger_file_path)
-        #     imos_logging.logging_stop(logger=LOGGER)
-        #     error_logger_file_path = imos_logging.rename_push_log_if_error(file_path=logger_file_path, add_runtime=True)
-        #     if vargs.email_alert:
-        #         e = Email(script_name=os.path.basename(__file__),
-        #                 email=os.getenv("EMAIL_TO"),
-        #                 log_file_path=error_logger_file_path)
-        #         e.send()
+        finally:
+            LOGGER.removeHandler(dep_handler)
+            dep_handler.close()
+            imos_logging.logging_stop(logger=DEP_LOGGER)
+            continue
 
 if __name__ == "__main__":
     main()
