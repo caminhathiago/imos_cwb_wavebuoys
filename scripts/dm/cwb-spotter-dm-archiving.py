@@ -18,7 +18,7 @@ SUBFOLDER = "processed_py"
 def main():
 
     with open(CSV_FILE) as f:
-        print("test")
+        
         reader = csv.DictReader(f)
         
         for row in reader:
@@ -84,14 +84,15 @@ def main():
 
             # remote
             if not remote_proc_py.exists():
-                # print(f"⚠️ [IRDS/DEP/PROCESS_PY] overwritting {remote_proc_py}")
                 print(f"❌ [IRDS/DEP/PROCESS_PY] {remote_proc_py}")
-                if row["archive"] == "1":
-                    print(f"🔄 [COPYING/PROCESSED DATA] {local_proc_py} → {remote_proc_py}")
-                    copy_with_robocopy(local_proc_py, remote_proc_py)
-                    print(f"✔️ [IRDS/DEP/PROCESS_PY] copied")
             else:
                 print(f"🟢 [IRDS/DEP/PROCESS_PY] {remote_proc_py}")
+                print(f"⚠️ [IRDS/DEP/PROCESS_PY] overwritting {remote_proc_py}")
+            if row["archive"] == "1":
+                print(f"🔄 [COPYING/PROCESSED DATA] {local_proc_py} → {remote_proc_py}")
+                copy_with_robocopy(local_proc_py, remote_proc_py)
+                print(f"✔️ [IRDS/DEP/PROCESS_PY] copied")
+
 
             
             # DELETE LOCAL FOLDER ------------------------------------------------
