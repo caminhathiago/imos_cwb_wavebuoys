@@ -163,8 +163,8 @@ def delete_local_folder_with_robocopy(folder_path:Path):
     # Delete folder and all contents quietly
     subprocess.run(f'cmd /c "rd /s /q "{path}""', shell=True, check=True)
     
-    # Recreate empty folder
-    path.mkdir(parents=True, exist_ok=True)
+    # # Recreate empty folder
+    # path.mkdir(parents=True, exist_ok=True)
 
 def move_to_archived(source_folder: Path, archived_base: Path):
 
