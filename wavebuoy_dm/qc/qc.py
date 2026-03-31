@@ -153,6 +153,7 @@ class WaveBuoyQC():
         for param in parameters:
             for test_enabled, qc_test_func in tests:
                 if test_enabled:
+                    print(f" {param} - {qc_test_func.__name__}...")
                     data = qc_test_func(data=data, parameter=param, qc_config=self.qc_config_dict)
 
         data = self.summarize_flags(data=data, parameter_type=parameter_type)
@@ -328,27 +329,55 @@ class WaveBuoyQC():
 
     def mean_std(self, data: pd.Series, time: pd.Series, time_window: int, std: float) -> list[int]:
 
-        qc_flags = []
-        for i in range(len(time)):
-            tnow = time.iloc[i]
-            tstart = tnow - timedelta(hours=time_window)
-            tend = tnow + timedelta(hours=time_window)
+        import polars as pl
 
-            if tstart >= time.iloc[0] and tend <= time.iloc[-1]:
+        df = pl.DataFrame({
+            "time": time,
+            "data": data
+        }).sort("time")
 
-                idx = (time >= tstart) & (time <= tend)
-                ddata = data[idx].to_numpy()
+        window_str = f"{2 * time_window}h"
 
-                mean = np.nanmean(ddata)
-                Mhi = mean + (std * np.nanstd(ddata, ddof=1))
-                Mlow = mean - (std * np.nanstd(ddata, ddof=1))
+        rolling = (
+            df.rolling(
+                index_column="time",
+                period=window_str,
+                offset=f"-{time_window}h"  # center the window
+            )
+            .agg([
+                pl.col("data").mean().alias("rolling_mean"),
+                pl.col("data").std(ddof=1).alias("rolling_std"),
+            ])
+        )
 
-                if data.iloc[i] > Mhi or data.iloc[i] < Mlow:
-                    qc_flags.append(3) 
-                else:
-                    qc_flags.append(1) 
-            else:
-                qc_flags.append(2) 
+        df = df.join(rolling, on="time", how="left")
+
+        df = df.with_columns([
+            (pl.col("rolling_mean") + std * pl.col("rolling_std")).alias("Mhi"),
+            (pl.col("rolling_mean") - std * pl.col("rolling_std")).alias("Mlow"),
+        ])
+
+        time_min = df.select(pl.col("time").min()).item()
+        time_max = df.select(pl.col("time").max()).item()
+
+        df = df.with_columns(
+            pl.when(
+                (pl.col("time") - time_min >= pl.duration(hours=time_window)) &
+                (time_max - pl.col("time") >= pl.duration(hours=time_window))
+            )
+            .then(
+                pl.when(
+                    (pl.col("data") > pl.col("Mhi")) |
+                    (pl.col("data") < pl.col("Mlow"))
+                )
+                .then(3)
+                .otherwise(1)
+            )
+            .otherwise(2)
+            .alias("qc")
+        )
+
+        qc_flags = df.get_column("qc").to_list()
 
         return qc_flags
 
