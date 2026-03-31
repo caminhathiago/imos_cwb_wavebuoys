@@ -124,12 +124,12 @@ def process_from_SD(raw_data_path,
     elif "Smart Mooring" in instrument or "Sofar Spotter V" in instrument:
         
         DEP_LOGGER.info(f"Concatenating csv files for suffixes_to_concat")
-        collected_results = cc.concat_files()
+        collected_results = cc.concat_files(instrument)
 
         cp = csvProcess()
         DEP_LOGGER.info("Processing cocatenated csv files")
 
-        collected_results = cp.process_concat_results_df(collected_results)
+        collected_results = cp.process_concat_results_df(collected_results, instrument) 
         
         if disp_manual_injection:
             DEP_LOGGER.warning(f"Manually injecting displacements from {disp_manual_injection}")
@@ -150,8 +150,8 @@ def process_from_SD(raw_data_path,
             {"baro_pressure": "ATM_PRESSURE", "datetime": "TIME_ATM_PRESSURE"}
         )
 
-    if "Sofar Spotter V2" in instrument:
-       collected_results["surface_temp"] = []
+    # if "Sofar Spotter V2" in instrument:
+    #    collected_results["surface_temp"] = []
 
     return collected_results
 

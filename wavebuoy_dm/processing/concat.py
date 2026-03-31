@@ -390,7 +390,7 @@ class csvConcat:
 
         return results, ignored_files, error_messages
     
-    def concat_files(self) -> pl.DataFrame:
+    def concat_files(self, instrument:str) -> pl.DataFrame:
         
         results = self.map_concat_results()
         error_messages = self.map_concat_results()
@@ -406,6 +406,11 @@ class csvConcat:
                 
                 if suffix == "LOC":
                     self.EXPECTED_SCHEMAS["LOC"]["GPS_Epoch_Time(s)"] = pl.Float64
+
+                if suffix == "SST" and "V2" in instrument:
+                    self.EXPECTED_SCHEMAS["SST"] = {"millis": pl.Int64,
+                                                    "temperature (C)": pl.Float64 
+                                                    }
 
                 truncate_ragged_lines = True
                 schema = self.EXPECTED_SCHEMAS[suffix]
@@ -436,6 +441,11 @@ class csvConcat:
                 if data.is_empty():
                     continue
 
+                if suffix == "SST" and "V2" in instrument:
+                    data = self.process_legacy_sst(sst_file=file, sst_data=data, tolerance=600)
+                    if data is None or data.is_empty():
+                        continue
+
                 data_list.append(data)
 
             concat_data = pl.concat(data_list, how="vertical")
@@ -457,3 +467,45 @@ class csvConcat:
         }
         
         return data.rename(rename_map)
+    
+    def process_legacy_sst(self, 
+                           sst_file:str, 
+                           sst_data:pl.DataFrame,
+                           tolerance:int=10)-> dict:
+
+
+        preffix = os.path.basename(sst_file).split("_")[0]
+        
+        corresp_flt_file = [file for file in self.files_suffixes['FLT'] if preffix in os.path.basename(file)]
+        if not corresp_flt_file:
+            print(f"No corresponding FLT file found for preffix {preffix}  skipping SST-FLT merge.")
+            return
+        
+        corresp_flt_file = corresp_flt_file[0]
+
+        truncate_ragged_lines = True
+        schema = self.EXPECTED_SCHEMAS['FLT']
+        schema_overrides = None
+
+        corresp_flt_data = pl.read_csv(
+                    corresp_flt_file,
+                    schema=schema,
+                    has_header=False,
+                    schema_overrides=schema_overrides,
+                    truncate_ragged_lines=truncate_ragged_lines,
+                    ignore_errors=True,
+                )
+
+        sst_sorted = sst_data.sort("millis")
+        flt_sorted = corresp_flt_data.select(["millis", "GPS_Epoch_Time(s)"]).sort("millis")
+
+        sst_data = sst_sorted.join_asof(
+            flt_sorted,
+            on="millis",
+            strategy="nearest",
+            tolerance=tolerance
+        )
+        
+        sst_data = sst_data.filter(pl.col("GPS_Epoch_Time(s)").is_not_null())
+
+        return sst_data
