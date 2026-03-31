@@ -129,7 +129,7 @@ def process_from_SD(raw_data_path,
         cp = csvProcess()
         DEP_LOGGER.info("Processing cocatenated csv files")
 
-        collected_results = cp.process_concat_results_df(collected_results, instrument) 
+        collected_results = cp.process_concat_results_df(collected_results) 
         
         if disp_manual_injection:
             DEP_LOGGER.warning(f"Manually injecting displacements from {disp_manual_injection}")
