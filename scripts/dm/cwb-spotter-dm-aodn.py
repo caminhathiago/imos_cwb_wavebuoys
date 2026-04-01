@@ -19,7 +19,7 @@ from wavebuoy_dm.netcdf.process import ncSpectra, ncDisp, ncBulk, Process
 from wavebuoy_dm.netcdf.writer import ncWriter, ncAttrsComposer
 from wavebuoy_dm.wavebuoy import WaveBuoy
 from wavebuoy_dm.utils import IMOSLogging, args_aodn_processing, Plots
-from wavebuoy_dm.qc.qc import WaveBuoyQC
+from wavebuoy_dm.qc.qc import WaveBuoyQC, WaveBuoySpectralQC
 
 
 @dataclass
@@ -317,7 +317,7 @@ def calculate_spectra_from_displacements(disp: pl.DataFrame,
         "t0_thresh": 5,
         'h': deploy_depth,
         'QC': qc,
-        'steepnes_thresh': 1/4
+        'steepnes_thresh': 1/7,
         # 'fmin': 1/10
     }
     
@@ -447,21 +447,24 @@ def generate_spectra_NC_file(spectra_bulk_df,
                             deploy_start,
                             deploy_end,
                             raw_data_path,
-                            output_path
+                            output_path,
+                            qc:bool=True
                             ) -> None:
     
     
-    # Process Spectra -------------------------------
-    spectra = Spectra().select_parameters(spectra_bulk_df, dataset_type="spectra")    
+    # Process Spectra -------------------------------    spectra = Spectra().select_parameters(spectra_bulk_df, dataset_type="spectra")    
     
-    # cp = csvProcess()
-    # deploy_lat, deploy_lon = site_buoys_to_process.loc['DeployLat'], site_buoys_to_process.loc['DeployLon']
-    # watch_circle = site_buoys_to_process.loc['watch_circle']
+    # QC -------------------------------
 
-    # spectra = cp.interpolate_lat_lon(dataframe=spectra, locations_dataframe=gps)
-    # spectra = cp.filter_watch_circle_geodesic(dataframe=spectra, deploy_lat=deploy_lat, deploy_lon=deploy_lon, max_distance=watch_circle)
-    
-    # spectra = cp.filter_deployment_dates(dataframe=spectra, deploy_start=deploy_start, deploy_end=deploy_end)
+    if qc:
+        
+        sqc = WaveBuoySpectralQC(config_id=1)
+
+        spectra = qc.create_global_qc_columns(data=spectra)
+
+
+    else:
+        spectra_qc = None
 
 
     # Generate Spectra NC File ------------------------
@@ -507,6 +510,8 @@ def generate_spectra_NC_file(spectra_bulk_df,
                         )
     
     DEP_LOGGER.info(f"WAVE-SPECTRA netCDFs successfully generated")
+
+    return spectra_qc
     
 def generate_bulk_NC_file(spectra_bulk_df,
                         gps,
@@ -807,7 +812,7 @@ if __name__ == "__main__":
             # log_reports_buoys_to_process(all_buoys_to_process, metadata_args.site_buoys_to_process, metadata_args.deployment_metadata)
 
             DEP_LOGGER.info(f"WAVE-SPECTRA AODN compliant file generation step ".upper() + "="*50)
-            generate_spectra_NC_file(spectra_bulk_df, results['gps'], **vars(metadata_args))
+            spectra_qc = generate_spectra_NC_file(spectra_bulk_df, results['gps'], **vars(metadata_args))
 
             DEP_LOGGER.info(f"WAVE-PARAMETERS AODN compliant file generation step ".upper() + "="*50)
             generate_bulk_NC_file(spectra_bulk_df, results['gps'], results['surface_temp'], **vars(metadata_args))
