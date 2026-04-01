@@ -15,8 +15,13 @@ load_dotenv()
 class WaveBuoyQC():
     waves_parameters = ['SSWMD', 'WMDS', 'WPDI', 'WPDS', 'WPFM', 'WPPE', 'WSSH']
 
-    def __init__(self, config_id: int = 1):
-        self.qc_configs = self.get_qc_configs()
+    def __init__(self, qc_config_path:str=None, config_id: int = 1):
+        
+        if not qc_config_path:
+            self.qc_configs = self.get_qc_configs()
+        else:
+            self.qc_configs = pd.read_csv(qc_config_path)
+
         self.qc_config = self.select_qc_config(qc_configs=self.qc_configs, config_id=config_id)
         self.qc_config_dict = self.convert_qc_config_to_dict(qc_config=self.qc_config )
     
