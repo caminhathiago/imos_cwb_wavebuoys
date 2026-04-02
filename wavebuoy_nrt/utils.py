@@ -136,6 +136,128 @@ def args_processing():
 
     return vargs
 
+def args_auswaves_processing():
+    """
+    Returns the script arguments
+
+        Parameters:
+
+        Returns:
+            vargs (obj): input arguments
+    """
+    parser = argparse.ArgumentParser(description='Creates NetCDF files.\n '
+                                     'Prints out the path of the new locally generated NetCDF file.')
+    
+    parser.add_argument('-o', '--output-path', dest='output_path', type=str, default=None,
+                        help="output directory of netcdf file",
+                        required=True)
+    
+    parser.add_argument('-i', '--incoming-path', dest='incoming_path', type=str, default=None,
+                        help="directory to store netcdf file to be pushed to AODN",
+                        required=True)
+
+    parser.add_argument('-w', '--window', dest='window', type=str, default=24,
+                        help="desired window from present backwards to be processed and qualified. Default to 24, please check argument --window-unit for the right desired unit.",
+                        required=False)
+
+    parser.add_argument('-wu', '--window-unit', dest='window_unit', type=str, default="hours",
+                        help="desired window unit (hours:Default, months).",
+                        required=False)
+
+    parser.add_argument('-bfw', '--backfill-wb-log', dest='backfill_wb_log', type=str, default=None, nargs=1,
+                        help="Deployment datetimes period to be processed. Please pass start and end dates as YYYYmmddTHHMMSS",
+                        required=False)
+
+    parser.add_argument('-eq', '--enable-qualification', dest='enable_qualification', action='store_true',
+                    help="Enable qualification based on QARTOD manuals.")
+
+    def parse_site_list(value):
+        return [site.strip() for site in value.split(',') if site.strip()]
+
+    parser.add_argument(
+        '-sp', '--site-to-process',
+        dest='site_to_process',
+        type=parse_site_list,
+        default=None,
+        help="Comma-separated list of sites to be processed (e.g., site1,site2,site3). A single site is also valid.",
+        required=False
+    )
+
+    parser.add_argument('-pp', '--period-to-process', dest='period_to_process', type=str, default=None, nargs=2,
+                        help="desired period to be extracted, processed and qualified. Please pass start and end dates as YYYY-mm-ddTHH:MM separated by a blank space.",
+                        required=False)
+    
+    parser.add_argument('-pqc', '--period-to-qualify', dest='period_to_qualify', type=str, default=None, nargs=2,
+                        help="desired period to be qualified. Please pass start and end dates as YYYY-mm-ddTHH:MM separated by a blank space.",
+                        required=False)
+
+    parser.add_argument('-bf', '--backfill', dest='backfill', action="store_true",
+                        help="wether the user wants to backfill the data from the latest available time back to the last processed time.",
+                        required=False)
+    
+    parser.add_argument('-fpn', '--flag-previous-new', dest='flag_previous_new', action="store_true",
+                        help="wether the user wants to flag previous/new data in the data products generated",
+                        required=False)
+    
+    parser.add_argument('-e', '--email-alert', dest='email_alert', action="store_true",
+                        help="toggle email alert.",
+                        required=False)
+
+    # parser.add_argument('-p', '--push-to-incoming', dest='incoming_path', type=str, default=None,
+    #                     help="incoming directory for files to be ingested by AODN pipeline (Optional)",
+    #                     required=False)
+
+
+    
+    vargs = parser.parse_args()
+
+    # if vargs.output_path is None:
+    #     vargs.output_path = tempfile.mkdtemp()
+    
+    if not os.path.exists(vargs.output_path):
+        try:
+            os.makedirs(vargs.output_path)
+        except Exception:
+            raise ValueError('{path} not a valid path'.format(path=vargs.output_path))
+            sys.exit(1)
+
+    if not os.path.exists(vargs.incoming_path):
+        try:
+            os.makedirs(vargs.incoming_path)
+        except Exception:
+            raise ValueError('{path} not a valid path'.format(path=vargs.incoming_path))
+            sys.exit(1)
+
+    if vargs.period_to_process:
+        vargs.period_to_process = vargs.period_to_process.split()
+        vargs.period_to_process_start_date = datetime.strptime(vargs.period_to_process[0],"%Y-%m-%dT%H:%M")
+        vargs.period_to_process_end_date = datetime.strptime(vargs.period_to_process[1],"%Y-%m-%dT%H:%M")
+
+    if vargs.period_to_qualify:
+        vargs.period_to_qualify = vargs.period_to_qualify.split()
+        vargs.period_to_qualify_start_date = datetime.strptime(vargs.period_to_qualify[0],"%Y-%m-%dT%H:%M")
+        vargs.period_to_qualify_end_date = datetime.strptime(vargs.period_to_qualify[1],"%Y-%m-%dT%H:%M")
+
+    if vargs.backfill:
+        backfill = True
+    else:
+        backfill = False
+
+    if vargs.flag_previous_new:
+        flag_previous_new = True
+    else:
+        flag_previous_new = False
+
+    if vargs.email_alert:
+        vargs.email_alert = True
+    else:
+        vargs.email_alert = False
+
+    if vargs.backfill_wb_log:
+        vargs.backfill_wb_log = datetime.strptime(vargs.backfill_wb_log[0],"%Y%m%dT%H%M%S")
+
+    return vargs
+
 def args_pushing():
     parser = argparse.ArgumentParser(description="pushes files to AODN FTP server. ")
     

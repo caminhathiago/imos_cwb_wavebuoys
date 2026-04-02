@@ -14,6 +14,8 @@ load_dotenv()
 
 class WaveBuoyQC():
     waves_parameters = ['SSWMD', 'WMDS', 'WPDI', 'WPDS', 'WPFM', 'WPPE', 'WSSH']
+    temp_parameters = ['TEMP']
+    temp_bottom_parameters = ['TEMP_bottom']
     
     def __init__(self, config_id: int = 1):
         self.qc_configs = self.get_qc_configs()
@@ -22,7 +24,7 @@ class WaveBuoyQC():
 
     def get_qc_configs(self, file_name: str = "qc_config.csv"):
         file_path = os.path.join(os.getenv('METADATA_PATH'), file_name)
-        file_path = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves\Data\aodn_nrt_python\qc_config_TC.csv"
+        # file_path = r"\\drive.irds.uwa.edu.au\OGS-COD-001\CUTTLER_wawaves\Data\aodn_nrt_python\qc_config_TC.csv"
         if os.path.exists(file_path):
             return pd.read_csv(file_path)
         else:
@@ -43,21 +45,24 @@ class WaveBuoyQC():
     def load_data(self, data: pd.DataFrame) -> pd.DataFrame:
         self.data = data
 
+    def get_time_col_name(self, data:pd.DataFrame) -> str:
+        return [col for col in data.columns if "time" in col.lower()][0]
+
     def drop_unwanted_variables(self, data: pd.DataFrame) -> pd.DataFrame:
         
-        variables_to_drop = ['timeSeries']
+        variables_to_drop = [col for col in data.columns if 'timeSeries' in col]
 
         proc_source = [col for col in data.columns if "processing_source" in col]
         variables_to_drop.extend(proc_source)
 
-        time_col = [col for col in data.columns if "TIME" in col]
-        variables_to_drop.extend(time_col)
+        time_col = self.get_time_col_name(data)
+        variables_to_drop.append(time_col)
 
         lat_lon_cols = [col for col in data.columns if col in ("LATITUDE", "LONGITUDE")]
         variables_to_drop.extend(lat_lon_cols)
 
         qc_cols = ['WAVE_quality_control', 'TEMP_quality_control']
-        qc_cols = [col for col in qc_cols if col in data.columns]
+        qc_cols = [col for col in qc_cols if col in data.columns and 'quality_control' in  col]
 
         variables_to_drop.extend(qc_cols)
 
@@ -117,8 +122,10 @@ class WaveBuoyQC():
         param_qc_column =  parameter + f"_{test}"
         if parameter in self.waves_parameters:
             param_qc_column = "WAVE_QC_" + param_qc_column
-        else:
+        elif parameter in self.temp_parameters:
             param_qc_column = "TEMP_QC_" + param_qc_column
+        elif parameter in self.temp_bottom_parameters:
+            param_qc_column = "TEMP_BOTTOM_QC_" + param_qc_column
         
         data[param_qc_column] = not_eval_flag 
         
@@ -134,7 +141,7 @@ class WaveBuoyQC():
 
     def _extract_qualification_window(self, data: pd.DataFrame, window=int) -> pd.DataFrame:
         
-        time_col = [col for col in data.columns if "TIME" in col][0]
+        time_col = self.get_time_col_name(data)
         
         window_start = data[time_col].max() - timedelta(hours=window)
 
@@ -165,8 +172,18 @@ class WaveBuoyQC():
                 rate_of_change_test: bool = True,
                 # flat_line_test:bool = True,
                 mean_std_test:bool = True,
-                spike_test: bool = True) -> pd.DataFrame:
+                spike_test: bool = True,
+                missing_values_test:bool = False) -> pd.DataFrame:
         
+        if parameter_type == 'waves':
+            parameter_type_params = self.waves_parameters
+        elif parameter_type == 'temp':
+            parameter_type_params = self.temp_parameters
+        elif parameter_type == 'temp_bottom':
+            parameter_type_params = self.temp_bottom_parameters
+
+        parameters = [param for param in parameters if param in parameter_type_params]
+
         self.check_qc_limits(qc_config=self.qc_config)
 
         if window == "all":
@@ -194,7 +211,8 @@ class WaveBuoyQC():
             (rate_of_change_test, self.rate_of_change_test),
             # (flat_line_test, self.flat_line_test),
             (mean_std_test, self.mean_std_test),
-            (spike_test, self.spike_test)
+            (spike_test, self.spike_test),
+            (missing_values_test, self.missing_values_test)
         ]
 
         for param in parameters:
@@ -317,7 +335,7 @@ class WaveBuoyQC():
                         parameter: str,
                         qc_config: dict) -> pd.DataFrame:
        
-        time_col = [col for col in data.columns if "TIME" in col][0]
+        time_col = self.get_time_col_name(data)
 
         time_freq = data[time_col].diff().mean().seconds
 
@@ -377,7 +395,7 @@ class WaveBuoyQC():
 
     def mean_std_test(self, data: pd.DataFrame, parameter:str, qc_config: dict):
         
-        time_col = [col for col in data.columns if "TIME" in col][0]
+        time_col = self.get_time_col_name(data)
 
         results = self.mean_std(data=data[parameter], 
                                      time=data[time_col],
@@ -414,7 +432,7 @@ class WaveBuoyQC():
 
     def spike_test(self, data: pd.DataFrame, parameter:str, qc_config: dict):
         
-        time_col = [col for col in data.columns if "TIME" in col][0]
+        time_col = self.get_time_col_name(data)
 
         results = self.spike(data=data[parameter], 
                             time=data[time_col],
@@ -427,6 +445,18 @@ class WaveBuoyQC():
 
         SITE_LOGGER.info(f"{parameter} | spike test completed")
         return data
+
+    def missing_values_test(self, data:pd.DataFrame, parameter:str, qc_config:dict):
+        
+        test_name = "missing_values"
+        param_qc_column, data = self._create_parameters_qc_column(data=data, parameter=parameter, test=test_name)
+
+        data[param_qc_column] = 2
+
+        data.loc[data[parameter].isna(), param_qc_column] = 9
+
+        return data
+
 
     def flags_counter(self, results: np.array):
         unique, counts = np.unique(results, return_counts=True)
@@ -452,19 +482,29 @@ class WaveBuoyQC():
         elif parameter_type == "temp":
             qc_col_prefix = "TEMP_QC_"
             global_qc_column = "TEMP_quality_control"
+        elif parameter_type == "temp_bottom":
+            qc_col_prefix = "TEMP_BOTTOM_QC_"
+            global_qc_column = "TEMP_bottom_quality_control"
 
+
+        # compute all missing values
+        missing_values_columns = data.filter(regex='missing_values').columns
+        all_missing = (data[missing_values_columns] == 9).all(axis=1)
 
         parameter_type_qc_columns = data.filter(regex=qc_col_prefix).columns
-        
+        parameter_type_qc_columns.drop(missing_values_columns)
+
         if parameter_type_qc_columns.empty:
             return data
-
-        # data = data.reset_index(drop=True)
-        # for idx, row in data[parameter_type_qc_columns].iterrows():
-        #     data.loc[idx, global_qc_column] = row.max()
-        temp_flags = data[parameter_type_qc_columns].replace(2, 1)
+        
+        # replace 2s and 9s by 1 to perform row-wise max
+        temp_flags = data[parameter_type_qc_columns].replace(2, 1).replace(9, 1)
         max_flags = temp_flags.max(axis=1)
+
         data[global_qc_column] = max_flags
+
+        # overwrite only all missing values
+        data.loc[all_missing, global_qc_column] = 9
 
         if drop_parameters_qc_columns:
             data = self.drop_parameters_qc_columns(data=data, qc_col_prefix=qc_col_prefix)

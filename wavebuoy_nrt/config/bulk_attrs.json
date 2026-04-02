@@ -135,6 +135,17 @@
         "ancillary_variables": "TEMP_quality_control",
         "coordinates": "TIME_TEMP"
         },
+        "TEMP_bottom": {
+        "standard_name": "bottom_temperature",
+        "long_name": "bottom temperature",
+        "units": "degrees_Celsius",
+        "_FillValue": -9999.0,
+        "valid_min": 0.0,
+        "valid_max": 100.0,
+        "method": "Measured using sensor mounted in mooring near the bottom",
+        "ancillary_variables": "TEMP_bottom_quality_control",
+        "coordinates": "TIME_TEMP_bottom"
+        },
         "WAVE_quality_control": {
         "long_name": "primary Quality Control flag for wave variables",
         "_FillValue": -127,
@@ -146,6 +157,15 @@
         },
         "TEMP_quality_control": {
         "long_name": "primary Quality Control flag for temperature variable",
+        "_FillValue": -127,
+        "valid_min": 1,
+        "valid_max": 9,
+        "flag_values": [1,2,3,4,9],
+        "flag_meanings": "good not_evaluated questionable bad missing",
+        "quality_control_convention": "Ocean Data Standards, UNESCO 2013 - IOC Manuals and Guides, 54, Volume 3 Version 1"
+        },
+        "TEMP_bottom_quality_control": {
+        "long_name": "primary Quality Control flag for bottom temperature variable",
         "_FillValue": -127,
         "valid_min": 1,
         "valid_max": 9,
